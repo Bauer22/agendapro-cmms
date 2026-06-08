@@ -120,19 +120,19 @@ export default function App() {
   const DPT = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
   const MPT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
 
-  const NAV: {id:Page, label:string, icon:React.ReactNode, perm?:string}[] = [
-    {id:'dashboard',  label:'Início',    icon:IC.home},
-    {id:'os',         label:'OS',        icon:IC.os},
-    {id:'machines',   label:'Máquinas',  icon:IC.mach},
-    {id:'maintenance',label:'Manutenção',icon:IC.maint},
-    {id:'pm',         label:'MP',        icon:IC.pm},
-    {id:'tasks',      label:'Tarefas',   icon:IC.task},
-    {id:'parts',      label:'Peças',     icon:IC.parts},
-    {id:'suppliers',  label:'Fornec.',   icon:IC.sup},
-    {id:'reports',    label:'Relatórios',icon:IC.rep},
-    {id:'users',      label:'Usuários',  icon:IC.users, perm:'admin'},
-    {id:'settings',   label:'Config',    icon:IC.cfg},
-  ].filter(n => !n.perm || profile?.role === n.perm)
+  const NAV: Array<{id:Page, label:string, icon:React.ReactNode, perm?:string}> = [
+    {id:'dashboard' as Page,  label:'Início',    icon:IC.home},
+    {id:'os' as Page,         label:'OS',        icon:IC.os},
+    {id:'machines' as Page,   label:'Máquinas',  icon:IC.mach},
+    {id:'maintenance' as Page,label:'Manutenção',icon:IC.maint},
+    {id:'pm' as Page,         label:'MP',        icon:IC.pm},
+    {id:'tasks' as Page,      label:'Tarefas',   icon:IC.task},
+    {id:'parts' as Page,      label:'Peças',     icon:IC.parts},
+    {id:'suppliers' as Page,  label:'Fornec.',   icon:IC.sup},
+    {id:'reports' as Page,    label:'Relatórios',icon:IC.rep},
+    {id:'users' as Page,      label:'Usuários',  icon:IC.users, perm:'admin'},
+    {id:'settings' as Page,   label:'Config',    icon:IC.cfg},
+  ].filter((n): n is {id:Page, label:string, icon:React.ReactNode, perm?:string} => !n.perm || profile?.role === n.perm)
 
   const PageMap: Record<Page, React.ReactNode> = {
     dashboard:   <DashPage    profile={profile} can={can} onNavigate={setPage} />,
