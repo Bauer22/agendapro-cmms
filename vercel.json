@@ -1,5 +1,1 @@
-{
-  "framework": "nextjs",
-  "buildCommand": "next build",
-  "outputDirectory": ".next"
-}
+{"rootDirectory":"agendapro-flat/agendapro-flat"} 
