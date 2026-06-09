@@ -42,6 +42,7 @@ import ReportsPage from './pages/ReportsPage'
 import UsersPage   from './pages/UsersPage'
 import SettPage    from './pages/SettPage'
 import LoginPage   from './pages/LoginPage'
+import FinancePage from './pages/FinancePage'
 
 type Page = 'dashboard'|'os'|'machines'|'maintenance'|'pm'|'tasks'|'parts'|'suppliers'|'reports'|'users'|'settings'|'finance'
 
