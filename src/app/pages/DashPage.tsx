@@ -15,12 +15,13 @@ export default function DashPage({ profile, can, onNavigate }: Props) {
 
   async function load() {
     try {
-      const [os, mach, maint, tasks, parts] = await Promise.all([
+      const [os, mach, maint, tasks, parts, bills] = await Promise.all([
         supabase.from('work_orders').select('*'),
         supabase.from('machines').select('*'),
         supabase.from('maintenance').select('*').order('date',{ascending:false}).limit(5),
         supabase.from('tasks').select('*').eq('date', new Date().toISOString().split('T')[0]),
         supabase.from('parts').select('*').filter('stock','lte','min_stock'),
+        supabase.from('accounts_payable').select('valor,status,due_date'),
       ])
       const today = new Date().toISOString().split('T')[0]
       const osList = os.data || []
@@ -42,7 +43,11 @@ export default function DashPage({ profile, can, onNavigate }: Props) {
       // Low stock
       ;(parts.data||[]).forEach((p:any) => alerts.push({ level:'am', icon:'📦', title:`${p.name} — Estoque baixo`, sub:`${p.stock} ${p.unit} (mín: ${p.min_stock})` }))
 
-      setData({
+      const billList = bills.data||[]
+        const today2 = new Date().toISOString().split('T')[0]
+        const pendingBills = billList.filter((b:any)=>b.status==='pending').length
+        const overdueBills = billList.filter((b:any)=>b.status==='pending'&&b.due_date&&b.due_date<today2).length
+        setData({
         osOpen:    osList.filter((o:any)=>o.status==='open').length,
         osProgress:osList.filter((o:any)=>o.status==='progress').length,
         osDone:    osList.filter((o:any)=>o.status==='done').length,
@@ -52,6 +57,7 @@ export default function DashPage({ profile, can, onNavigate }: Props) {
         recentOS:  osList.filter((o:any)=>o.open_date===today||o.status==='progress').slice(0,5),
         todayTasks:(tasks.data||[]),
         recentMaint:(maint.data||[]),
+          pendingBills, overdueBills,
       })
     } catch(e) { console.error(e) }
     finally { setLoading(false) }

@@ -19,6 +19,12 @@ const IC = {
   users:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
   cfg:  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>,
   bell: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
+  fin:  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+  wood: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
+  fuel: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 22V8l9-6 9 6v14"/><path d="M10 22V12h4v10"/></svg>,
+  load: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v3"/><rect x="9" y="11" width="14" height="10" rx="2"/></svg>,
+  drv:  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>,
+  cli:  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
   out:  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
   gear: '⚙️',
 }
@@ -35,9 +41,15 @@ import SuppPage    from './pages/SuppPage'
 import ReportsPage from './pages/ReportsPage'
 import UsersPage   from './pages/UsersPage'
 import SettPage    from './pages/SettPage'
+import FinancePage from './pages/FinancePage'
+import WoodPage    from './pages/WoodPage'
+import FuelPage    from './pages/FuelPage'
+import LoadsPage   from './pages/LoadsPage'
+import DriversPage from './pages/DriversPage'
+import ClientsPage from './pages/ClientsPage'
 import LoginPage   from './pages/LoginPage'
 
-type Page = 'dashboard'|'os'|'machines'|'maintenance'|'pm'|'tasks'|'parts'|'suppliers'|'reports'|'users'|'settings'
+type Page = 'dashboard'|'os'|'machines'|'maintenance'|'pm'|'tasks'|'parts'|'suppliers'|'reports'|'users'|'settings'|'finance'|'wood'|'fuel'|'loads'|'drivers'|'clients'
 
 export default function App() {
   const [user, setUser]    = useState<any>(null)
@@ -120,7 +132,8 @@ export default function App() {
   const DPT = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
   const MPT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
 
-  const NAV: Array<{id:Page, label:string, icon:React.ReactNode, perm?:string}> = [
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const NAV: any[] = [
     {id:'dashboard' as Page,  label:'Início',    icon:IC.home},
     {id:'os' as Page,         label:'OS',        icon:IC.os},
     {id:'machines' as Page,   label:'Máquinas',  icon:IC.mach},
@@ -130,9 +143,15 @@ export default function App() {
     {id:'parts' as Page,      label:'Peças',     icon:IC.parts},
     {id:'suppliers' as Page,  label:'Fornec.',   icon:IC.sup},
     {id:'reports' as Page,    label:'Relatórios',icon:IC.rep},
-    {id:'users' as Page,      label:'Usuários',  icon:IC.users, perm:'admin'},
+    {id:'finance' as Page,    label:'Financeiro',icon:IC.fin},
+    {id:'wood' as Page,       label:'Pátio Toras',icon:IC.wood},
+    {id:'fuel' as Page,       label:'Combustível',icon:IC.fuel},
+    {id:'loads' as Page,      label:'Carregam.',  icon:IC.load},
+    {id:'drivers' as Page,    label:'Motoristas', icon:IC.drv},
+    {id:'clients' as Page,    label:'Clientes',   icon:IC.cli},
+    {id:'users' as Page,      label:'Usuários',   icon:IC.users, perm:'admin'},
     {id:'settings' as Page,   label:'Config',    icon:IC.cfg},
-  ].filter((n): n is {id:Page, label:string, icon:React.ReactNode, perm?:string} => !n.perm || profile?.role === n.perm)
+  ].filter(n => !n.perm || profile?.role === n.perm)
 
   const PageMap: Record<Page, React.ReactNode> = {
     dashboard:   <DashPage    profile={profile} can={can} onNavigate={setPage} />,
@@ -146,6 +165,12 @@ export default function App() {
     reports:     <ReportsPage profile={profile} can={can} />,
     users:       <UsersPage   profile={profile} can={can} />,
     settings:    <SettPage    profile={profile} onSave={p => setProfile(p)} />,
+    finance:     <FinancePage profile={profile} can={can} />,
+    wood:        <WoodPage    profile={profile} can={can} />,
+    fuel:        <FuelPage    profile={profile} can={can} />,
+    loads:       <LoadsPage   profile={profile} can={can} />,
+    drivers:     <DriversPage profile={profile} can={can} />,
+    clients:     <ClientsPage profile={profile} can={can} />,
   }
 
   return (
