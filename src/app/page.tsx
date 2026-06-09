@@ -41,15 +41,9 @@ import SuppPage    from './pages/SuppPage'
 import ReportsPage from './pages/ReportsPage'
 import UsersPage   from './pages/UsersPage'
 import SettPage    from './pages/SettPage'
-import FinancePage from './pages/FinancePage'
-import WoodPage    from './pages/WoodPage'
-import FuelPage    from './pages/FuelPage'
-import LoadsPage   from './pages/LoadsPage'
-import DriversPage from './pages/DriversPage'
-import ClientsPage from './pages/ClientsPage'
 import LoginPage   from './pages/LoginPage'
 
-type Page = 'dashboard'|'os'|'machines'|'maintenance'|'pm'|'tasks'|'parts'|'suppliers'|'reports'|'users'|'settings'|'finance'|'wood'|'fuel'|'loads'|'drivers'|'clients'
+type Page = 'dashboard'|'os'|'machines'|'maintenance'|'pm'|'tasks'|'parts'|'suppliers'|'reports'|'users'|'settings'|'finance'
 
 export default function App() {
   const [user, setUser]    = useState<any>(null)
@@ -144,11 +138,6 @@ export default function App() {
     {id:'suppliers' as Page,  label:'Fornec.',   icon:IC.sup},
     {id:'reports' as Page,    label:'Relatórios',icon:IC.rep},
     {id:'finance' as Page,    label:'Financeiro',icon:IC.fin},
-    {id:'wood' as Page,       label:'Pátio Toras',icon:IC.wood},
-    {id:'fuel' as Page,       label:'Combustível',icon:IC.fuel},
-    {id:'loads' as Page,      label:'Carregam.',  icon:IC.load},
-    {id:'drivers' as Page,    label:'Motoristas', icon:IC.drv},
-    {id:'clients' as Page,    label:'Clientes',   icon:IC.cli},
     {id:'users' as Page,      label:'Usuários',   icon:IC.users, perm:'admin'},
     {id:'settings' as Page,   label:'Config',    icon:IC.cfg},
   ].filter(n => !n.perm || profile?.role === n.perm)
@@ -166,11 +155,6 @@ export default function App() {
     users:       <UsersPage   profile={profile} can={can} />,
     settings:    <SettPage    profile={profile} onSave={p => setProfile(p)} />,
     finance:     <FinancePage profile={profile} can={can} />,
-    wood:        <WoodPage    profile={profile} can={can} />,
-    fuel:        <FuelPage    profile={profile} can={can} />,
-    loads:       <LoadsPage   profile={profile} can={can} />,
-    drivers:     <DriversPage profile={profile} can={can} />,
-    clients:     <ClientsPage profile={profile} can={can} />,
   }
 
   return (
