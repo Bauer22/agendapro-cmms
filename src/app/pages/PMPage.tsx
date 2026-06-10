@@ -49,16 +49,17 @@ export default function PMPage({ profile, can }: Props) {
     const [m, p, u] = await Promise.all([
       supabase.from('machines').select('id,name,icon,pm_plan,current_hours'),
       supabase.from('parts').select('id,name,code,unit,stock'),
-      supabase.from('profiles').select('id,display_name,email,role,shift').eq('blocked',false),
+      supabase.from('profiles').select('id,display_name,email,role,shift').neq('blocked',true),
     ])
     setMach(m.data||[]); setParts(p.data||[])
     // Build user list with display names
-    const userList = (u.data||[]).map((x:any) => ({
-      ...x,
-      display_name: (!x.display_name || x.display_name.includes('-')) 
-        ? (x.email?.split('@')[0]||'Usuário') 
-        : x.display_name
-    }))
+    const userList = (u.data||[]).map((x:any) => {
+      let name = x.display_name || ''
+      if (!name || (name.includes('-') && name.length > 30)) {
+        name = x.email?.split('@')[0] || 'Usuário'
+      }
+      return { ...x, display_name: name }
+    }).sort((a:any,b:any) => a.display_name.localeCompare(b.display_name))
     setUsers(userList)
 
     if (tab==='pm') {

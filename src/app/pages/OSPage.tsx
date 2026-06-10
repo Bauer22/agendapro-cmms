@@ -60,17 +60,19 @@ export default function OSPage({ profile, can }: Props) {
   async function loadMeta() {
     const [m, u, c, p] = await Promise.all([
       supabase.from('machines').select('id,name,code,icon'),
-      supabase.from('profiles').select('id,display_name,email,shift,role').eq('blocked',false),
+      supabase.from('profiles').select('id,display_name,email,shift,role').neq('blocked',true),
       supabase.from('os_counter').select('val').single(),
       supabase.from('parts').select('id,name,code,unit,stock,category'),
     ])
     setMachines(m.data||[])
-    const userList = (u.data||[]).map((x:any) => ({
-      ...x,
-      display_name: (!x.display_name || x.display_name.includes('-'))
-        ? (x.email?.split('@')[0]||'Usuário')
-        : x.display_name
-    }))
+    const userList = (u.data||[]).map((x:any) => {
+      let name = x.display_name || ''
+      // If empty or looks like UUID (contains multiple dashes and is long)
+      if (!name || (name.includes('-') && name.length > 30)) {
+        name = x.email?.split('@')[0] || 'Usuário'
+      }
+      return { ...x, display_name: name }
+    }).sort((a:any,b:any) => a.display_name.localeCompare(b.display_name))
     setUsers(userList)
     setParts(p.data||[])
     if (c.data?.val) setCounter(c.data.val + 1)
