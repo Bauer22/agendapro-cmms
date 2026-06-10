@@ -9,7 +9,14 @@ import type { UserProfile } from '@/types'
 interface Props { profile: UserProfile|null; onSave:(p:UserProfile)=>void }
 
 export default function SettPage({ profile, onSave }: Props) {
-  const [name, setName]   = useState(profile?.display_name||'')
+  const [name, setName]   = useState(() => {
+    const n = profile?.display_name || ''
+    // If looks like UUID, use email prefix
+    if (n && n.includes('-') && n.length > 30) {
+      return profile?.email?.split('@')[0] || ''
+    }
+    return n
+  })
   const [shift, setShift] = useState(profile?.shift||'')
   const [coName, setCoName] = useState('')
   const [coSector, setCoSector] = useState('')

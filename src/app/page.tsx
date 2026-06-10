@@ -75,16 +75,26 @@ export default function App() {
 
   async function loadProfile(uid: string) {
     try {
+      const { data: authUser } = await supabase.auth.getUser()
+      const email = authUser?.user?.email || ''
       const { data } = await supabase.from('profiles').select('*').eq('id', uid).single()
       if (data) {
-        setProfile(data)
+        // If display_name is missing or looks like a UUID, use email prefix
+        if (!data.display_name || data.display_name === uid || data.display_name.includes('-')) {
+          const nameFromEmail = email.split('@')[0].replace(/[._]/g,' ').replace(/\b\w/g,(c:string)=>c.toUpperCase())
+          const updatedProfile = { ...data, display_name: nameFromEmail, email }
+          await supabase.from('profiles').update({ display_name: nameFromEmail, email }).eq('id', uid)
+          setProfile(updatedProfile)
+        } else {
+          setProfile({ ...data, email: data.email || email })
+        }
       } else {
-        // Auto-create profile
-        const p: any = { id: uid, email: supabase.auth.getUser().then(r=>r.data.user?.email), role: 'admin', display_name: uid }
+        const nameFromEmail = email.split('@')[0].replace(/[._]/g,' ').replace(/\b\w/g,(c:string)=>c.toUpperCase())
+        const p: any = { id: uid, email, role: 'admin', display_name: nameFromEmail }
         await supabase.from('profiles').upsert(p)
         setProfile(p)
       }
-    } catch { }
+    } catch(e) { console.error(e) }
     finally {
       setTimeout(() => { setLoading(false); setSplashDone(true) }, 300)
     }
@@ -170,7 +180,7 @@ export default function App() {
                 {(profile?.display_name||profile?.email||'?')[0].toUpperCase()}
               </div>
               <div>
-                <div className="font-semibold" style={{color:'var(--t1)'}}>{profile?.display_name || 'Usuário'}</div>
+                <div className="font-semibold" style={{color:'var(--t1)'}}>{profile?.display_name && !profile.display_name.includes('-') ? profile.display_name : (profile?.email?.split('@')[0] || 'Usuário')}</div>
                 <div style={{color:'var(--cy)',fontSize:'9px',fontWeight:700}}>{ROLES[profile?.role||'viewer']?.label}</div>
               </div>
             </div>
