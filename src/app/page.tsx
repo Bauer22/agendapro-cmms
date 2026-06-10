@@ -33,7 +33,6 @@ const IC = {
 import DashPage    from './pages/DashPage'
 import OSPage      from './pages/OSPage'
 import MachPage    from './pages/MachPage'
-import MaintPage   from './pages/MaintPage'
 import PMPage      from './pages/PMPage'
 import TasksPage   from './pages/TasksPage'
 import PartsPage   from './pages/PartsPage'
@@ -42,9 +41,8 @@ import ReportsPage from './pages/ReportsPage'
 import UsersPage   from './pages/UsersPage'
 import SettPage    from './pages/SettPage'
 import LoginPage   from './pages/LoginPage'
-import FinancePage from './pages/FinancePage'
 
-type Page = 'dashboard'|'os'|'machines'|'maintenance'|'pm'|'tasks'|'parts'|'suppliers'|'reports'|'users'|'settings'|'finance'
+type Page = 'dashboard'|'os'|'machines'|'pm'|'tasks'|'parts'|'suppliers'|'reports'|'users'|'settings'
 
 export default function App() {
   const [user, setUser]    = useState<any>(null)
@@ -132,13 +130,11 @@ export default function App() {
     {id:'dashboard' as Page,  label:'Início',    icon:IC.home},
     {id:'os' as Page,         label:'OS',        icon:IC.os},
     {id:'machines' as Page,   label:'Máquinas',  icon:IC.mach},
-    {id:'maintenance' as Page,label:'Manutenção',icon:IC.maint},
     {id:'pm' as Page,         label:'MP',        icon:IC.pm},
     {id:'tasks' as Page,      label:'Tarefas',   icon:IC.task},
     {id:'parts' as Page,      label:'Peças',     icon:IC.parts},
     {id:'suppliers' as Page,  label:'Fornec.',   icon:IC.sup},
     {id:'reports' as Page,    label:'Relatórios',icon:IC.rep},
-    {id:'finance' as Page,    label:'Financeiro',icon:IC.fin},
     {id:'users' as Page,      label:'Usuários',   icon:IC.users, perm:'admin'},
     {id:'settings' as Page,   label:'Config',    icon:IC.cfg},
   ].filter(n => !n.perm || profile?.role === n.perm)
@@ -147,7 +143,6 @@ export default function App() {
     dashboard:   <DashPage    profile={profile} can={can} onNavigate={setPage} />,
     os:          <OSPage      profile={profile} can={can} />,
     machines:    <MachPage    profile={profile} can={can} />,
-    maintenance: <MaintPage   profile={profile} can={can} />,
     pm:          <PMPage      profile={profile} can={can} />,
     tasks:       <TasksPage   profile={profile} can={can} />,
     parts:       <PartsPage   profile={profile} can={can} />,
@@ -155,7 +150,6 @@ export default function App() {
     reports:     <ReportsPage profile={profile} can={can} />,
     users:       <UsersPage   profile={profile} can={can} />,
     settings:    <SettPage    profile={profile} onSave={p => setProfile(p)} />,
-    finance:     <FinancePage profile={profile} can={can} />,
   }
 
   return (
