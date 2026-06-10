@@ -60,12 +60,18 @@ export default function OSPage({ profile, can }: Props) {
   async function loadMeta() {
     const [m, u, c, p] = await Promise.all([
       supabase.from('machines').select('id,name,code,icon'),
-      supabase.from('profiles').select('id,display_name,email'),
+      supabase.from('profiles').select('id,display_name,email,shift,role').eq('blocked',false),
       supabase.from('os_counter').select('val').single(),
       supabase.from('parts').select('id,name,code,unit,stock,category'),
     ])
     setMachines(m.data||[])
-    setUsers(u.data||[])
+    const userList = (u.data||[]).map((x:any) => ({
+      ...x,
+      display_name: (!x.display_name || x.display_name.includes('-'))
+        ? (x.email?.split('@')[0]||'Usuário')
+        : x.display_name
+    }))
+    setUsers(userList)
     setParts(p.data||[])
     if (c.data?.val) setCounter(c.data.val + 1)
   }
@@ -336,8 +342,11 @@ export default function OSPage({ profile, can }: Props) {
         </div>
         <Select label="Máquina" value={editing.machine_id} onChange={(v:string)=>setEditing(e=>({...e,machine_id:v}))}
           options={[{value:'',label:'Selecione...'}, ...machines.map(m=>({value:m.id,label:`${m.icon||'⚙️'} ${m.name}`}))]} />
-        <Select label="Responsável" value={editing.resp_id} onChange={(v:string)=>setEditing(e=>({...e,resp_id:v}))}
-          options={[{value:'',label:'Selecione...'}, ...users.map(u=>({value:u.id,label:u.display_name||u.email}))]} />
+        <Select label="Responsável pela Manutenção" value={editing.resp_id} onChange={(v:string)=>{
+            const u = users.find(x=>x.id===v)
+            setEditing(e=>({...e, resp_id:v, resp_name: u?.display_name||u?.email||''}))
+          }}
+          options={[{value:'',label:'Selecione o responsável...'}, ...users.map(u=>({value:u.id,label:`${u.display_name}${u.shift?' — Turno '+u.shift:''}`}))]} />
         <div className="mb-2.5">
           <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{color:'var(--t2)'}}>Prioridade</label>
           <div className="flex gap-1.5">

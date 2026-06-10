@@ -25,6 +25,7 @@ export default function PMPage({ profile, can }: Props) {
   const [repairs, setRepairs]   = useState<any[]>([])
   const [machines, setMach]     = useState<any[]>([])
   const [parts, setParts]       = useState<any[]>([])
+  const [users, setUsers]       = useState<any[]>([])
   const [loading, setLoad]      = useState(true)
   const [tab, setTab]           = useState('pm')
   const [modal, setModal]       = useState(false)
@@ -45,11 +46,20 @@ export default function PMPage({ profile, can }: Props) {
   useEffect(() => { load() }, [tab])
 
   async function load() {
-    const [m, p] = await Promise.all([
+    const [m, p, u] = await Promise.all([
       supabase.from('machines').select('id,name,icon,pm_plan,current_hours'),
       supabase.from('parts').select('id,name,code,unit,stock'),
+      supabase.from('profiles').select('id,display_name,email,role,shift').eq('blocked',false),
     ])
     setMach(m.data||[]); setParts(p.data||[])
+    // Build user list with display names
+    const userList = (u.data||[]).map((x:any) => ({
+      ...x,
+      display_name: (!x.display_name || x.display_name.includes('-')) 
+        ? (x.email?.split('@')[0]||'Usuário') 
+        : x.display_name
+    }))
+    setUsers(userList)
 
     if (tab==='pm') {
       const { data } = await supabase.from('pm_reports').select('*').order('date',{ascending:false}).limit(100)
@@ -62,7 +72,10 @@ export default function PMPage({ profile, can }: Props) {
   }
 
   function openNew() {
-    setEdit({ date: td(), status:'ok', pm_status:'open', operator: profile?.display_name||'', period:'monthly' })
+    const defaultOperator = profile?.display_name && !profile.display_name.includes('-') 
+      ? profile.display_name 
+      : profile?.email?.split('@')[0] || ''
+    setEdit({ date: td(), status:'ok', pm_status:'open', operator: defaultOperator, operator_id: profile?.id, period:'monthly' })
     setChecklist([]); setChecked({})
     setModal(true)
   }
@@ -409,7 +422,11 @@ export default function PMPage({ profile, can }: Props) {
           <Select label="Período *" value={editing.period} onChange={(v:string)=>{setEdit((e:any)=>({...e,period:v}));loadChecklist(editing.machine_id||'',v)}}
             options={Object.entries(PERIOD_LABEL).map(([k,v])=>({value:k,label:v}))} />
           <Input label="Data *" value={editing.date} onChange={(v:string)=>setEdit((e:any)=>({...e,date:v}))} type="date" />
-          <Input label="Operador *" value={editing.operator} onChange={(v:string)=>setEdit((e:any)=>({...e,operator:v}))} placeholder="Nome" />
+          <Select label="Responsável *" value={editing.operator_id||''} onChange={(v:string)=>{
+              const u=users.find((x:any)=>x.id===v)
+              const name = u ? (u.display_name||u.email?.split('@')[0]||'') : ''
+              setEdit((e:any)=>({...e,operator_id:v,operator:name}))
+            }} options={[{value:'',label:'Selecione o responsável...'}, ...users.map((u:any)=>({value:u.id,label:`${u.display_name}${u.shift?' (Turno '+u.shift+')':''}`}))]} />
           <Input label="Horímetro (h)" value={editing.hours_reading} onChange={(v:string)=>setEdit((e:any)=>({...e,hours_reading:parseFloat(v)||undefined}))} type="number" />
         </div>
         <Select label="Status da Execução" value={editing.pm_status||'open'} onChange={(v:string)=>setEdit((e:any)=>({...e,pm_status:v}))} options={PM_STATUS_OPTS} />
@@ -438,6 +455,11 @@ export default function PMPage({ profile, can }: Props) {
         footer={<><Btn onClick={()=>setRepairModal(false)} variant="secondary" size="md">Cancelar</Btn><Btn onClick={saveRepair} variant="primary" size="md">Salvar</Btn></>}>
         <Select label="Máquina *" value={editRepair.machine_id} onChange={(v:string)=>setEditRepair((e:any)=>({...e,machine_id:v}))}
           options={[{value:'',label:'Selecione...'}, ...machines.map(m=>({value:m.id,label:`${m.icon||'⚙️'} ${m.name}`}))]} />
+        <Select label="Responsável" value={editRepair.operator_id||''} onChange={(v:string)=>{
+            const u=users.find((x:any)=>x.id===v)
+            const name = u ? (u.display_name||u.email?.split('@')[0]||'') : ''
+            setEditRepair((e:any)=>({...e,operator_id:v,operator:name}))
+          }} options={[{value:'',label:'Selecione o responsável...'}, ...users.map((u:any)=>({value:u.id,label:u.display_name}))]} />
         <Input label="Item / Peça enviada *" value={editRepair.item_name} onChange={(v:string)=>setEditRepair((e:any)=>({...e,item_name:v}))} placeholder="Ex: Motor bomba hidráulica" />
         <Textarea label="Problema / Descrição *" value={editRepair.description} onChange={(v:string)=>setEditRepair((e:any)=>({...e,description:v}))} rows={2} placeholder="Descreva o problema..." />
         <div className="grid grid-cols-2 gap-x-2">
