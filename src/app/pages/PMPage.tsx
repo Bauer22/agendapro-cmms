@@ -177,9 +177,10 @@ export default function PMPage({ profile, can }: Props) {
       created_by: profile?.display_name||profile?.email,
     }
     // Remove UI-only fields
-    delete obj._part_select; delete obj._part_qty
+    delete obj._part_select; delete obj._part_qty; delete obj._was_status
     try {
       if (editRepair.id) {
+        delete obj._was_status
         const { error } = await supabase.from('repair_orders').update(obj).eq('id', editRepair.id)
         if (error) throw error
 
