@@ -20,7 +20,7 @@ export default function DashPage({ profile, can, onNavigate }: Props) {
         supabase.from('machines').select('*'),
         supabase.from('maintenance').select('*').order('date',{ascending:false}).limit(5),
         supabase.from('tasks').select('*').eq('date', new Date().toISOString().split('T')[0]),
-        supabase.from('parts').select('*').filter('stock','lte','min_stock'),
+        supabase.from('parts').select('stock,min_stock,name,unit,code'),
         supabase.from('accounts_payable').select('valor,status,due_date'),
       ])
       const today = new Date().toISOString().split('T')[0]

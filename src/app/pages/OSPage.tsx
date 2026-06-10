@@ -60,7 +60,7 @@ export default function OSPage({ profile, can }: Props) {
   async function loadMeta() {
     const [m, u, c, p] = await Promise.all([
       supabase.from('machines').select('id,name,code,icon'),
-      supabase.from('profiles').select('id,display_name,email,shift,role').neq('blocked',true),
+      supabase.from('profiles').select('id,display_name,email,shift,role'),
       supabase.from('os_counter').select('val').single(),
       supabase.from('parts').select('id,name,code,unit,stock,category'),
     ])

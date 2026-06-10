@@ -49,7 +49,7 @@ export default function PMPage({ profile, can }: Props) {
     const [m, p, u] = await Promise.all([
       supabase.from('machines').select('id,name,icon,pm_plan,current_hours'),
       supabase.from('parts').select('id,name,code,unit,stock'),
-      supabase.from('profiles').select('id,display_name,email,role,shift').neq('blocked',true),
+      supabase.from('profiles').select('id,display_name,email,role,shift'),
     ])
     setMach(m.data||[]); setParts(p.data||[])
     // Build user list with display names
