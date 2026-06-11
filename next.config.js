@@ -1,1 +1,1 @@
-/** @type {import("next").NextConfig} */`nconst nextConfig = { typescript: { ignoreBuildErrors: true }, eslint: { ignoreDuringBuilds: true }, images: { unoptimized: true } };`nmodule.exports = nextConfig
+﻿/** @type {import('next').NextConfig} */\r\nconst nextConfig = { typescript: { ignoreBuildErrors: true }, eslint: { ignoreDuringBuilds: true }, images: { unoptimized: true } }\r\nmodule.exports = nextConfig
