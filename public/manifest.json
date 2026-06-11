@@ -1,25 +1,7 @@
 {
-  "name": "Industrial8",
-  "short_name": "Industrial8",
-  "description": "Manuten\u00e7\u00e3o Industrial Inteligente",
-  "theme_color": "#0c1628",
-  "background_color": "#0c1628",
-  "display": "standalone",
-  "orientation": "portrait-primary",
-  "scope": "/",
-  "start_url": "/",
-  "icons": [
-    {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable any"
-    }
-  ]
+  "name":"Industrial8","short_name":"I8",
+  "description":"Manutenção Industrial Inteligente",
+  "start_url":"/","display":"standalone",
+  "theme_color":"#06101e","background_color":"#06101e",
+  "icons":[{"src":"/logo.png","sizes":"192x192","type":"image/png"}]
 }

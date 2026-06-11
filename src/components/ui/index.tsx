@@ -1,95 +1,66 @@
 'use client'
-import { ReactNode, useState } from 'react'
-import { cn } from '@/lib/utils'
+import { useState, useCallback } from 'react'
 
-// ─── Badge ────────────────────────────────────────────────────────────────
-export function Badge({ children, color='blue', className='' }: { children:ReactNode, color?:'blue'|'green'|'amber'|'red'|'gray'|'purple', className?:string }) {
-  const map = {
-    blue:  {bg:'rgba(249,115,22,.15)', color:'#f97316'},
-    green: {bg:'rgba(16,185,129,.13)', color:'#10b981'},
-    amber: {bg:'rgba(245,158,11,.13)', color:'#f59e0b'},
-    red:   {bg:'rgba(239,68,68,.13)',  color:'#ef4444'},
-    gray:  {bg:'rgba(107,114,128,.15)',color:'#9ca3af'},
-    purple:{bg:'rgba(124,58,237,.2)',  color:'#a78bfa'},
-  }
-  const s = map[color]
-  return <span className={cn('inline-flex items-center px-2 py-0.5 rounded-xl text-xs font-bold',className)} style={{background:s.bg,color:s.color}}>{children}</span>
+// ── Button
+type BtnVariant = 'primary'|'secondary'|'danger'
+type BtnSize = 'sm'|'md'|'lg'
+const BV: Record<BtnVariant,{bg:string;color:string}> = {
+  primary:   { bg:'linear-gradient(135deg,#f97316,#c85a00)', color:'#fff' },
+  secondary: { bg:'rgba(249,115,22,.1)', color:'#f97316' },
+  danger:    { bg:'rgba(239,68,68,.1)',  color:'#ef4444' },
 }
-
-// ─── Button ──────────────────────────────────────────────────────────────
-export function Btn({ children, onClick, variant='primary', size='md', disabled=false, className='' }: { children:ReactNode, onClick?:()=>void, variant?:'primary'|'secondary'|'danger'|'ghost', size?:'sm'|'md'|'lg', disabled?:boolean, className?:string }) {
-  const v = {
-    primary:   {bg:'linear-gradient(135deg,#f97316,#c85a00)', color:'#fff', hov:'brightness(1.1)'},
-    secondary: {bg:'transparent',   color:'var(--t2)',    border:'1px solid var(--bd)'},
-    danger:    {bg:'var(--rd)',      color:'#fff',         hov:'brightness(1.1)'},
-    ghost:     {bg:'transparent',   color:'var(--t3)',    border:'none'},
-  }[variant]
-  const sz = { sm:'px-2.5 py-1.5 text-xs rounded-lg', md:'px-4 py-2.5 text-sm rounded-xl', lg:'px-5 py-3 text-sm rounded-xl w-full' }[size]
+const BS: Record<BtnSize,{padding:string;fontSize:string;borderRadius:string}> = {
+  sm: { padding:'5px 10px',  fontSize:'11px', borderRadius:'8px'  },
+  md: { padding:'9px 16px',  fontSize:'12px', borderRadius:'10px' },
+  lg: { padding:'12px 24px', fontSize:'14px', borderRadius:'12px' },
+}
+export function Btn({ children, onClick, variant='secondary', size='sm', disabled, className }: any) {
+  const v = BV[variant as BtnVariant]; const s = BS[size as BtnSize]
   return (
-    <button onClick={onClick} disabled={disabled} className={cn('inline-flex items-center justify-center gap-1.5 font-semibold transition-all cursor-pointer border-none',sz,className)}
-      style={{background:v.bg,color:v.color,border:(v as any).border||'none',opacity:disabled?.5:1,cursor:disabled?'not-allowed':'pointer',fontFamily:'Sora,system-ui,sans-serif'}}>
+    <button onClick={onClick} disabled={disabled} className={className}
+      style={{...s, background:v.bg, color:v.color, border:`1px solid ${variant==='secondary'?'rgba(249,115,22,.28)':variant==='danger'?'rgba(239,68,68,.28)':'transparent'}`, fontFamily:"'Sora',system-ui", fontWeight:700, cursor:disabled?'not-allowed':'pointer', opacity:disabled?.5:1, whiteSpace:'nowrap', flexShrink:0}}>
       {children}
     </button>
   )
 }
 
-// ─── Input ──────────────────────────────────────────────────────────────
-export function Input({ label, value, onChange, placeholder='', type='text', required=false, disabled=false, className='' }: any) {
-  return (
-    <div className={cn('mb-2.5',className)}>
-      {label && <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{color:'var(--t2)'}}>{label}{required&&<span style={{color:'var(--rd)'}}> *</span>}</label>}
-      <input type={type} value={value||''} onChange={e=>onChange(e.target.value)} placeholder={placeholder} disabled={disabled}
-        className="w-full rounded-xl px-3 py-2 text-xs outline-none transition-all"
-        style={{background:'var(--s2)',border:'1px solid var(--bd)',color:'var(--t1)',fontFamily:'Sora,system-ui,sans-serif',WebkitAppearance:'none'}}
-        onFocus={e=>{e.target.style.borderColor='rgba(249,115,22,.6)';e.target.style.boxShadow='0 0 10px rgba(249,115,22,.12)'}} onBlur={e=>{e.target.style.borderColor='var(--bd)';e.target.style.boxShadow='none'}} />
-    </div>
-  )
+// ── Badge
+const BC: Record<string,{bg:string;color:string;border:string}> = {
+  blue:   {bg:'rgba(59,130,246,.12)',  color:'#60a5fa', border:'rgba(59,130,246,.2)'},
+  orange: {bg:'rgba(249,115,22,.12)',  color:'#f97316', border:'rgba(249,115,22,.2)'},
+  green:  {bg:'rgba(34,197,94,.12)',   color:'#4ade80', border:'rgba(34,197,94,.2)'},
+  amber:  {bg:'rgba(234,179,8,.12)',   color:'#facc15', border:'rgba(234,179,8,.2)'},
+  red:    {bg:'rgba(239,68,68,.12)',   color:'#f87171', border:'rgba(239,68,68,.2)'},
+  purple: {bg:'rgba(167,139,250,.12)', color:'#a78bfa', border:'rgba(167,139,250,.2)'},
+  gray:   {bg:'rgba(107,114,128,.12)', color:'#9ca3af', border:'rgba(107,114,128,.2)'},
 }
-
-// ─── Select ──────────────────────────────────────────────────────────────
-export function Select({ label, value, onChange, options, required=false, className='' }: any) {
+export function Badge({ children, color='gray' }: any) {
+  const c = BC[color] || BC.gray
   return (
-    <div className={cn('mb-2.5',className)}>
-      {label && <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{color:'var(--t2)'}}>{label}{required&&<span style={{color:'var(--rd)'}}> *</span>}</label>}
-      <select value={value||''} onChange={e=>onChange(e.target.value)}
-        className="w-full rounded-xl px-3 py-2 text-xs outline-none transition-all cursor-pointer"
-        style={{background:'var(--s2)',border:'1px solid var(--bd)',color:'var(--t1)',fontFamily:'Sora,system-ui,sans-serif',WebkitAppearance:'none'}}
-        onFocus={e=>{e.target.style.borderColor='rgba(249,115,22,.6)';e.target.style.boxShadow='0 0 10px rgba(249,115,22,.12)'}} onBlur={e=>{e.target.style.borderColor='var(--bd)';e.target.style.boxShadow='none'}}>
-        {options.map((o: any) => <option key={o.value||o} value={o.value||o}>{o.label||o}</option>)}
-      </select>
-    </div>
-  )
-}
-
-// ─── Textarea ────────────────────────────────────────────────────────────
-export function Textarea({ label, value, onChange, placeholder='', rows=3, className='' }: any) {
-  return (
-    <div className={cn('mb-2.5',className)}>
-      {label && <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{color:'var(--t2)'}}>{label}</label>}
-      <textarea value={value||''} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows}
-        className="w-full rounded-xl px-3 py-2 text-xs outline-none transition-all resize-none"
-        style={{background:'var(--s2)',border:'1px solid var(--bd)',color:'var(--t1)',fontFamily:'Sora,system-ui,sans-serif',lineHeight:1.5}}
-        onFocus={e=>{e.target.style.borderColor='rgba(249,115,22,.6)';e.target.style.boxShadow='0 0 10px rgba(249,115,22,.12)'}} onBlur={e=>{e.target.style.borderColor='var(--bd)';e.target.style.boxShadow='none'}} />
-    </div>
-  )
-}
-
-// ─── Card ────────────────────────────────────────────────────────────────
-export function Card({ children, className='', onClick }: { children:ReactNode, className?:string, onClick?:()=>void }) {
-  return (
-    <div onClick={onClick} className={cn('rounded-xl p-3',className,onClick?'cursor-pointer':'')}
-      style={{background:'var(--s1)',border:'1px solid var(--bd)',borderLeft:'2px solid rgba(249,115,22,.4)'}}>
+    <span style={{display:'inline-flex',alignItems:'center',padding:'2px 7px',borderRadius:'20px',fontSize:'9px',fontWeight:700,letterSpacing:'.3px',background:c.bg,color:c.color,border:`1px solid ${c.border}`,whiteSpace:'nowrap',flexShrink:0}}>
       {children}
+    </span>
+  )
+}
+
+// ── KPI
+export function KPI({ num, label, color='orange' }: any) {
+  const c: Record<string,string> = {orange:'#f97316',blue:'#3b82f6',green:'#22c55e',amber:'#f59e0b',red:'#ef4444',purple:'#a78bfa'}
+  const clr = c[color] || '#f97316'
+  return (
+    <div style={{background:'var(--s1)',border:'1px solid var(--bd)',borderTop:`2px solid ${clr}`,borderRadius:'14px',padding:'10px 8px',textAlign:'center',position:'relative',overflow:'hidden'}}>
+      <div style={{fontFamily:"'Bebas Neue',impact,sans-serif",fontSize:'28px',lineHeight:1,color:clr,marginBottom:'2px'}}>{num}</div>
+      <div style={{fontSize:'7px',color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.5px',fontWeight:600}}>{label}</div>
     </div>
   )
 }
 
-// ─── Section Header ──────────────────────────────────────────────────────
-export function SH({ label, action }: { label:string, action?:ReactNode }) {
+// ── SH (Section Header)
+export function SH({ label, action }: any) {
   return (
-    <div className="flex items-center justify-between my-3">
-      <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider" style={{color:'var(--t2)'}}>
-        <div className="w-1 h-3 rounded-sm" style={{background:'linear-gradient(180deg,#f97316,#ea6a00)',boxShadow:'0 0 6px rgba(249,115,22,.6)'}}/>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'8px'}}>
+      <div style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.7px',color:'var(--t2)'}}>
+        <div style={{width:'3px',height:'14px',background:'linear-gradient(180deg,#f97316,#c85a00)',borderRadius:'2px',boxShadow:'0 0 6px rgba(249,115,22,.5)'}}/>
         {label}
       </div>
       {action}
@@ -97,91 +68,94 @@ export function SH({ label, action }: { label:string, action?:ReactNode }) {
   )
 }
 
-// ─── KPI ─────────────────────────────────────────────────────────────────
-export function KPI({ num, label, color='blue' }: { num:number|string, label:string, color?:'blue'|'green'|'amber'|'red' }) {
-  const c = {blue:'var(--cy)',green:'var(--gn)',amber:'var(--am)',red:'var(--rd)'}[color]
+// ── Empty
+export function Empty({ icon, text }: any) {
   return (
-    <div className="rounded-xl p-2.5 text-center relative overflow-hidden" style={{background:'var(--s1)',border:'1px solid var(--bd)',borderTop:'2px solid '+c}}>
-      <div className="font-bebas text-3xl leading-none" style={{color:c,textShadow:`0 0 12px ${c}88`}}>{num}</div>
-      <div className="text-xs mt-0.5" style={{color:'var(--t3)',fontSize:'8px',textTransform:'uppercase',letterSpacing:'.3px'}}>{label}</div>
+    <div style={{textAlign:'center',padding:'32px 16px',color:'var(--t3)'}}>
+      <div style={{fontSize:'32px',marginBottom:'8px'}}>{icon}</div>
+      <div style={{fontSize:'12px'}}>{text}</div>
     </div>
   )
 }
 
-// ─── Empty State ─────────────────────────────────────────────────────────
-export function Empty({ icon='📋', text='Nenhum item encontrado' }: { icon?:string, text?:string }) {
+// ── Input
+export function Input({ label, value, onChange, type='text', placeholder, className }: any) {
   return (
-    <div className="text-center py-8">
-      <div className="text-4xl mb-2 opacity-40">{icon}</div>
-      <div className="text-xs" style={{color:'var(--t3)'}}>{text}</div>
+    <div style={{marginBottom:'10px'}} className={className}>
+      {label&&<label style={{display:'block',fontSize:'9px',fontWeight:700,letterSpacing:'1.2px',color:'rgba(249,115,22,.65)',textTransform:'uppercase',marginBottom:'4px'}}>{label}</label>}
+      <input value={value||''} onChange={e=>onChange(e.target.value)} type={type} placeholder={placeholder}
+        style={{width:'100%',background:'var(--s2)',border:'1px solid var(--bd)',borderRadius:'10px',padding:'9px 12px',color:'var(--t1)',fontFamily:"'Sora',system-ui",fontSize:'12px',outline:'none',transition:'border-color .15s'}}
+        onFocus={e=>{e.target.style.borderColor='rgba(249,115,22,.55)';e.target.style.boxShadow='0 0 10px rgba(249,115,22,.12)'}}
+        onBlur={e=>{e.target.style.borderColor='var(--bd)';e.target.style.boxShadow='none'}} />
     </div>
   )
 }
 
-// ─── Modal ───────────────────────────────────────────────────────────────
-export function Modal({ open, onClose, title, children, footer }: { open:boolean, onClose:()=>void, title:string, children:ReactNode, footer?:ReactNode }) {
+// ── Select
+export function Select({ label, value, onChange, options, className }: any) {
+  const opts = Array.isArray(options) ? options.map((o:any) => typeof o==='string' ? {value:o,label:o} : o) : []
+  return (
+    <div style={{marginBottom:'10px'}} className={className}>
+      {label&&<label style={{display:'block',fontSize:'9px',fontWeight:700,letterSpacing:'1.2px',color:'rgba(249,115,22,.65)',textTransform:'uppercase',marginBottom:'4px'}}>{label}</label>}
+      <select value={value||''} onChange={e=>onChange(e.target.value)}
+        style={{width:'100%',background:'var(--s2)',border:'1px solid var(--bd)',borderRadius:'10px',padding:'9px 12px',color:'var(--t1)',fontFamily:"'Sora',system-ui",fontSize:'12px',outline:'none',WebkitAppearance:'none'}}>
+        {opts.map((o:any,i:number)=><option key={i} value={o.value}>{o.label}</option>)}
+      </select>
+    </div>
+  )
+}
+
+// ── Textarea
+export function Textarea({ label, value, onChange, rows=3, placeholder }: any) {
+  return (
+    <div style={{marginBottom:'10px'}}>
+      {label&&<label style={{display:'block',fontSize:'9px',fontWeight:700,letterSpacing:'1.2px',color:'rgba(249,115,22,.65)',textTransform:'uppercase',marginBottom:'4px'}}>{label}</label>}
+      <textarea value={value||''} onChange={e=>onChange(e.target.value)} rows={rows} placeholder={placeholder}
+        style={{width:'100%',background:'var(--s2)',border:'1px solid var(--bd)',borderRadius:'10px',padding:'9px 12px',color:'var(--t1)',fontFamily:"'Sora',system-ui",fontSize:'12px',outline:'none',resize:'vertical'}}
+        onFocus={e=>{e.target.style.borderColor='rgba(249,115,22,.55)'}}
+        onBlur={e=>{e.target.style.borderColor='var(--bd)'}} />
+    </div>
+  )
+}
+
+// ── Modal
+export function Modal({ open, onClose, title, children, footer }: any) {
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-[200] flex items-end justify-center" style={{background:'rgba(0,0,0,.8)',backdropFilter:'blur(6px)'}}
-      onClick={e=>{if(e.target===e.currentTarget)onClose()}}>
-      <div className="w-full max-w-lg rounded-t-2xl overflow-y-auto" style={{background:'var(--bg2)',border:'1px solid var(--bd)',borderBottom:'none',maxHeight:'92vh',scrollbarWidth:'none'}}>
-        <div className="w-9 h-1 rounded-sm mx-auto mt-3 mb-0" style={{background:'var(--t3)'}}/>
-        <div className="flex items-center justify-between px-4 py-3 sticky top-0 z-10" style={{background:'var(--bg2)',borderBottom:'1px solid var(--bd)'}}>
-          <div className="text-sm font-bold">{title}</div>
-          <button onClick={onClose} className="w-7 h-7 rounded-full flex items-center justify-center text-xs" style={{background:'var(--s2)',border:'none',color:'var(--t2)',cursor:'pointer'}}>✕</button>
+    <div style={{position:'fixed',inset:0,zIndex:100,display:'flex',alignItems:'flex-end',justifyContent:'center',padding:'0'}} onClick={e=>{if(e.target===e.currentTarget)onClose()}}>
+      <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.7)',backdropFilter:'blur(4px)'}}/>
+      <div style={{position:'relative',zIndex:1,background:'var(--bg2)',border:'1px solid var(--bd)',borderRadius:'20px 20px 0 0',width:'100%',maxWidth:'520px',maxHeight:'90vh',display:'flex',flexDirection:'column',boxShadow:'0 -8px 40px rgba(0,0,0,.5)'}}>
+        <div style={{position:'absolute',top:0,left:0,right:0,height:'2px',background:'linear-gradient(90deg,transparent,#f97316,transparent)',borderRadius:'20px 20px 0 0'}}/>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px 12px',flexShrink:0}}>
+          <div style={{fontSize:'14px',fontWeight:700,color:'var(--t1)'}}>{title}</div>
+          <button onClick={onClose} style={{background:'var(--s2)',border:'1px solid var(--bd)',borderRadius:'8px',width:'28px',height:'28px',cursor:'pointer',color:'var(--t2)',fontSize:'16px',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
         </div>
-        <div className="px-4 pt-3 pb-2">{children}</div>
-        {footer && <div className="px-4 pb-5 pt-3 flex gap-2 sticky bottom-0" style={{background:'var(--bg2)',borderTop:'1px solid var(--bd)'}}>{footer}</div>}
+        <div style={{flex:1,overflowY:'auto',padding:'0 20px 8px'}}>
+          {children}
+        </div>
+        {footer&&<div style={{padding:'12px 20px 16px',borderTop:'1px solid var(--bd)',display:'flex',gap:'8px',justifyContent:'flex-end',flexShrink:0}}>{footer}</div>}
       </div>
     </div>
   )
 }
 
-// ─── Confirm Dialog ──────────────────────────────────────────────────────
+// ── useConfirm
 export function useConfirm() {
-  const [state, setState] = useState<{msg:string,resolve:(v:boolean)=>void}|null>(null)
-  const confirm = (msg: string) => new Promise<boolean>(res => setState({msg,resolve:res}))
+  const [state, setState] = useState<{msg:string;resolve:(v:boolean)=>void}|null>(null)
+  const confirm = useCallback((msg: string): Promise<boolean> => {
+    return new Promise(resolve => setState({ msg, resolve }))
+  }, [])
   const dialog = state ? (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center p-5" style={{background:'rgba(0,0,0,.85)',backdropFilter:'blur(8px)'}}>
-      <div className="rounded-2xl p-6 text-center" style={{background:'var(--bg2)',border:'1px solid var(--bd)',maxWidth:300,width:'100%'}}>
-        <div className="text-3xl mb-3">⚠️</div>
-        <div className="text-sm font-semibold mb-5 leading-relaxed">{state.msg}</div>
-        <div className="flex gap-2">
-          <button className="flex-1 py-2.5 rounded-xl text-xs font-bold" style={{background:'transparent',border:'1px solid var(--bd)',color:'var(--t2)',cursor:'pointer',fontFamily:'Sora,system-ui,sans-serif'}}
-            onClick={()=>{state.resolve(false);setState(null)}}>Cancelar</button>
-          <button className="flex-1 py-2.5 rounded-xl text-xs font-bold" style={{background:'var(--rd)',border:'none',color:'#fff',cursor:'pointer',fontFamily:'Sora,system-ui,sans-serif'}}
-            onClick={()=>{state.resolve(true);setState(null)}}>Confirmar</button>
+    <div style={{position:'fixed',inset:0,zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:'16px'}}>
+      <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.7)'}} onClick={()=>{state.resolve(false);setState(null)}}/>
+      <div style={{position:'relative',background:'var(--s1)',border:'1px solid rgba(249,115,22,.3)',borderRadius:'16px',padding:'24px',maxWidth:'320px',width:'100%',boxShadow:'0 0 40px rgba(0,0,0,.6)'}}>
+        <div style={{fontSize:'13px',color:'var(--t1)',marginBottom:'20px',lineHeight:1.5}}>{state.msg}</div>
+        <div style={{display:'flex',gap:'10px',justifyContent:'flex-end'}}>
+          <Btn onClick={()=>{state.resolve(false);setState(null)}} variant="secondary" size="md">Cancelar</Btn>
+          <Btn onClick={()=>{state.resolve(true);setState(null)}} variant="danger" size="md">Confirmar</Btn>
         </div>
       </div>
     </div>
   ) : null
   return { confirm, dialog }
-}
-
-// ─── Search ──────────────────────────────────────────────────────────────
-export function SearchBar({ value, onChange, placeholder='Buscar...', action }: any) {
-  return (
-    <div className="flex gap-2 mb-3">
-      <input value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
-        className="flex-1 rounded-xl px-3 py-2 text-xs outline-none"
-        style={{background:'var(--s1)',border:'1px solid var(--bd)',color:'var(--t1)',fontFamily:'Sora,system-ui,sans-serif'}}
-        onFocus={e=>{e.target.style.borderColor='rgba(249,115,22,.6)';e.target.style.boxShadow='0 0 10px rgba(249,115,22,.12)'}} onBlur={e=>{e.target.style.borderColor='var(--bd)';e.target.style.boxShadow='none'}} />
-      {action}
-    </div>
-  )
-}
-
-// ─── Chips ───────────────────────────────────────────────────────────────
-export function Chips({ options, value, onChange }: { options:{label:string,value:string}[], value:string, onChange:(v:string)=>void }) {
-  return (
-    <div className="flex gap-1.5 overflow-x-auto pb-1 mb-3" style={{scrollbarWidth:'none'}}>
-      {options.map(o => (
-        <button key={o.value} onClick={()=>onChange(o.value)}
-          className="flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer border"
-          style={{background:value===o.value?'var(--cy)':'transparent',color:value===o.value?'#000':'var(--t2)',borderColor:value===o.value?'var(--cy)':'var(--bd)',fontFamily:'Sora,system-ui,sans-serif'}}>
-          {o.label}
-        </button>
-      ))}
-    </div>
-  )
 }

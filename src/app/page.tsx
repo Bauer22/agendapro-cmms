@@ -89,27 +89,21 @@ export default function App() {
       const email = authUser?.user?.email || ''
       const { data } = await supabase.from('profiles').select('*').eq('id', uid).single()
       if (data) {
-        // If display_name is missing or looks like a UUID, use email prefix
-        if (!data.display_name || data.display_name === uid || data.display_name.includes('-')) {
-          const nameFromEmail = email.split('@')[0].replace(/[._]/g,' ').replace(/\b\w/g,(c:string)=>c.toUpperCase())
-          const updatedProfile = { ...data, display_name: nameFromEmail, email }
-          await supabase.from('profiles').update({ display_name: nameFromEmail, email }).eq('id', uid)
-          setProfile(updatedProfile)
-        } else {
-          setProfile({ ...data, email: data.email || email })
+        let name = data.display_name || ''
+        if (!name || (name.includes('-') && name.length > 30)) {
+          name = email.split('@')[0].replace(/[._]/g,' ').replace(/\w/g,(c:string)=>c.toUpperCase())
+          await supabase.from('profiles').update({ display_name: name, email }).eq('id', uid)
         }
+        setProfile({ ...data, display_name: name, email: data.email || email })
       } else {
-        const nameFromEmail = email.split('@')[0].replace(/[._]/g,' ').replace(/\b\w/g,(c:string)=>c.toUpperCase())
-        const p: any = { id: uid, email, role: 'admin', display_name: nameFromEmail }
+        const name = email.split('@')[0].replace(/[._]/g,' ').replace(/\w/g,(c:string)=>c.toUpperCase())
+        const p: any = { id: uid, email, role: 'admin', display_name: name }
         await supabase.from('profiles').upsert(p)
         setProfile(p)
       }
     } catch(e) { console.error(e) }
-    finally {
-      setTimeout(() => { setLoading(false); setSplashDone(true) }, 300)
-    }
+    finally { setTimeout(() => { setLoading(false); setSplashDone(true) }, 300) }
   }
-
   const logout = useCallback(async () => {
     await supabase.auth.signOut()
     setUser(null); setProfile(null); setPage('dashboard')
