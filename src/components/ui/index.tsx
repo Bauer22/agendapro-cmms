@@ -19,7 +19,7 @@ export function Badge({ children, color='blue', className='' }: { children:React
 // ─── Button ──────────────────────────────────────────────────────────────
 export function Btn({ children, onClick, variant='primary', size='md', disabled=false, className='' }: { children:ReactNode, onClick?:()=>void, variant?:'primary'|'secondary'|'danger'|'ghost', size?:'sm'|'md'|'lg', disabled?:boolean, className?:string }) {
   const v = {
-    primary:   {bg:'linear-gradient(135deg,#f97316,#ea6a00)', color:'#fff', hov:'brightness(1.1)'},
+    primary:   {bg:'linear-gradient(135deg,#f97316,#c85a00)', color:'#fff', hov:'brightness(1.1)'},
     secondary: {bg:'transparent',   color:'var(--t2)',    border:'1px solid var(--bd)'},
     danger:    {bg:'var(--rd)',      color:'#fff',         hov:'brightness(1.1)'},
     ghost:     {bg:'transparent',   color:'var(--t3)',    border:'none'},
@@ -41,7 +41,7 @@ export function Input({ label, value, onChange, placeholder='', type='text', req
       <input type={type} value={value||''} onChange={e=>onChange(e.target.value)} placeholder={placeholder} disabled={disabled}
         className="w-full rounded-xl px-3 py-2 text-xs outline-none transition-all"
         style={{background:'var(--s2)',border:'1px solid var(--bd)',color:'var(--t1)',fontFamily:'Sora,system-ui,sans-serif',WebkitAppearance:'none'}}
-        onFocus={e=>{e.target.style.borderColor='var(--cy)'}} onBlur={e=>{e.target.style.borderColor='var(--bd)'}} />
+        onFocus={e=>{e.target.style.borderColor='rgba(249,115,22,.6)';e.target.style.boxShadow='0 0 10px rgba(249,115,22,.12)'}} onBlur={e=>{e.target.style.borderColor='var(--bd)';e.target.style.boxShadow='none'}} />
     </div>
   )
 }
@@ -54,7 +54,7 @@ export function Select({ label, value, onChange, options, required=false, classN
       <select value={value||''} onChange={e=>onChange(e.target.value)}
         className="w-full rounded-xl px-3 py-2 text-xs outline-none transition-all cursor-pointer"
         style={{background:'var(--s2)',border:'1px solid var(--bd)',color:'var(--t1)',fontFamily:'Sora,system-ui,sans-serif',WebkitAppearance:'none'}}
-        onFocus={e=>{e.target.style.borderColor='var(--cy)'}} onBlur={e=>{e.target.style.borderColor='var(--bd)'}}>
+        onFocus={e=>{e.target.style.borderColor='rgba(249,115,22,.6)';e.target.style.boxShadow='0 0 10px rgba(249,115,22,.12)'}} onBlur={e=>{e.target.style.borderColor='var(--bd)';e.target.style.boxShadow='none'}}>
         {options.map((o: any) => <option key={o.value||o} value={o.value||o}>{o.label||o}</option>)}
       </select>
     </div>
@@ -69,7 +69,7 @@ export function Textarea({ label, value, onChange, placeholder='', rows=3, class
       <textarea value={value||''} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows}
         className="w-full rounded-xl px-3 py-2 text-xs outline-none transition-all resize-none"
         style={{background:'var(--s2)',border:'1px solid var(--bd)',color:'var(--t1)',fontFamily:'Sora,system-ui,sans-serif',lineHeight:1.5}}
-        onFocus={e=>{e.target.style.borderColor='var(--cy)'}} onBlur={e=>{e.target.style.borderColor='var(--bd)'}} />
+        onFocus={e=>{e.target.style.borderColor='rgba(249,115,22,.6)';e.target.style.boxShadow='0 0 10px rgba(249,115,22,.12)'}} onBlur={e=>{e.target.style.borderColor='var(--bd)';e.target.style.boxShadow='none'}} />
     </div>
   )
 }
@@ -78,7 +78,7 @@ export function Textarea({ label, value, onChange, placeholder='', rows=3, class
 export function Card({ children, className='', onClick }: { children:ReactNode, className?:string, onClick?:()=>void }) {
   return (
     <div onClick={onClick} className={cn('rounded-xl p-3',className,onClick?'cursor-pointer':'')}
-      style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+      style={{background:'var(--s1)',border:'1px solid var(--bd)',borderLeft:'2px solid rgba(249,115,22,.4)'}}>
       {children}
     </div>
   )
@@ -88,8 +88,8 @@ export function Card({ children, className='', onClick }: { children:ReactNode, 
 export function SH({ label, action }: { label:string, action?:ReactNode }) {
   return (
     <div className="flex items-center justify-between my-3">
-      <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider" style={{color:'var(--t3)'}}>
-        <div className="w-0.5 h-2.5 rounded-sm" style={{background:'var(--cy)'}}/>
+      <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider" style={{color:'var(--t2)'}}>
+        <div className="w-1 h-3 rounded-sm" style={{background:'linear-gradient(180deg,#f97316,#ea6a00)',boxShadow:'0 0 6px rgba(249,115,22,.6)'}}/>
         {label}
       </div>
       {action}
@@ -101,9 +101,8 @@ export function SH({ label, action }: { label:string, action?:ReactNode }) {
 export function KPI({ num, label, color='blue' }: { num:number|string, label:string, color?:'blue'|'green'|'amber'|'red' }) {
   const c = {blue:'var(--cy)',green:'var(--gn)',amber:'var(--am)',red:'var(--rd)'}[color]
   return (
-    <div className="rounded-xl p-2.5 text-center relative overflow-hidden" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
-      <div className="absolute top-0 inset-x-0 h-0.5" style={{background:c}}/>
-      <div className="font-bebas text-3xl leading-none" style={{color:c}}>{num}</div>
+    <div className="rounded-xl p-2.5 text-center relative overflow-hidden" style={{background:'var(--s1)',border:'1px solid var(--bd)',borderTop:'2px solid '+c}}>
+      <div className="font-bebas text-3xl leading-none" style={{color:c,textShadow:`0 0 12px ${c}88`}}>{num}</div>
       <div className="text-xs mt-0.5" style={{color:'var(--t3)',fontSize:'8px',textTransform:'uppercase',letterSpacing:'.3px'}}>{label}</div>
     </div>
   )
@@ -166,7 +165,7 @@ export function SearchBar({ value, onChange, placeholder='Buscar...', action }: 
       <input value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
         className="flex-1 rounded-xl px-3 py-2 text-xs outline-none"
         style={{background:'var(--s1)',border:'1px solid var(--bd)',color:'var(--t1)',fontFamily:'Sora,system-ui,sans-serif'}}
-        onFocus={e=>{e.target.style.borderColor='var(--cy)'}} onBlur={e=>{e.target.style.borderColor='var(--bd)'}} />
+        onFocus={e=>{e.target.style.borderColor='rgba(249,115,22,.6)';e.target.style.boxShadow='0 0 10px rgba(249,115,22,.12)'}} onBlur={e=>{e.target.style.borderColor='var(--bd)';e.target.style.boxShadow='none'}} />
       {action}
     </div>
   )

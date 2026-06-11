@@ -124,12 +124,16 @@ export default function App() {
 
   // ─── Splash ────────────────────────────────────────────────────────────────
   if (!splashDone) return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{background:'var(--bg)'}}>
-      <div className="text-center px-6">
-        <img src="/logo.png" alt="Industrial8" className="glow mx-auto mb-4" style={{height:'80px',width:'auto',objectFit:'contain'}} />
-        <div className="text-xs tracking-widest mt-1" style={{color:'var(--t3)'}}>MANUTENÇÃO INDUSTRIAL INTELIGENTE</div>
-        <div className="w-48 h-1 rounded-full mx-auto mt-5 overflow-hidden" style={{background:'var(--s1)'}}>
-          <div className="h-full rounded-full" style={{background:'linear-gradient(90deg,var(--cy),#7c3aed)',animation:'sfill 1.4s ease-out forwards'}}/>
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{background:'#0a1628'}}>
+      {/* Grid */}
+      <div className="absolute inset-0 opacity-10" style={{backgroundImage:'linear-gradient(rgba(249,115,22,.4) 1px,transparent 1px),linear-gradient(90deg,rgba(249,115,22,.4) 1px,transparent 1px)',backgroundSize:'60px 60px'}}/>
+      {/* Glow center */}
+      <div className="absolute" style={{width:'400px',height:'400px',borderRadius:'50%',background:'radial-gradient(circle,rgba(249,115,22,.12),transparent 70%)',top:'50%',left:'50%',transform:'translate(-50%,-50%)'}}/>
+      <div className="text-center px-6 relative z-10">
+        <img src="/logo.png" alt="Industrial8" className="glow mx-auto mb-4" style={{height:'90px',width:'auto',objectFit:'contain',filter:'drop-shadow(0 0 20px rgba(249,115,22,.8))'}} />
+        <div className="text-xs tracking-widest mt-1 font-bold" style={{color:'rgba(249,115,22,.6)',letterSpacing:'4px'}}>MANUTENÇÃO INDUSTRIAL INTELIGENTE</div>
+        <div className="w-48 h-0.5 mx-auto mt-5 overflow-hidden rounded-full" style={{background:'rgba(249,115,22,.15)'}}>
+          <div className="h-full rounded-full" style={{background:'linear-gradient(90deg,#f97316,#fb923c)',animation:'sfill 1.4s ease-out forwards',boxShadow:'0 0 8px rgba(249,115,22,.8)'}}/>
         </div>
         <style>{`@keyframes sfill{to{width:100%}} div.h-full{width:0}`}</style>
         <div className="text-xs mt-2" style={{color:'var(--t3)'}}>Conectando...</div>
@@ -180,12 +184,14 @@ export default function App() {
   return (
     <div className="fixed inset-0 flex flex-col" style={{background:'var(--bg)'}}>
       {/* HEADER */}
-      <header className="flex-shrink-0" style={{paddingTop:'var(--sat)',background:'rgba(6,13,26,.97)',backdropFilter:'blur(20px)',borderBottom:'1px solid var(--bd)',zIndex:50}}>
-        <div className="h-14 flex items-center justify-between px-3">
+      <header className="flex-shrink-0" style={{paddingTop:'var(--sat)',background:'rgba(10,22,40,.98)',backdropFilter:'blur(20px)',borderBottom:'1px solid rgba(249,115,22,.25)',zIndex:50,boxShadow:'0 2px 20px rgba(249,115,22,.1)'}}>
+        {/* Orange top line */}
+        <div style={{height:'2px',background:'linear-gradient(90deg,transparent,#f97316,#fb923c,#f97316,transparent)',position:'absolute',top:0,left:0,right:0}}/>
+        <div className="h-14 flex items-center justify-between px-3" style={{marginTop:'2px'}}>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2">
-              <img src="/logo.png" alt="Industrial8" style={{height:'32px',width:'auto',objectFit:'contain'}} />
-              <div className="text-xs" style={{color:'var(--t2)'}}>{DPT[now.getDay()]}, {now.getDate()} {MPT[now.getMonth()]} {now.getFullYear()}</div>
+              <img src="/logo.png" alt="Industrial8" style={{height:'28px',width:'auto',objectFit:'contain',filter:'drop-shadow(0 0 8px rgba(249,115,22,.5))'}} />
+              <div className="text-xs font-semibold" style={{color:'rgba(249,115,22,.6)',letterSpacing:'1px'}}>{DPT[now.getDay()]}, {now.getDate()} {MPT[now.getMonth()]} {now.getFullYear()}</div>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -206,7 +212,7 @@ export default function App() {
       </header>
 
       {/* NAV */}
-      <nav className="flex-shrink-0 flex overflow-x-auto" style={{background:'var(--bg2)',borderBottom:'2px solid var(--bd)',scrollbarWidth:'none'}}>
+      <nav className="flex-shrink-0 flex overflow-x-auto" style={{background:'rgba(12,20,36,.98)',borderBottom:'1px solid rgba(249,115,22,.2)',scrollbarWidth:'none',boxShadow:'0 4px 12px rgba(0,0,0,.4)'}}>
         <style>{`.nav-scroll::-webkit-scrollbar{display:none}`}</style>
         {NAV.map(n => (
           <button key={n.id} onClick={() => setPage(n.id)}
@@ -219,7 +225,7 @@ export default function App() {
             }}>
             {n.icon}
             <span>{n.label}</span>
-            {page===n.id && <div className="absolute bottom-0 left-3 right-3 h-0.5 rounded-t-sm" style={{background:'var(--cy)',boxShadow:'0 0 6px var(--cy)'}}/>}
+            {page===n.id && <div className="absolute bottom-0 left-3 right-3 h-0.5 rounded-t-sm" style={{background:'linear-gradient(90deg,transparent,#f97316,transparent)',boxShadow:'0 0 8px rgba(249,115,22,.8)'}}/>}
           </button>
         ))}
       </nav>
