@@ -58,15 +58,6 @@ export default function PMPage({ profile, can }: Props) {
       return { ...x, display_name: name }
     }).sort((a:any,b:any) => a.display_name.localeCompare(b.display_name))
     setUsers(userList)
-    // Build user list with display names
-    const userList = (u.data||[]).map((x:any) => {
-      let name = x.display_name || ''
-      if (!name || (name.includes('-') && name.length > 30)) {
-        name = x.email?.split('@')[0] || 'Usuário'
-      }
-      return { ...x, display_name: name }
-    }).sort((a:any,b:any) => a.display_name.localeCompare(b.display_name))
-    setUsers(userList)
 
     if (tab==='pm') {
       const { data } = await supabase.from('pm_reports').select('*').order('date',{ascending:false}).limit(100)
