@@ -80,7 +80,9 @@ export default function App() {
         setUser(null); setProfile(null); setLoading(false); setSplashDone(true)
       }
     })
-    return () => subscription.unsubscribe()
+    const hdrStyle = `@keyframes hdrGearSpin { to { transform: rotate(360deg) } }`
+
+  return () => subscription.unsubscribe()
   }, [])
 
   async function loadProfile(uid: string) {
@@ -118,19 +120,37 @@ export default function App() {
 
   // ─── Splash ────────────────────────────────────────────────────────────────
   if (!splashDone) return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{background:'#0a1628'}}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{background:'#06101e',overflow:'hidden'}}>
+      <style>{`@keyframes splashSpin{to{transform:rotate(360deg)}} @keyframes splashPulse{0%,100%{opacity:.3}50%{opacity:.7}} @keyframes splashFill{from{width:0}to{width:100%}}`}</style>
       {/* Grid */}
-      <div className="absolute inset-0 opacity-10" style={{backgroundImage:'linear-gradient(rgba(249,115,22,.4) 1px,transparent 1px),linear-gradient(90deg,rgba(249,115,22,.4) 1px,transparent 1px)',backgroundSize:'60px 60px'}}/>
-      {/* Glow center */}
-      <div className="absolute" style={{width:'400px',height:'400px',borderRadius:'50%',background:'radial-gradient(circle,rgba(249,115,22,.12),transparent 70%)',top:'50%',left:'50%',transform:'translate(-50%,-50%)'}}/>
-      <div className="text-center px-6 relative z-10">
-        <img src="/logo.png" alt="Industrial8" className="glow mx-auto mb-4" style={{height:'90px',width:'auto',objectFit:'contain',filter:'drop-shadow(0 0 20px rgba(249,115,22,.8))'}} />
-        <div className="text-xs tracking-widest mt-1 font-bold" style={{color:'rgba(249,115,22,.6)',letterSpacing:'4px'}}>MANUTENÇÃO INDUSTRIAL INTELIGENTE</div>
-        <div className="w-48 h-0.5 mx-auto mt-5 overflow-hidden rounded-full" style={{background:'rgba(249,115,22,.15)'}}>
-          <div className="h-full rounded-full" style={{background:'linear-gradient(90deg,#f97316,#fb923c)',animation:'sfill 1.4s ease-out forwards',boxShadow:'0 0 8px rgba(249,115,22,.8)'}}/>
+      <div style={{position:'absolute',inset:0,backgroundImage:'linear-gradient(rgba(249,115,22,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(249,115,22,.025) 1px,transparent 1px)',backgroundSize:'50px 50px',animation:'splashPulse 4s ease-in-out infinite'}}/>
+      {/* Glow */}
+      <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:'400px',height:'400px',borderRadius:'50%',background:'radial-gradient(circle,rgba(249,115,22,.1),transparent 65%)',animation:'splashPulse 3s ease-in-out infinite'}}/>
+      {/* Content */}
+      <div className="relative z-10 text-center px-6">
+        {/* Animated gear */}
+        <svg width="72" height="72" viewBox="0 0 52 52" fill="none" className="mx-auto mb-4" style={{filter:'drop-shadow(0 0 16px rgba(249,115,22,.8))'}}>
+          <g style={{transformOrigin:'26px 26px',animation:'splashSpin 7s linear infinite'}}>
+            <path d="M22 1h8l1.5 5.5a18 18 0 0 1 4.5 1.8l5-2.8 5.7 5.7-2.8 5a18 18 0 0 1 1.8 4.5L51 22v8l-5.5 1.5a18 18 0 0 1-1.8 4.5l2.8 5-5.7 5.7-5-2.8a18 18 0 0 1-4.5 1.8L30 51h-8l-1.5-5.5a18 18 0 0 1-4.5-1.8l-5 2.8-5.7-5.7 2.8-5a18 18 0 0 1-1.8-4.5L1 30v-8l5.5-1.5a18 18 0 0 1 1.8-4.5l-2.8-5 5.7-5.7 5 2.8a18 18 0 0 1 4.5-1.8L22 1z" fill="#1e3a6e" stroke="#f97316" strokeWidth="1.3"/>
+          </g>
+          <circle cx="26" cy="26" r="9" fill="#06101e" stroke="#f97316" strokeWidth="1.5"/>
+          <g style={{transformOrigin:'26px 26px',animation:'splashSpin 4s linear infinite reverse'}}>
+            <circle cx="26" cy="26" r="5.5" fill="none" stroke="rgba(249,115,22,.45)" strokeWidth="1" strokeDasharray="3 2"/>
+          </g>
+          <circle cx="26" cy="26" r="2.8" fill="#f97316"/>
+          <circle cx="26" cy="26" r="1.1" fill="#06101e"/>
+        </svg>
+        {/* Logo text */}
+        <div style={{fontSize:'36px',fontWeight:800,color:'#e8edf5',letterSpacing:'-.5px',lineHeight:1,fontFamily:"'Sora',system-ui",filter:'drop-shadow(0 0 12px rgba(249,115,22,.4))'}}>
+          industrial<span style={{color:'#f97316'}}>8</span>
         </div>
-        <style>{`@keyframes sfill{to{width:100%}} div.h-full{width:0}`}</style>
-        <div className="text-xs mt-2" style={{color:'var(--t3)'}}>Conectando...</div>
+        <div style={{fontSize:'9px',letterSpacing:'3.5px',color:'rgba(249,115,22,.55)',fontWeight:700,textTransform:'uppercase',marginTop:'6px'}}>
+          MANUTENÇÃO INDUSTRIAL INTELIGENTE
+        </div>
+        {/* Progress bar */}
+        <div style={{width:'180px',height:'2px',background:'rgba(249,115,22,.15)',borderRadius:'2px',margin:'20px auto 0',overflow:'hidden'}}>
+          <div style={{height:'100%',background:'linear-gradient(90deg,#f97316,#fb923c)',borderRadius:'2px',animation:'splashFill 1.2s ease-out forwards',boxShadow:'0 0 8px rgba(249,115,22,.7)'}}/>
+        </div>
       </div>
     </div>
   )
@@ -178,14 +198,30 @@ export default function App() {
   return (
     <div className="fixed inset-0 flex flex-col" style={{background:'var(--bg)'}}>
       {/* HEADER */}
+      <style>{hdrStyle}</style>
       <header className="flex-shrink-0" style={{paddingTop:'var(--sat)',background:'rgba(10,22,40,.98)',backdropFilter:'blur(20px)',borderBottom:'1px solid rgba(249,115,22,.25)',zIndex:50,boxShadow:'0 2px 20px rgba(249,115,22,.1)'}}>
         {/* Orange top line */}
         <div style={{height:'2px',background:'linear-gradient(90deg,transparent,#f97316,#fb923c,#f97316,transparent)',position:'absolute',top:0,left:0,right:0}}/>
         <div className="h-14 flex items-center justify-between px-3" style={{marginTop:'2px'}}>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2">
-              <img src="/logo.png" alt="Industrial8" style={{height:'28px',width:'auto',objectFit:'contain',filter:'drop-shadow(0 0 8px rgba(249,115,22,.5))'}} />
-              <div className="text-xs font-semibold" style={{color:'rgba(249,115,22,.6)',letterSpacing:'1px'}}>{DPT[now.getDay()]}, {now.getDate()} {MPT[now.getMonth()]} {now.getFullYear()}</div>
+              <svg width="30" height="30" viewBox="0 0 52 52" fill="none" style={{flexShrink:0}}>
+                <g style={{transformOrigin:'26px 26px',animation:'hdrGearSpin 8s linear infinite'}}>
+                  <path d="M22 1h8l1.5 5.5a18 18 0 0 1 4.5 1.8l5-2.8 5.7 5.7-2.8 5a18 18 0 0 1 1.8 4.5L51 22v8l-5.5 1.5a18 18 0 0 1-1.8 4.5l2.8 5-5.7 5.7-5-2.8a18 18 0 0 1-4.5 1.8L30 51h-8l-1.5-5.5a18 18 0 0 1-4.5-1.8l-5 2.8-5.7-5.7 2.8-5a18 18 0 0 1-1.8-4.5L1 30v-8l5.5-1.5a18 18 0 0 1 1.8-4.5l-2.8-5 5.7-5.7 5 2.8a18 18 0 0 1 4.5-1.8L22 1z" fill="#1e3a6e" stroke="#f97316" strokeWidth="1.2"/>
+                </g>
+                <circle cx="26" cy="26" r="9" fill="#06101e" stroke="#f97316" strokeWidth="1.5"/>
+                <g style={{transformOrigin:'26px 26px',animation:'hdrGearSpin 5s linear infinite reverse'}}>
+                  <circle cx="26" cy="26" r="5.5" fill="none" stroke="rgba(249,115,22,.4)" strokeWidth="1" strokeDasharray="3 2"/>
+                </g>
+                <circle cx="26" cy="26" r="2.8" fill="#f97316"/>
+                <circle cx="26" cy="26" r="1.1" fill="#06101e"/>
+              </svg>
+              <div style={{display:'flex',flexDirection:'column'}}>
+                <div style={{fontSize:'15px',fontWeight:800,color:'#e8edf5',letterSpacing:'-.3px',lineHeight:1,fontFamily:"'Sora',system-ui"}}>
+                  industrial<span style={{color:'#f97316'}}>8</span>
+                </div>
+                <div style={{fontSize:'7px',letterSpacing:'1.5px',color:'rgba(249,115,22,.5)',fontWeight:700,textTransform:'uppercase'}}>{DPT[now.getDay()]}, {now.getDate()} {MPT[now.getMonth()]}</div>
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-1">
