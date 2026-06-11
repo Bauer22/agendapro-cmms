@@ -1,4 +1,4 @@
-# 🚀 AgendaPro CMMS — Guia de Deploy
+# 🚀 Industrial8 — Guia de Deploy
 
 ## Passo 1 — Criar conta Supabase (gratuito)
 
@@ -6,7 +6,7 @@
 2. Crie uma conta com Google ou e-mail
 3. Clique em **New Project**
 4. Preencha:
-   - **Name:** agendapro-cmms
+   - **Name:** industrial8
    - **Database Password:** (anote, vai precisar)
    - **Region:** South America (São Paulo)
 5. Clique em **Create new project** e aguarde ~2 minutos
@@ -42,16 +42,16 @@
 ## Passo 5 — Criar repositório GitHub
 
 1. Acesse **https://github.com** → **New repository**
-2. Nome: `agendapro-cmms` → Public ou Private → **Create repository**
+2. Nome: `industrial8` → Public ou Private → **Create repository**
 3. No terminal, dentro da pasta do projeto:
 
 ```bash
-cd agendapro-cmms
+cd industrial8
 git init
 git add .
-git commit -m "AgendaPro CMMS v3"
+git commit -m "Industrial8 v3"
 git branch -M main
-git remote add origin https://github.com/SEU_USUARIO/agendapro-cmms.git
+git remote add origin https://github.com/SEU_USUARIO/industrial8.git
 git push -u origin main
 ```
 
@@ -60,7 +60,7 @@ git push -u origin main
 ## Passo 6 — Deploy no Vercel
 
 1. No Vercel, clique em **New Project**
-2. Selecione o repositório `agendapro-cmms`
+2. Selecione o repositório `industrial8`
 3. Na tela de configuração, expanda **Environment Variables** e adicione:
 
 | Nome | Valor |
@@ -69,7 +69,7 @@ git push -u origin main
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJhbGci...` |
 
 4. Clique em **Deploy** e aguarde ~3 minutos
-5. Sua URL será algo como: `https://agendapro-cmms.vercel.app`
+5. Sua URL será algo como: `https://industrial8.vercel.app`
 
 ---
 

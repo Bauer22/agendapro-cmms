@@ -26,11 +26,10 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
 
   return (
     <div className="fixed inset-0 flex items-center justify-center p-5" style={{background:'var(--bg)'}}>
-      <div className="w-full max-w-sm rounded-2xl p-8" style={{background:'var(--bg2)',border:'1px solid var(--bd)'}}>
+      <div className="w-full max-w-sm rounded-2xl p-8" style={{background:'var(--bg2)',border:'1px solid rgba(249,115,22,.3)',boxShadow:'0 0 30px rgba(249,115,22,.08)'}}>
         <div className="text-center mb-7">
-          <div className="text-5xl mb-3">⚙️</div>
-          <div className="font-bebas text-4xl tracking-widest" style={{color:'var(--cy)'}}>AgendaPro</div>
-          <div className="text-xs tracking-widest mt-1" style={{color:'var(--t3)'}}>CMMS · GESTÃO INDUSTRIAL</div>
+          <img src="/logo.png" alt="Industrial8" className="mx-auto mb-3" style={{height:'70px',width:'auto',objectFit:'contain'}} />
+          <div className="text-xs tracking-widest" style={{color:'var(--t3)'}}>MANUTENÇÃO INDUSTRIAL INTELIGENTE</div>
         </div>
         {err && <div className="rounded-lg p-3 mb-3 text-xs" style={{background:'rgba(239,68,68,.1)',border:'1px solid rgba(239,68,68,.3)',color:'var(--rd)'}}>{err}</div>}
         <div className="mb-3">
@@ -51,10 +50,10 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
         </div>
         <button onClick={login} disabled={loading}
           className="w-full py-3 rounded-xl font-bold text-sm transition-all"
-          style={{background:loading?'var(--s2)':'var(--cy)',color:loading?'var(--t2)':'#000',border:'none',cursor:loading?'not-allowed':'pointer',fontFamily:'Sora,system-ui,sans-serif'}}>
+          style={{background:loading?'var(--s2)':'linear-gradient(135deg,#f97316,#ea6a00)',color:loading?'var(--t2)':'#fff',border:'none',cursor:loading?'not-allowed':'pointer',fontFamily:'Sora,system-ui,sans-serif'}}>
           {loading ? 'Entrando...' : 'Entrar'}
         </button>
-        <div className="text-center text-xs mt-4" style={{color:'var(--t3)'}}>AgendaPro · Acesso restrito</div>
+        <div className="text-center text-xs mt-4" style={{color:'var(--t3)'}}>Industrial8 · Acesso restrito</div>
       </div>
     </div>
   )

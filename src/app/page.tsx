@@ -25,6 +25,12 @@ const IC = {
   load: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v3"/><rect x="9" y="11" width="14" height="10" rx="2"/></svg>,
   drv:  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>,
   cli:  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  qr:   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><path d="M21 16h-3v3m0-3v-2h-2m5 5v-2m-7 2h2m0-5h2v2m2-2v3"/><rect x="5" y="5" width="1" height="1"/><rect x="18" y="5" width="1" height="1"/><rect x="5" y="18" width="1" height="1"/></svg>,
+  down: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+  sadm: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>,
+  qr:   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><rect x="5" y="5" width="1" height="1"/><rect x="18" y="5" width="1" height="1"/><rect x="5" y="18" width="1" height="1"/></svg>,
+  down: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+  sadm: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>,
   out:  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
   gear: '⚙️',
 }
@@ -41,8 +47,12 @@ import ReportsPage from './pages/ReportsPage'
 import UsersPage   from './pages/UsersPage'
 import SettPage    from './pages/SettPage'
 import LoginPage   from './pages/LoginPage'
+import FinancePage    from './pages/FinancePage'
+import QRPage         from './pages/QRPage'
+import DowntimePage   from './pages/DowntimePage'
+import SuperAdminPage from './pages/SuperAdminPage'
 
-type Page = 'dashboard'|'os'|'machines'|'pm'|'tasks'|'parts'|'suppliers'|'reports'|'users'|'settings'
+type Page = 'dashboard'|'os'|'machines'|'pm'|'tasks'|'parts'|'suppliers'|'reports'|'users'|'settings'|'finance'|'qr'|'downtime'|'superadmin'
 
 export default function App() {
   const [user, setUser]    = useState<any>(null)
@@ -107,7 +117,7 @@ export default function App() {
 
   const can = useCallback((perm: string) => {
     if (!profile) return false
-    if (profile.role === 'admin') return true
+    if (profile.role === 'superadmin' || profile.role === 'admin') return true
     const perms = ROLES[profile.role]?.perms || []
     return perms.includes(perm) || perms.includes('all')
   }, [profile])
@@ -116,9 +126,8 @@ export default function App() {
   if (!splashDone) return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{background:'var(--bg)'}}>
       <div className="text-center px-6">
-        <div className="text-6xl spin inline-block mb-3">⚙️</div>
-        <div className="font-bebas text-5xl tracking-widest" style={{color:'var(--cy)'}}>AgendaPro</div>
-        <div className="text-xs tracking-widest mt-1" style={{color:'var(--t3)'}}>CMMS · GESTÃO INDUSTRIAL</div>
+        <img src="/logo.png" alt="Industrial8" className="glow mx-auto mb-4" style={{height:'80px',width:'auto',objectFit:'contain'}} />
+        <div className="text-xs tracking-widest mt-1" style={{color:'var(--t3)'}}>MANUTENÇÃO INDUSTRIAL INTELIGENTE</div>
         <div className="w-48 h-1 rounded-full mx-auto mt-5 overflow-hidden" style={{background:'var(--s1)'}}>
           <div className="h-full rounded-full" style={{background:'linear-gradient(90deg,var(--cy),#7c3aed)',animation:'sfill 1.4s ease-out forwards'}}/>
         </div>
@@ -145,9 +154,12 @@ export default function App() {
     {id:'parts' as Page,      label:'Peças',     icon:IC.parts},
     {id:'suppliers' as Page,  label:'Fornec.',   icon:IC.sup},
     {id:'reports' as Page,    label:'Relatórios',icon:IC.rep},
-    {id:'users' as Page,      label:'Usuários',   icon:IC.users, perm:'admin'},
+    {id:'qr' as Page,          label:'QR Codes',   icon:IC.qr},
+    {id:'downtime' as Page,    label:'Paradas',    icon:IC.down},
+    {id:'users' as Page,       label:'Usuários',   icon:IC.users, perm:'admin'},
+    {id:'superadmin' as Page,  label:'Super Admin',icon:IC.sadm,  perm:'superadmin'},
     {id:'settings' as Page,   label:'Config',    icon:IC.cfg},
-  ].filter(n => !n.perm || profile?.role === n.perm)
+  ].filter(n => !n.perm || profile?.role === n.perm || (n.perm === 'admin' && profile?.role === 'superadmin'))
 
   const PageMap: Record<Page, React.ReactNode> = {
     dashboard:   <DashPage    profile={profile} can={can} onNavigate={setPage} />,
@@ -159,7 +171,10 @@ export default function App() {
     suppliers:   <SuppPage    profile={profile} can={can} />,
     reports:     <ReportsPage profile={profile} can={can} />,
     users:       <UsersPage   profile={profile} can={can} />,
-    settings:    <SettPage    profile={profile} onSave={p => setProfile(p)} />,
+    settings:    <SettPage      profile={profile} onSave={p => setProfile(p)} />,
+    qr:          <QRPage        profile={profile} can={can} onNavigate={setPage} />,
+    downtime:    <DowntimePage  profile={profile} can={can} />,
+    superadmin:  <SuperAdminPage profile={profile} />,
   }
 
   return (
@@ -168,9 +183,8 @@ export default function App() {
       <header className="flex-shrink-0" style={{paddingTop:'var(--sat)',background:'rgba(6,13,26,.97)',backdropFilter:'blur(20px)',borderBottom:'1px solid var(--bd)',zIndex:50}}>
         <div className="h-14 flex items-center justify-between px-3">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center text-lg" style={{background:'var(--s2)',border:'1px solid var(--bd)'}}>⚙️</div>
-            <div>
-              <div className="text-sm font-bold leading-tight">AgendaPro CMMS</div>
+            <div className="flex items-center gap-2">
+              <img src="/logo.png" alt="Industrial8" style={{height:'32px',width:'auto',objectFit:'contain'}} />
               <div className="text-xs" style={{color:'var(--t2)'}}>{DPT[now.getDay()]}, {now.getDate()} {MPT[now.getMonth()]} {now.getFullYear()}</div>
             </div>
           </div>
@@ -205,7 +219,7 @@ export default function App() {
             }}>
             {n.icon}
             <span>{n.label}</span>
-            {page===n.id && <div className="absolute bottom-0 left-3 right-3 h-0.5 rounded-t-sm" style={{background:'var(--cy)'}}/>}
+            {page===n.id && <div className="absolute bottom-0 left-3 right-3 h-0.5 rounded-t-sm" style={{background:'var(--cy)',boxShadow:'0 0 6px var(--cy)'}}/>}
           </button>
         ))}
       </nav>

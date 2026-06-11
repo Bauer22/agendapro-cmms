@@ -83,7 +83,7 @@ export default function ReportsPage({ profile, can }: Props) {
       doc.setFillColor(6,13,26)
       doc.rect(0,0,210,25,'F')
       doc.setTextColor(0,212,255); doc.setFontSize(14); doc.setFont('helvetica','bold')
-      doc.text('AgendaPro CMMS', 12, 11)
+      doc.text('Industrial8', 12, 11)
       doc.setTextColor(148,163,184); doc.setFontSize(8); doc.setFont('helvetica','normal')
       doc.text(`Gerado em: ${dateStr} por ${profile?.display_name||''}`, 12, 18)
 

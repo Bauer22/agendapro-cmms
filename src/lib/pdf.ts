@@ -6,12 +6,12 @@ import { fmtD, fmtDT } from './utils'
 interface PDFOptions { title: string; company?: string; logo?: string; user?: string }
 
 function header(doc: jsPDF, opts: PDFOptions) {
-  const { title, company = 'AgendaPro CMMS', user = '' } = opts
+  const { title, company = 'Industrial8', user = '' } = opts
   doc.setFillColor(6,13,26)
   doc.rect(0,0,210,28,'F')
   doc.setTextColor(0,212,255)
   doc.setFontSize(16); doc.setFont('helvetica','bold')
-  doc.text('AgendaPro CMMS', 12, 12)
+  doc.text('Industrial8', 12, 12)
   doc.setTextColor(148,163,184); doc.setFontSize(9); doc.setFont('helvetica','normal')
   doc.text(company, 12, 19)
   const now = new Date()

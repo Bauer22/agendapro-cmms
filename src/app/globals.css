@@ -4,21 +4,41 @@
 @tailwind utilities;
 
 :root {
-  --bg:#060d1a;--bg2:#0c1628;--s1:#111d33;--s2:#192840;--s3:#1e3050;
-  --bd:#1e3a5f;--bd2:#2a4f7c;
-  --cy:#00d4ff;--am:#f59e0b;--gn:#10b981;--rd:#ef4444;
-  --t1:#e2e8f0;--t2:#8fa3bf;--t3:#4a6380;
-  --sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);
+  --bg:  #0c1628;
+  --bg2: #111e35;
+  --s1:  #162540;
+  --s2:  #1c2f50;
+  --s3:  #243a60;
+  --bd:  #1e3a5f;
+  --bd2: #2a4f7c;
+  --cy:  #f97316;
+  --cy2: #fb923c;
+  --am:  #eab308;
+  --gn:  #22c55e;
+  --rd:  #ef4444;
+  --pu:  #a78bfa;
+  --t1:  #e8edf5;
+  --t2:  #8fa3bf;
+  --t3:  #4a6380;
+  --bl:  #1e3a6e;
+  --sat: env(safe-area-inset-top,0px);
+  --sab: env(safe-area-inset-bottom,0px);
 }
 *,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;background:var(--bg);color:var(--t1);font-family:'Sora',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
-body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(ellipse 80% 40% at 50% -5%,rgba(0,212,255,.06),transparent),linear-gradient(rgba(0,212,255,.015) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.015) 1px,transparent 1px);background-size:100%,36px 36px,36px 36px}
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse 70% 35% at 50% -5%,rgba(249,115,22,.08),transparent),
+  linear-gradient(rgba(249,115,22,.012) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(249,115,22,.012) 1px,transparent 1px);
+  background-size:100%,36px 36px,36px 36px}
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--bd);border-radius:2px}
 .page-enter{animation:pageUp .18s ease}
 @keyframes pageUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes spin{to{transform:rotate(360deg)}}
-@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,.4)}50%{box-shadow:0 0 0 6px rgba(16,185,129,0)}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(249,115,22,.4)}50%{box-shadow:0 0 0 6px rgba(249,115,22,0)}}
+@keyframes glow{0%,100%{filter:drop-shadow(0 0 4px rgba(249,115,22,.6))}50%{filter:drop-shadow(0 0 14px rgba(249,115,22,.95))}}
 .spin{animation:spin .8s linear infinite}
 .pulse{animation:pulse 2s infinite}
+.glow{animation:glow 2s ease-in-out infinite}

@@ -3,12 +3,12 @@ import './globals.css'
 import { Toaster } from 'react-hot-toast'
 
 export const metadata: Metadata = {
-  title: 'AgendaPro CMMS',
+  title: 'Industrial8',
   description: 'Sistema de Gestão de Manutenção Industrial',
   manifest: '/manifest.json',
-  themeColor: '#060d1a',
+  themeColor: '#0c1628',
   viewport: 'width=device-width,initial-scale=1,viewport-fit=cover',
-  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'AgendaPro' },
+  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Industrial8' },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

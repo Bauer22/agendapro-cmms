@@ -87,7 +87,7 @@ export default function SettPage({ profile, onSave }: Props) {
         </div>
       </div>
 
-      <div className="text-center py-4 text-xs" style={{color:'var(--t3)'}}>AgendaPro CMMS v3.0 · Supabase · Vercel · PWA</div>
+      <div className="text-center py-4 text-xs" style={{color:'var(--t3)'}}>Industrial8 v3.0 · Supabase · Vercel · PWA</div>
     </div>
   )
 }

@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 // ─── Badge ────────────────────────────────────────────────────────────────
 export function Badge({ children, color='blue', className='' }: { children:ReactNode, color?:'blue'|'green'|'amber'|'red'|'gray'|'purple', className?:string }) {
   const map = {
-    blue:  {bg:'rgba(0,212,255,.12)',  color:'#00d4ff'},
+    blue:  {bg:'rgba(249,115,22,.15)', color:'#f97316'},
     green: {bg:'rgba(16,185,129,.13)', color:'#10b981'},
     amber: {bg:'rgba(245,158,11,.13)', color:'#f59e0b'},
     red:   {bg:'rgba(239,68,68,.13)',  color:'#ef4444'},
@@ -19,7 +19,7 @@ export function Badge({ children, color='blue', className='' }: { children:React
 // ─── Button ──────────────────────────────────────────────────────────────
 export function Btn({ children, onClick, variant='primary', size='md', disabled=false, className='' }: { children:ReactNode, onClick?:()=>void, variant?:'primary'|'secondary'|'danger'|'ghost', size?:'sm'|'md'|'lg', disabled?:boolean, className?:string }) {
   const v = {
-    primary:   {bg:'var(--cy)',      color:'#000',         hov:'brightness(1.08)'},
+    primary:   {bg:'linear-gradient(135deg,#f97316,#ea6a00)', color:'#fff', hov:'brightness(1.1)'},
     secondary: {bg:'transparent',   color:'var(--t2)',    border:'1px solid var(--bd)'},
     danger:    {bg:'var(--rd)',      color:'#fff',         hov:'brightness(1.1)'},
     ghost:     {bg:'transparent',   color:'var(--t3)',    border:'none'},
