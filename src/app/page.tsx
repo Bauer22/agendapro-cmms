@@ -80,9 +80,7 @@ export default function App() {
         setUser(null); setProfile(null); setLoading(false); setSplashDone(true)
       }
     })
-    const hdrStyle = `@keyframes hdrGearSpin { to { transform: rotate(360deg) } }`
-
-  return () => subscription.unsubscribe()
+    return () => subscription.unsubscribe()
   }, [])
 
   async function loadProfile(uid: string) {
@@ -198,7 +196,7 @@ export default function App() {
   return (
     <div className="fixed inset-0 flex flex-col" style={{background:'var(--bg)'}}>
       {/* HEADER */}
-      <style>{hdrStyle}</style>
+      <style>{`@keyframes hdrGearSpin { to { transform: rotate(360deg) } }`}</style>
       <header className="flex-shrink-0" style={{paddingTop:'var(--sat)',background:'rgba(10,22,40,.98)',backdropFilter:'blur(20px)',borderBottom:'1px solid rgba(249,115,22,.25)',zIndex:50,boxShadow:'0 2px 20px rgba(249,115,22,.1)'}}>
         {/* Orange top line */}
         <div style={{height:'2px',background:'linear-gradient(90deg,transparent,#f97316,#fb923c,#f97316,transparent)',position:'absolute',top:0,left:0,right:0}}/>
