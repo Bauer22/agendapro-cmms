@@ -30,3 +30,13 @@ export const ROLES: Record<string,{perms:string[]}> = {
 export const DPT = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
 export const MPT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
 export const MFULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+
+export const fmtH = (h?: number) => h != null ? `${h.toLocaleString('pt-BR')}h` : '—'
+
+export function oilStatus(current: number, lastOil: number, interval: number) {
+  const diff = current - lastOil
+  const pct  = interval > 0 ? (diff / interval) * 100 : 0
+  if (pct >= 100) return { label: '🔴 Troca vencida',   color: 'rd' }
+  if (pct >= 80)  return { label: '🟡 Trocar em breve', color: 'am' }
+  return { label: '🟢 Em dia', color: 'gn' }
+}
