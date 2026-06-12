@@ -76,29 +76,36 @@ export default function DowntimePage({ profile, can }: Props) {
     const mach = machines.find(m => m.id === editing.machine_id)
     const duration_min = editing.end_time ? calcDuration(editing.start_time, editing.end_time) : undefined
     const obj = { ...editing, machine_name: mach?.name, duration_min, created_by: profile?.display_name||profile?.email }
+    // remove campos que não existem na tabela / não devem ser enviados
+    delete obj.id
     try {
+      let error
       if (editing.id) {
-        await supabase.from('downtime_records').update(obj).eq('id', editing.id)
+        ;({ error } = await supabase.from('downtime_records').update(obj).eq('id', editing.id))
+        if (error) throw error
         toast.success('Registro atualizado ✅')
       } else {
-        await supabase.from('downtime_records').insert({ ...obj, created_at: new Date().toISOString() })
+        ;({ error } = await supabase.from('downtime_records').insert({ ...obj, created_at: new Date().toISOString() }))
+        if (error) throw error
         toast.success('Parada registrada ✅')
       }
       setModal(false); load()
-    } catch(e:any) { toast.error('Erro: '+e.message) }
+    } catch(e:any) { toast.error('Erro: '+(e.message||JSON.stringify(e))) }
   }
 
   async function closeDowntime(rec: any) {
     const now = new Date().toISOString().slice(0,16)
     const duration_min = calcDuration(rec.start_time, now)
-    await supabase.from('downtime_records').update({ end_time: now, duration_min, status:'closed' }).eq('id', rec.id)
-    toast.success(`Parada encerrada — ${(duration_min||0/60).toFixed(1)}h ✅`)
+    const { error } = await supabase.from('downtime_records').update({ end_time: now, duration_min, status:'closed' }).eq('id', rec.id)
+    if (error) { toast.error('Erro: '+error.message); return }
+    toast.success(`Parada encerrada — ${((duration_min||0)/60).toFixed(1)}h ✅`)
     load()
   }
 
   async function del(id: string) {
     if (!await confirm('Excluir este registro?')) return
-    await supabase.from('downtime_records').delete().eq('id', id)
+    const { error } = await supabase.from('downtime_records').delete().eq('id', id)
+    if (error) { toast.error('Erro: '+error.message); return }
     toast.success('Excluído'); load()
   }
 

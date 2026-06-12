@@ -51,7 +51,8 @@ export default function UsersPage({ profile, can }: Props) {
   async function toggleBlock(u: UserProfile) {
     const action = u.blocked ? 'desbloquear' : 'bloquear'
     if (!await confirm(`Deseja ${action} ${u.display_name||u.email}?`)) return
-    await supabase.from('profiles').update({ blocked: !u.blocked }).eq('id', u.id)
+    const { error: eBl } = await supabase.from('profiles').update({ blocked: !u.blocked }).eq('id', u.id)
+    if (eBl) { toast.error('Erro: '+eBl.message); return }
     toast.success(u.blocked ? 'Usuário desbloqueado' : 'Usuário bloqueado')
     load()
   }

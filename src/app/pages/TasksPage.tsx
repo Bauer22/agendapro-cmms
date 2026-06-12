@@ -39,7 +39,8 @@ export default function TasksPage({ profile, can }: Props) {
   function openEdit(t: Task) { setEdit({...t}); setModal(true) }
 
   async function toggle(t: Task) {
-    await supabase.from('tasks').update({ done: !t.done }).eq('id', t.id)
+    const { error: eT } = await supabase.from('tasks').update({ done: !t.done }).eq('id', t.id)
+    if (eT) { toast.error('Erro: '+eT.message); return }
     load()
   }
 
@@ -61,7 +62,8 @@ export default function TasksPage({ profile, can }: Props) {
 
   async function del(id: string) {
     if (!await confirm('Excluir esta tarefa?')) return
-    await supabase.from('tasks').delete().eq('id', id)
+    const { error: eDel } = await supabase.from('tasks').delete().eq('id', id)
+    if (eDel) { toast.error('Erro: '+eDel.message); return }
     toast.success('Excluída'); load()
   }
 

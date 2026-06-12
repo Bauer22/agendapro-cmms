@@ -84,8 +84,9 @@ export default function PartsPage({ profile, can }: Props) {
       newStock -= Number(move.quantity)
     } else newStock = Number(move.quantity)
     try {
-      await supabase.from('parts').update({ stock: newStock }).eq('id', move.part_id)
-      await supabase.from('stock_movements').insert({
+      const { error: e1 } = await supabase.from('parts').update({ stock: newStock }).eq('id', move.part_id)
+      if (e1) { toast.error('Erro: '+e1.message); return }
+      const { error: e2 } = await supabase.from('stock_movements').insert({
         ...move,
         part_name: part.name, part_code: part.code,
         stock_after: newStock,
@@ -103,16 +104,20 @@ export default function PartsPage({ profile, can }: Props) {
     const obj = { ...editPO, part_name: part?.name, part_code: part?.code, status: editPO.status||'pending', created_by: profile?.display_name, created_at: new Date().toISOString() }
     try {
       if (editPO.id) {
-        await supabase.from('purchase_orders').update(obj).eq('id', editPO.id)
+        const { error: ePo } = await supabase.from('purchase_orders').update(obj).eq('id', editPO.id)
+        if (ePo) { toast.error('Erro: '+ePo.message); return }
         // If received, auto-update stock
         if (editPO.status==='received') {
           const newStock = (part?.stock||0) + Number(editPO.quantity)
-          await supabase.from('parts').update({ stock: newStock }).eq('id', editPO.part_id)
-          await supabase.from('stock_movements').insert({ part_id: editPO.part_id, part_name: part?.name, type:'in', quantity: editPO.quantity, reason: 'Recebimento de pedido de compra', stock_after: newStock, created_by: profile?.display_name, created_at: new Date().toISOString() })
+          const { error: e3 } = await supabase.from('parts').update({ stock: newStock }).eq('id', editPO.part_id)
+          if (e3) toast.error('Erro estoque: '+e3.message)
+          const { error: e4 } = await supabase.from('stock_movements').insert({ part_id: editPO.part_id, part_name: part?.name, type:'in', quantity: editPO.quantity, reason: 'Recebimento de pedido de compra', stock_after: newStock, created_by: profile?.display_name, created_at: new Date().toISOString() })
+          if (e4) toast.error('Erro movimento: '+e4.message)
           toast.success('Pedido recebido! Estoque atualizado ✅')
         } else { toast.success('Pedido atualizado ✅') }
       } else {
-        await supabase.from('purchase_orders').insert(obj)
+        const { error: ePo2 } = await supabase.from('purchase_orders').insert(obj)
+        if (ePo2) { toast.error('Erro: '+ePo2.message); return }
         toast.success('Pedido criado ✅')
       }
       setModalPO(false); load()
@@ -121,7 +126,8 @@ export default function PartsPage({ profile, can }: Props) {
 
   async function del(id: string) {
     if (!await confirm('Excluir esta peça?')) return
-    await supabase.from('parts').delete().eq('id', id)
+    const { error: eDel } = await supabase.from('parts').delete().eq('id', id)
+    if (eDel) { toast.error('Erro: '+eDel.message); return }
     toast.success('Excluída'); load()
   }
 

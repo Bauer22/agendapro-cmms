@@ -62,22 +62,26 @@ export default function FinancePage({ profile, can }: Props) {
     try {
       const obj = { ...editing, active: true }
       if (editing.id) {
-        await supabase.from('cost_centers').update(obj).eq('id', editing.id)
+        const { error: eCc } = await supabase.from('cost_centers').update(obj).eq('id', editing.id)
+        if (eCc) { toast.error('Erro: '+eCc.message); return }
       } else {
-        await supabase.from('cost_centers').insert(obj)
+        const { error: eCc2 } = await supabase.from('cost_centers').insert(obj)
+        if (eCc2) { toast.error('Erro: '+eCc2.message); return }
       }
       toast.success('Centro de custo salvo ✅'); setModal(false); load()
     } catch(e:any) { toast.error('Erro: '+e.message) }
   }
 
   async function markPaid(id: string) {
-    await supabase.from('accounts_payable').update({ status:'paid', data_recebimento: td() }).eq('id', id)
+    const { error: ePay } = await supabase.from('accounts_payable').update({ status:'paid', data_recebimento: td() }).eq('id', id)
+    if (ePay) { toast.error('Erro: '+ePay.message); return }
     toast.success('Marcado como pago ✅'); load()
   }
 
   async function del(id: string, tbl: string) {
     if (!await confirm('Excluir este registro?')) return
-    await supabase.from(tbl).delete().eq('id', id)
+    const { error: eDel } = await supabase.from(tbl).delete().eq('id', id)
+    if (eDel) { toast.error('Erro: '+eDel.message); return }
     toast.success('Excluído'); load()
   }
 

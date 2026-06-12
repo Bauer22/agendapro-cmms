@@ -92,7 +92,8 @@ export default function PMPage({ profile, can }: Props) {
 
   async function finalize(rec: any) {
     if (!await confirm('Finalizar este relatório de MP?')) return
-    await supabase.from('pm_reports').update({ pm_status:'done', close_date: td() }).eq('id', rec.id)
+    const { error: ePm } = await supabase.from('pm_reports').update({ pm_status:'done', close_date: td() }).eq('id', rec.id)
+    if (ePm) { toast.error('Erro: '+ePm.message); return }
     toast.success('MP finalizado ✅'); setViewModal(false); load()
   }
 
@@ -129,7 +130,8 @@ export default function PMPage({ profile, can }: Props) {
 
   async function del(id: string) {
     if (!await confirm('Excluir este registro?')) return
-    await supabase.from('pm_reports').delete().eq('id', id)
+    const { error: eDel } = await supabase.from('pm_reports').delete().eq('id', id)
+    if (eDel) { toast.error('Erro: '+eDel.message); return }
     toast.success('Excluído'); setViewModal(false); load()
   }
 
@@ -187,8 +189,10 @@ export default function PMPage({ profile, can }: Props) {
             const partData = parts.find((x:any)=>x.id===p.part_id)
             if (partData) {
               const newStock = Math.max(0, (partData.stock||0) - (p.qty||0))
-              await supabase.from('parts').update({ stock: newStock }).eq('id', p.part_id)
-              await supabase.from('stock_movements').insert({ part_id: p.part_id, part_name: p.part_name, type:'out', quantity: p.qty, reason: `Conserto: ${mach?.name}`, stock_after: newStock, created_by: profile?.display_name, created_at: new Date().toISOString() })
+              const { error: ePs } = await supabase.from('parts').update({ stock: newStock }).eq('id', p.part_id)
+              if (ePs) toast.error('Erro estoque: '+ePs.message)
+              const { error: eSm } = await supabase.from('stock_movements').insert({ part_id: p.part_id, part_name: p.part_name, type:'out', quantity: p.qty, reason: `Conserto: ${mach?.name}`, stock_after: newStock, created_by: profile?.display_name, created_at: new Date().toISOString() })
+              if (eSm) toast.error('Erro movimento: '+eSm.message)
             }
           }
           toast.success('Peças baixadas do estoque ✅')
@@ -205,7 +209,8 @@ export default function PMPage({ profile, can }: Props) {
 
   async function delRepair(id: string) {
     if (!await confirm('Excluir este registro de conserto?')) return
-    await supabase.from('repair_orders').delete().eq('id', id)
+    const { error: eDelR } = await supabase.from('repair_orders').delete().eq('id', id)
+    if (eDelR) { toast.error('Erro: '+eDelR.message); return }
     toast.success('Excluído'); setRepairViewModal(false); load()
   }
 

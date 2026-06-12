@@ -38,7 +38,8 @@ export default function SuppPage({ profile, can }: Props) {
 
   async function del(id: string) {
     if (!await confirm('Excluir este fornecedor?')) return
-    await supabase.from('suppliers').delete().eq('id', id)
+    const { error: eDel } = await supabase.from('suppliers').delete().eq('id', id)
+    if (eDel) { toast.error('Erro: '+eDel.message); return }
     toast.success('Excluído'); load()
   }
 

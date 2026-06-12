@@ -14,8 +14,6 @@ const REPORT_MODULES = [
   {id:'pm',       icon:'📝', title:'Relatórios MP',        desc:'Preventivas por período e máquina'},
   {id:'parts',    icon:'📦', title:'Inventário de Peças',  desc:'Estoque atual com alertas e movimentos'},
   {id:'po',       icon:'🛒', title:'Pedidos de Compra',    desc:'Pedidos por status e fornecedor'},
-  {id:'fuel',     icon:'⛽', title:'Combustível',          desc:'Entradas, saídas e estoque'},
-  {id:'wood',     icon:'🪵', title:'Pátio de Toras',       desc:'Entradas por fornecedor e período'},
   {id:'finance',  icon:'💰', title:'Contas a Pagar',       desc:'Pagamentos por status e vencimento'},
   {id:'backup',   icon:'💾', title:'Backup Completo',      desc:'Exportar todos os dados em JSON'},
 ]
@@ -191,49 +189,6 @@ export default function ReportsPage({ profile, can }: Props) {
         })
         doc.save(`PedidosCompra_${dateStr.replace(/\//g,'-')}.pdf`)
 
-      } else if (moduleId === 'fuel') {
-        const [entries, outputs] = await Promise.all([
-          buildDateFilter(supabase.from('fuel_entries').select('*').order('created_at',{ascending:false})).limit(100),
-          buildDateFilter(supabase.from('fuel_outputs').select('*').order('created_at',{ascending:false})).limit(100),
-        ])
-        const totalIn  = (entries.data||[]).reduce((s:number,e:any)=>s+(e.litros||0),0)
-        const totalOut = (outputs.data||[]).reduce((s:number,o:any)=>s+(o.litros||0),0)
-        doc.setTextColor(226,232,240); doc.setFontSize(12); doc.setFont('helvetica','bold')
-        doc.text(`Relatório de Combustível`, 12, startY)
-        doc.setFontSize(9); doc.setTextColor(245,158,11)
-        doc.text(`Entradas: ${totalIn}L | Saídas: ${totalOut}L | Saldo: ${totalIn-totalOut}L`, 12, startY+8)
-        autoTable(doc, {
-          startY: startY+14,
-          head: [['Tipo','Data','Litros','Valor/L','Valor Total']],
-          body: [
-            ...(entries.data||[]).map((e:any) => ['Entrada',fmtD(e.created_at?.split('T')[0]),e.litros,e.valor_litro?`R$${e.valor_litro}`:'—',e.valor_total?`R$${e.valor_total}`:'—']),
-            ...(outputs.data||[]).map((o:any) => ['Saída',fmtD(o.data_abastecimento),o.litros,'—','—']),
-          ],
-          styles: { fontSize:7, cellPadding:2 },
-          headStyles: { fillColor:[6,13,26], textColor:[0,212,255] },
-        })
-        doc.save(`Combustivel_${dateStr.replace(/\//g,'-')}.pdf`)
-
-      } else if (moduleId === 'wood') {
-        let q = supabase.from('wood_entries').select('*').order('data_entrada',{ascending:false})
-        if (dateFrom) q = q.gte('data_entrada', dateFrom)
-        if (dateTo)   q = q.lte('data_entrada', dateTo)
-        const { data } = await q
-        const totalVol = (data||[]).reduce((s:number,e:any)=>s+(e.volume_estereo||0),0)
-        doc.setTextColor(226,232,240); doc.setFontSize(12); doc.setFont('helvetica','bold')
-        doc.text(`Pátio de Toras (${(data||[]).length} entradas)`, 12, startY)
-        doc.setFontSize(9); doc.setTextColor(16,185,129)
-        doc.text(`Volume total: ${totalVol.toFixed(2)} m³`, 12, startY+8)
-        autoTable(doc, {
-          startY: startY+14,
-          head: [['Data','Classe','Peso Líq.(kg)','Volume(m³)','Peso Est.(kg)']],
-          body: (data||[]).map((e:any) => [fmtD(e.data_entrada),e.classe||'—',e.peso_liquido||'—',e.volume_estereo||'—',e.peso_estimado||'—']),
-          styles: { fontSize:7, cellPadding:2 },
-          headStyles: { fillColor:[6,13,26], textColor:[0,212,255] },
-          alternateRowStyles: { fillColor:[241,245,249] },
-        })
-        doc.save(`Toras_${dateStr.replace(/\//g,'-')}.pdf`)
-
       } else if (moduleId === 'finance') {
         let q = supabase.from('accounts_payable').select('*').order('due_date')
         if (dateFrom) q = q.gte('due_date', dateFrom)
@@ -257,7 +212,7 @@ export default function ReportsPage({ profile, can }: Props) {
         doc.save(`Financeiro_${dateStr.replace(/\//g,'-')}.pdf`)
 
       } else if (moduleId === 'backup') {
-        const tables = ['work_orders','maintenance','machines','parts','pm_reports','tasks','accounts_payable','wood_entries','fuel_entries','fuel_outputs','veneer_loads','chip_loads','purchase_orders','stock_movements']
+        const tables = ['work_orders','maintenance','machines','parts','pm_reports','tasks','accounts_payable','purchase_orders','stock_movements','suppliers','downtime_records','repair_orders','tasks']
         const result: any = { _date: new Date().toISOString(), _version: '4.0' }
         for (const t of tables) {
           const { data } = await supabase.from(t).select('*')

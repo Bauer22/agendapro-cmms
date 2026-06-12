@@ -52,7 +52,8 @@ export default function OSPage({ profile, can }: Props) {
   useEffect(() => { load(); loadMeta() }, [])
 
   async function load() {
-    const { data } = await supabase.from('work_orders').select('*').order('created_at',{ascending:false})
+    const { data, error } = await supabase.from('work_orders').select('*').order('created_at',{ascending:false})
+    if (error) toast.error('Erro ao carregar OS: '+error.message)
     setOrders(data || [])
     setLoading(false)
   }
@@ -73,6 +74,10 @@ export default function OSPage({ profile, can }: Props) {
       }
       return { ...x, display_name: name }
     }).sort((a:any,b:any) => a.display_name.localeCompare(b.display_name))
+    // Garante que o usuário logado sempre apareça na lista
+    if (profile && !userList.find((x:any)=>x.id===profile.id)) {
+      userList.unshift({ id: profile.id, display_name: profile.display_name || profile.email, email: profile.email, shift: (profile as any).shift, role: profile.role })
+    }
     setUsers(userList)
     setParts(p.data||[])
     if (c.data?.val) setCounter(c.data.val + 1)
@@ -87,6 +92,8 @@ export default function OSPage({ profile, can }: Props) {
       open_date: today,
       type,
       number: `OS-${String(counter).padStart(4,'0')}`,
+      resp_id: profile?.id || '',
+      resp_name: profile?.display_name || profile?.email || '',
     })
     setPartsUsedList([])
     setView(null); setModal(true)
@@ -126,8 +133,9 @@ export default function OSPage({ profile, can }: Props) {
       const part = parts.find(p => p.id === item.part_id)
       if (!part) continue
       const newStock = Math.max(0, (part.stock || 0) - item.qty)
-      await supabase.from('parts').update({ stock: newStock }).eq('id', item.part_id)
-      await supabase.from('stock_movements').insert({
+      const { error: e1 } = await supabase.from('parts').update({ stock: newStock }).eq('id', item.part_id)
+      if (e1) { toast.error('Erro ao atualizar estoque: '+e1.message); continue }
+      const { error: e2 } = await supabase.from('stock_movements').insert({
         part_id: item.part_id,
         part_name: item.part_name,
         part_code: item.part_code,
@@ -139,6 +147,7 @@ export default function OSPage({ profile, can }: Props) {
         created_by: profile?.display_name || profile?.email,
         created_at: new Date().toISOString(),
       })
+      if (e2) toast.error('Erro ao registrar movimento: '+e2.message)
     }
     // Reload parts
     const { data } = await supabase.from('parts').select('id,name,code,unit,stock,category')
@@ -179,7 +188,8 @@ export default function OSPage({ profile, can }: Props) {
           created_by: profile?.display_name || profile?.email,
         }).select().single()
         if (error) throw error
-        await supabase.from('os_counter').upsert({ id:1, val: counter })
+        const { error: ec } = await supabase.from('os_counter').upsert({ id:1, val: counter })
+        if (ec) console.warn('Erro contador OS:', ec.message)
         setCounter(c => c + 1)
 
         // If creating already as done, deduct stock
@@ -194,7 +204,8 @@ export default function OSPage({ profile, can }: Props) {
 
   async function del(id: string) {
     if (!await confirm('Excluir esta OS permanentemente?')) return
-    await supabase.from('work_orders').delete().eq('id', id)
+    const { error } = await supabase.from('work_orders').delete().eq('id', id)
+    if (error) { toast.error('Erro ao excluir: '+error.message); return }
     toast.success('OS excluída'); setView(null); load()
   }
 

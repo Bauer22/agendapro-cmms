@@ -70,7 +70,8 @@ export default function MaintPage({ profile, can }: Props) {
         if (editing.type === 'Troca de óleo' && mach) {
           const { data: machData } = await supabase.from('machines').select('current_hours,category').eq('id', editing.machine_id).single()
           if (machData?.category === 'transport') {
-            await supabase.from('machines').update({ last_oil_hours: machData.current_hours, last_oil_date: editing.date }).eq('id', editing.machine_id)
+            const { error: eMu } = await supabase.from('machines').update({ last_oil_hours: machData.current_hours, last_oil_date: editing.date }).eq('id', editing.machine_id)
+          if (eMu) toast.error('Erro ao atualizar máquina: '+eMu.message)
           }
         }
         toast.success('Manutenção registrada ✅')
@@ -81,7 +82,8 @@ export default function MaintPage({ profile, can }: Props) {
 
   async function del(id: string) {
     if (!await confirm('Excluir este registro?')) return
-    await supabase.from('maintenance').delete().eq('id', id)
+    const { error: eDel } = await supabase.from('maintenance').delete().eq('id', id)
+    if (eDel) { toast.error('Erro: '+eDel.message); return }
     toast.success('Excluído'); setViewModal(false); load()
   }
 

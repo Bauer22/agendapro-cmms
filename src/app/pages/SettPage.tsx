@@ -39,7 +39,8 @@ export default function SettPage({ profile, onSave }: Props) {
 
   async function saveCompany() {
     try {
-      await supabase.from('config').upsert({ id:'company', name: coName, sector: coSector, updated_at: new Date().toISOString() })
+      const { error: eCfg } = await supabase.from('config').upsert({ id:'company', name: coName, sector: coSector, updated_at: new Date().toISOString() })
+      if (eCfg) toast.error('Erro: '+eCfg.message)
       toast.success('Empresa atualizada ✅')
     } catch(e:any) { toast.error('Erro: '+e.message) }
   }

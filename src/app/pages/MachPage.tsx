@@ -43,7 +43,8 @@ export default function MachPage({ profile, can }: Props) {
 
   async function seedMachines() {
     const recs = DEFAULT_MACHINES.map(m => ({ ...m, created_at: new Date().toISOString() }))
-    await supabase.from('machines').insert(recs)
+    const { error: eIns } = await supabase.from('machines').insert(recs)
+    if (eIns) toast.error('Erro: '+eIns.message)
     const { data } = await supabase.from('machines').select('*').order('name')
     setMachines(data || [])
     toast.success('7 máquinas padrão instaladas ✅')
@@ -76,7 +77,8 @@ export default function MachPage({ profile, can }: Props) {
 
   async function del(id: string) {
     if (!await confirm('Excluir esta máquina?')) return
-    await supabase.from('machines').delete().eq('id', id)
+    const { error: eDel } = await supabase.from('machines').delete().eq('id', id)
+    if (eDel) { toast.error('Erro: '+eDel.message); return }
     toast.success('Excluída'); load()
   }
 
