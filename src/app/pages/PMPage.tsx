@@ -36,6 +36,8 @@ export default function PMPage({ profile, can }: Props) {
   const [selectedRepair, setSelectedRepair] = useState<any>(null)
   const [editing, setEdit]      = useState<any>({})
   const [editRepair, setEditRepair] = useState<any>({})
+  const [showNewPart, setShowNewPart] = useState(false)
+  const [newPart, setNewPart] = useState<any>({})
   const [checklist, setChecklist] = useState<string[]>([])
   const [checked, setChecked]   = useState<Record<number,boolean>>({})
   const [fMach, setFMach]       = useState('')
@@ -144,6 +146,24 @@ export default function PMPage({ profile, can }: Props) {
   function openEditRepair(rep: any) {
     setEditRepair({ ...rep, parts_list: rep.parts_list||[] })
     setRepairViewModal(false); setRepairModal(true)
+  }
+
+  async function createNewPart() {
+    if (!newPart.name) { toast.error('Informe o nome da peça'); return }
+    const obj = {
+      name: newPart.name,
+      code: newPart.code || newPart.name.substring(0,8).toUpperCase().replace(/\s/g,''),
+      unit: newPart.unit || 'un',
+      stock: newPart.stock || 0,
+      min_stock: newPart.min_stock || 0,
+      category: 'Conserto',
+    }
+    const { data, error } = await supabase.from('parts').insert(obj).select().single()
+    if (error) { toast.error('Erro ao criar peça: '+error.message); return }
+    toast.success(`Peça "${data.name}" cadastrada ✅`)
+    setParts((p:any)=>[...p, data])
+    setEditRepair((e:any)=>({...e,_part_select:data.id}))
+    setShowNewPart(false); setNewPart({})
   }
 
   function addRepairPart() {
@@ -492,11 +512,15 @@ export default function PMPage({ profile, can }: Props) {
             </div>
           ))}
           <div className="flex gap-2 mt-2">
-            <select value={editRepair._part_select||''} onChange={e=>setEditRepair((x:any)=>({...x,_part_select:e.target.value}))}
+            <select value={editRepair._part_select||''} onChange={e=>{
+                if (e.target.value === '__new__') { setShowNewPart(true); return }
+                setEditRepair((x:any)=>({...x,_part_select:e.target.value}))
+              }}
               className="flex-1 rounded-xl px-2 py-1.5 text-xs outline-none"
               style={{background:'var(--s3)',border:'1px solid var(--bd)',color:'var(--t1)',fontFamily:'Sora,system-ui,sans-serif',WebkitAppearance:'none'}}>
               <option value="">Selecionar peça...</option>
               {parts.map(p=><option key={p.id} value={p.id}>{p.name} ({p.stock} {p.unit})</option>)}
+              <option value="__new__">+ Cadastrar peça nova...</option>
             </select>
             <input type="number" min="1" value={editRepair._part_qty||1}
               onChange={e=>setEditRepair((x:any)=>({...x,_part_qty:parseFloat(e.target.value)||1}))}
@@ -504,6 +528,24 @@ export default function PMPage({ profile, can }: Props) {
               style={{background:'var(--s3)',border:'1px solid var(--bd)',color:'var(--t1)',fontFamily:'Sora,system-ui,sans-serif'}} />
             <Btn onClick={addRepairPart} size="sm" variant="primary">+ Add</Btn>
           </div>
+          {showNewPart && (
+            <div className="mt-2 p-2.5 rounded-xl" style={{background:'var(--s3)',border:'1px solid rgba(249,115,22,.3)'}}>
+              <div className="text-xs font-bold mb-2" style={{color:'var(--cy)'}}>📦 Nova Peça</div>
+              <Input label="Nome *" value={newPart.name} onChange={(v:string)=>setNewPart((p:any)=>({...p,name:v}))} placeholder="Ex: Rolamento 22208" />
+              <div className="grid grid-cols-2 gap-x-2">
+                <Input label="Código" value={newPart.code} onChange={(v:string)=>setNewPart((p:any)=>({...p,code:v}))} placeholder="Ex: ROL-001" />
+                <Input label="Unidade" value={newPart.unit} onChange={(v:string)=>setNewPart((p:any)=>({...p,unit:v}))} placeholder="un, pç, kg..." />
+              </div>
+              <div className="grid grid-cols-2 gap-x-2">
+                <Input label="Estoque Inicial" value={newPart.stock} onChange={(v:string)=>setNewPart((p:any)=>({...p,stock:parseFloat(v)||0}))} type="number" placeholder="0" />
+                <Input label="Estoque Mínimo" value={newPart.min_stock} onChange={(v:string)=>setNewPart((p:any)=>({...p,min_stock:parseFloat(v)||0}))} type="number" placeholder="0" />
+              </div>
+              <div className="flex gap-2 justify-end mt-1">
+                <Btn onClick={()=>{setShowNewPart(false); setNewPart({})}} size="sm" variant="secondary">Cancelar</Btn>
+                <Btn onClick={createNewPart} size="sm" variant="primary">Cadastrar</Btn>
+              </div>
+            </div>
+          )}
           {editRepair.status==='done'&&(editRepair.parts_list||[]).length>0&&(
             <div className="text-xs mt-2 p-2 rounded-lg" style={{background:'rgba(245,158,11,.1)',color:'var(--am)'}}>
               ⚠️ Ao finalizar, as peças serão baixadas automaticamente do estoque.
