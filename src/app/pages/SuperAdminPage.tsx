@@ -3,6 +3,11 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Btn, Modal, Input, Select, SH, Empty, Badge, useConfirm } from '@/components/ui'
 import { fmtD, td } from '@/lib/utils'
+
+const INTERNAL_DOMAIN = 'industrial8.local'
+function usernameToEmail(u: string) {
+  return `${(u||'').trim().toLowerCase().replace(/[^a-z0-9._-]/g,'')}@${INTERNAL_DOMAIN}`
+}
 import toast from 'react-hot-toast'
 import type { UserProfile } from '@/types'
 
@@ -76,19 +81,34 @@ export default function SuperAdminPage({ profile }: Props) {
   }
 
   async function inviteUser() {
-    if (!newUser.email||!newUser.company_id) { toast.error('Preencha e-mail e empresa'); return }
+    if (!newUser.username||!newUser.company_id) { toast.error('Preencha usuário e empresa'); return }
+    if (!/^[a-z0-9._-]{3,}$/i.test(newUser.username)) { toast.error('Usuário inválido (mín. 3 caracteres, sem espaços)'); return }
+    if (!newUser.password || newUser.password.length < 6) { toast.error('Senha deve ter ao menos 6 caracteres'); return }
     try {
-      // Create user via Supabase Auth admin
-      const { error } = await supabase.auth.admin?.inviteUserByEmail(newUser.email, {
-        data: { company_id: newUser.company_id, role: newUser.role||'operator', display_name: newUser.display_name }
-      }) || { error: new Error('Admin API not available') }
-      if (error) throw error
-      toast.success(`Convite enviado para ${newUser.email} ✅`)
-      setUserModal(false); setNewUser({})
+      const email = usernameToEmail(newUser.username)
+      const { data, error } = await supabase.auth.signUp({
+        email, password: newUser.password,
+        options: { data: {
+          company_id: newUser.company_id, role: newUser.role||'operator', display_name: newUser.display_name || newUser.username
+        }}
+      })
+      if (error) {
+        if (error.message?.includes('already registered')) toast.error('Esse nome de usuário já existe.')
+        else toast.error('Erro: '+error.message)
+        return
+      }
+      if (data.user) {
+        await new Promise(r => setTimeout(r, 800))
+        await supabase.from('profiles').update({
+          display_name: newUser.display_name || newUser.username,
+          role: newUser.role || 'operator',
+          company_id: newUser.company_id,
+        }).eq('id', data.user.id)
+      }
+      toast.success(`Usuário "${newUser.username}" criado ✅`)
+      setUserModal(false); setNewUser({}); load()
     } catch(e:any) {
-      // Fallback: show instructions
-      toast(`Crie o usuário manualmente:\nSupabase → Auth → Users → Invite\nE-mail: ${newUser.email}`, {duration:8000,icon:'ℹ️'})
-      setUserModal(false)
+      toast.error('Erro: '+e.message)
     }
   }
 
@@ -195,7 +215,7 @@ export default function SuperAdminPage({ profile }: Props) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-bold">{u.display_name||u.email}</div>
-                    <div className="text-xs" style={{color:'var(--t2)'}}>{u.email}</div>
+                    <div className="text-xs" style={{color:'var(--t2)'}}>@{(u.email||"").split("@")[0]}</div>
                     <div className="text-xs mt-0.5" style={{color:'var(--t3)'}}>🏭 {(u as any).companies?.name||'—'} · {u.role}</div>
                   </div>
                   <Badge color={u.blocked?'red':'green'}>{u.blocked?'Bloqueado':'Ativo'}</Badge>
@@ -231,10 +251,11 @@ export default function SuperAdminPage({ profile }: Props) {
         footer={<><Btn onClick={()=>setUserModal(false)} variant="secondary" size="md">Cancelar</Btn><Btn onClick={inviteUser} variant="primary" size="md">Enviar Convite</Btn></>}>
         <div className="rounded-xl p-3 mb-3" style={{background:'rgba(0,212,255,.06)',border:'1px solid rgba(0,212,255,.2)'}}>
           <div className="text-xs font-bold mb-1" style={{color:'var(--cy)'}}>ℹ️ Como funciona</div>
-          <div className="text-xs" style={{color:'var(--t2)',lineHeight:1.6}}>O usuário recebe um e-mail de convite e cria a própria senha. Ele já entra direto na empresa correta.</div>
+          <div className="text-xs" style={{color:'var(--t2)',lineHeight:1.6}}>Defina usuário e senha. O acesso já fica vinculado à empresa selecionada — sem necessidade de e-mail.</div>
         </div>
-        <Input label="E-mail *" value={newUser.email} onChange={(v:string)=>setNewUser((e:any)=>({...e,email:v}))} type="email" placeholder="usuario@empresa.com" />
-        <Input label="Nome" value={newUser.display_name} onChange={(v:string)=>setNewUser((e:any)=>({...e,display_name:v}))} placeholder="Nome completo" />
+        <Input label="Nome de Usuário *" value={newUser.username} onChange={(v:string)=>setNewUser((e:any)=>({...e,username:v.toLowerCase().replace(/[^a-z0-9._-]/g,'')}))} placeholder="ex: joao.silva" />
+        <Input label="Senha *" value={newUser.password} onChange={(v:string)=>setNewUser((e:any)=>({...e,password:v}))} type="password" placeholder="mínimo 6 caracteres" />
+        <Input label="Nome Completo" value={newUser.display_name} onChange={(v:string)=>setNewUser((e:any)=>({...e,display_name:v}))} placeholder="Nome completo" />
         <Select label="Empresa *" value={newUser.company_id} onChange={(v:string)=>setNewUser((e:any)=>({...e,company_id:v}))}
           options={[{value:'',label:'Selecione...'}, ...companies.map(c=>({value:c.id,label:c.name}))]} />
         <Select label="Perfil" value={newUser.role||'operator'} onChange={(v:string)=>setNewUser((e:any)=>({...e,role:v}))}

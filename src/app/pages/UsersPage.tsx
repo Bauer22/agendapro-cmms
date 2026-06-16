@@ -6,6 +6,11 @@ import { ROLES } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import type { UserProfile } from '@/types'
 
+const INTERNAL_DOMAIN = 'industrial8.local'
+function usernameToEmail(u: string) {
+  return `${(u||'').trim().toLowerCase().replace(/[^a-z0-9._-]/g,'')}@${INTERNAL_DOMAIN}`
+}
+
 interface Props { profile: UserProfile|null; can:(p:string)=>boolean }
 const ROLE_OPTS = Object.entries(ROLES).map(([k,v])=>({value:k,label:v.label}))
 const SHIFTS = ['A','B','C','D','ADM']
@@ -17,6 +22,7 @@ export default function UsersPage({ profile, can }: Props) {
   const [modal, setModal]   = useState(false)
   const [editing, setEdit]  = useState<any>({})
   const [isNew, setIsNew]   = useState(false)
+  const [saving, setSaving] = useState(false)
   const { confirm, dialog } = useConfirm()
 
   useEffect(() => { load() }, [])
@@ -30,22 +36,59 @@ export default function UsersPage({ profile, can }: Props) {
   function openEdit(u: UserProfile) { setEdit({...u}); setIsNew(false); setModal(true) }
 
   async function save() {
-    if (!editing.email && isNew) { toast.error('Informe o e-mail'); return }
-    if (!editing.display_name)   { toast.error('Informe o nome'); return }
+    if (!editing.display_name) { toast.error('Informe o nome'); return }
+    if (isNew) {
+      if (!editing.username) { toast.error('Informe o nome de usuário'); return }
+      if (!/^[a-z0-9._-]{3,}$/i.test(editing.username)) { toast.error('Usuário inválido (mín. 3 letras/números, sem espaços)'); return }
+      if (!editing.password || editing.password.length < 6) { toast.error('Senha deve ter ao menos 6 caracteres'); return }
+    }
+    setSaving(true)
     try {
       if (isNew) {
-        // Create auth user via Supabase Admin — requires service role (show instructions instead)
-        toast('Para criar usuários: Supabase Dashboard → Authentication → Users → Invite user.\nDepois edite o perfil aqui.', { duration:6000, icon:'ℹ️' })
-        // Create profile doc (will be linked when user accepts invite)
-        await supabase.from('profiles').upsert({ ...editing, created_at: new Date().toISOString() })
-        toast.success('Perfil preparado ✅')
+        const email = usernameToEmail(editing.username)
+        const { data: signData, error: signErr } = await supabase.auth.signUp({
+          email, password: editing.password,
+          options: { data: {
+            display_name: editing.display_name,
+            role: editing.role || 'operator',
+            company_id: profile?.company_id || null,
+          }}
+        })
+        if (signErr) {
+          if (signErr.message?.includes('already registered') || signErr.message?.includes('already been registered')) {
+            toast.error('Esse nome de usuário já existe.')
+          } else {
+            toast.error('Erro: '+signErr.message)
+          }
+          setSaving(false); return
+        }
+        if (signData.user) {
+          await new Promise(r => setTimeout(r, 800))
+          await supabase.from('profiles').update({
+            display_name: editing.display_name,
+            role: editing.role || 'operator',
+            shift: editing.shift,
+            sector: editing.sector,
+            code: editing.code,
+            company_id: profile?.company_id || null,
+          }).eq('id', signData.user.id)
+        }
+        toast.success(`Usuário "${editing.username}" criado ✅`)
       } else {
-        const { error } = await supabase.from('profiles').update(editing).eq('id', editing.id)
+        const { error } = await supabase.from('profiles').update({
+          display_name: editing.display_name, role: editing.role,
+          shift: editing.shift, sector: editing.sector, code: editing.code,
+        }).eq('id', editing.id)
         if (error) throw error
         toast.success('Usuário atualizado ✅')
       }
       setModal(false); load()
     } catch(e:any) { toast.error('Erro: '+e.message) }
+    setSaving(false)
+  }
+
+  async function resetPassword(u: UserProfile) {
+    toast('Para alterar senha de outro usuário, acesse:\nSupabase → Authentication → Users → selecione o usuário → Reset Password', { duration:8000, icon:'ℹ️' })
   }
 
   async function toggleBlock(u: UserProfile) {
@@ -83,7 +126,7 @@ export default function UsersPage({ profile, can }: Props) {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-bold">{u.display_name||'Sem nome'}</div>
-                <div className="text-xs" style={{color:'var(--t2)'}}>{u.email}</div>
+                <div className="text-xs" style={{color:'var(--t2)'}}>@{(u.email||"").split("@")[0]}</div>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <Badge color={ROLE_COLORS[u.role] as any}>{ROLES[u.role]?.label||u.role}</Badge>
                   {u.shift && <span className="text-xs" style={{color:'var(--t3)'}}>Turno {u.shift}</span>}
@@ -104,9 +147,12 @@ export default function UsersPage({ profile, can }: Props) {
       )}
 
       <Modal open={modal} onClose={()=>setModal(false)} title={isNew?'Novo Usuário':'Editar Usuário'}
-        footer={<><Btn onClick={()=>setModal(false)} variant="secondary" size="md">Cancelar</Btn><Btn onClick={save} variant="primary" size="md">Salvar</Btn></>}>
+        footer={<><Btn onClick={()=>setModal(false)} variant="secondary" size="md">Cancelar</Btn><Btn onClick={save} variant="primary" size="md" disabled={saving}>{saving?"Salvando...":"Salvar"}</Btn></>}>
         <Input label="Nome *" value={editing.display_name} onChange={(v:string)=>setEdit((e:any)=>({...e,display_name:v}))} placeholder="Nome completo" />
-        {isNew && <Input label="E-mail *" value={editing.email} onChange={(v:string)=>setEdit((e:any)=>({...e,email:v}))} type="email" placeholder="email@empresa.com" />}
+        {isNew && <>
+          <Input label="Nome de Usuário *" value={editing.username} onChange={(v:string)=>setEdit((e:any)=>({...e,username:v.toLowerCase().replace(/[^a-z0-9._-]/g,'')}))} placeholder="ex: joao.silva" />
+          <Input label="Senha *" value={editing.password} onChange={(v:string)=>setEdit((e:any)=>({...e,password:v}))} type="password" placeholder="mínimo 6 caracteres" />
+        </>}
         <div className="grid grid-cols-2 gap-x-2">
           <Select label="Perfil *" value={editing.role} onChange={(v:string)=>setEdit((e:any)=>({...e,role:v}))} options={ROLE_OPTS} />
           <Select label="Turno" value={editing.shift} onChange={(v:string)=>setEdit((e:any)=>({...e,shift:v}))} options={SHIFTS} />

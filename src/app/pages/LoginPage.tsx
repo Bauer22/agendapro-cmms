@@ -3,8 +3,11 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useLoginRateLimit } from '@/hooks/useRateLimit'
 
+// Domínio interno usado para converter username -> email (invisível ao usuário)
+const INTERNAL_DOMAIN = 'industrial8.local'
+
 export default function LoginPage({ onLogin }: { onLogin?: () => void }) {
-  const [email, setEmail]     = useState('')
+  const [username, setUsername] = useState('')
   const [pass,  setPass]      = useState('')
   const [loading, setLoad]    = useState(false)
   const [err, setErr]         = useState('')
@@ -16,44 +19,43 @@ export default function LoginPage({ onLogin }: { onLogin?: () => void }) {
   const MTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
   const dateStr = `${DAYS[now.getDay()]}, ${now.getDate()} ${MTHS[now.getMonth()]} ${now.getFullYear()}`
 
+  function usernameToEmail(u: string) {
+    const clean = u.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '')
+    return `${clean}@${INTERNAL_DOMAIN}`
+  }
+
   async function login() {
     setErr('')
 
-    // Rate limit check
     const { allowed, remaining, waitMin } = check()
     if (!allowed) {
       setErr(`🔒 Muitas tentativas. Aguarde ${waitMin} min.`)
       return
     }
 
-    if (!email || !pass) { setErr('Preencha e-mail e senha.'); return }
+    if (!username || !pass) { setErr('Preencha usuário e senha.'); return }
 
-    // Basic email format check
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setErr('E-mail inválido.')
+    if (username.trim().length < 3) {
+      setErr('Usuário deve ter ao menos 3 caracteres.')
       return
     }
 
     setLoad(true)
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.toLowerCase().trim(),
-      password: pass,
-    })
+    const email = usernameToEmail(username)
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password: pass })
 
     if (error) {
-      record() // count failed attempt
+      record()
       const msgs: Record<string,string> = {
-        'Invalid login credentials': `E-mail ou senha incorretos. (${remaining - 1} tentativas restantes)`,
-        'Email not confirmed':       'Confirme seu e-mail antes de entrar.',
+        'Invalid login credentials': `Usuário ou senha incorretos. (${remaining - 1} tentativas restantes)`,
         'Too many requests':         '🔒 Bloqueado temporariamente pelo servidor. Aguarde.',
-        'User not found':            'Usuário não encontrado.',
       }
       setErr(msgs[error.message] || error.message)
       setLoad(false)
       return
     }
 
-    // Success — reset rate limit
     reset()
     setLoad(false)
   }
@@ -184,8 +186,8 @@ export default function LoginPage({ onLogin }: { onLogin?: () => void }) {
           <div style={{background:'rgba(8,16,32,.94)',border:'1px solid rgba(249,115,22,.32)',borderRadius:'20px',padding:'28px 28px 22px',position:'relative',overflow:'hidden',boxShadow:'0 0 80px rgba(249,115,22,.15),0 30px 80px rgba(0,0,0,.75),inset 0 1px 0 rgba(249,115,22,.2)',backdropFilter:'blur(28px)'}}>
             <div style={{position:'absolute',top:0,left:0,right:0,height:'2px',background:'linear-gradient(90deg,transparent,#f97316,#fb923c,#f97316,transparent)',boxShadow:'0 0 10px rgba(249,115,22,.6)'}}/>
             <div style={{position:'absolute',bottom:0,left:0,right:0,height:'1px',background:'linear-gradient(90deg,transparent,rgba(249,115,22,.22),transparent)'}}/>
-            {['left:-6px','right:-6px'].map((s,i)=>(
-              <div key={i} style={{position:'absolute',[i===0?'left':'right']:'-6px',top:'15%',bottom:'15%',width:'8px',backgroundImage:'repeating-linear-gradient(180deg,#505a6c 0,#505a6c 7px,#303848 7px,#303848 14px)',borderRadius:'4px',opacity:.48}}/>
+            {['left','right'].map((s,i)=>(
+              <div key={i} style={{position:'absolute',[s]:'-6px',top:'15%',bottom:'15%',width:'8px',backgroundImage:'repeating-linear-gradient(180deg,#505a6c 0,#505a6c 7px,#303848 7px,#303848 14px)',borderRadius:'4px',opacity:.48}}/>
             ))}
 
             {/* Card Logo */}
@@ -214,7 +216,7 @@ export default function LoginPage({ onLogin }: { onLogin?: () => void }) {
             {/* Security badge */}
             <div style={{display:'flex',alignItems:'center',gap:'6px',justifyContent:'center',marginBottom:'16px',padding:'5px 12px',background:'rgba(34,197,94,.06)',borderRadius:'8px',border:'1px solid rgba(34,197,94,.2)'}}>
               <span style={{fontSize:'11px'}}>🔐</span>
-              <span style={{fontSize:'8px',color:'rgba(34,197,94,.7)',fontWeight:700,letterSpacing:'.5px',textTransform:'uppercase'}}>Acesso Seguro · Criptografado TLS</span>
+              <span style={{fontSize:'8px',color:'rgba(34,197,94,.7)',fontWeight:700,letterSpacing:'.5px',textTransform:'uppercase'}}>Acesso Seguro · Restrito à Empresa</span>
             </div>
 
             {err && (
@@ -223,12 +225,12 @@ export default function LoginPage({ onLogin }: { onLogin?: () => void }) {
               </div>
             )}
 
-            {/* Email */}
+            {/* Username */}
             <div style={{marginBottom:'12px'}}>
-              <div style={{fontSize:'8px',fontWeight:700,letterSpacing:'1.5px',color:'rgba(249,115,22,.65)',textTransform:'uppercase',marginBottom:'5px'}}>✉ E-MAIL</div>
-              <input className="g-inp" value={email} onChange={e=>setEmail(e.target.value)}
+              <div style={{fontSize:'8px',fontWeight:700,letterSpacing:'1.5px',color:'rgba(249,115,22,.65)',textTransform:'uppercase',marginBottom:'5px'}}>👤 USUÁRIO</div>
+              <input className="g-inp" value={username} onChange={e=>setUsername(e.target.value)}
                 onKeyDown={e=>e.key==='Enter'&&document.getElementById('gpw')?.focus()}
-                type="email" placeholder="seu@email.com" autoComplete="email" spellCheck={false}
+                type="text" placeholder="seu.usuario" autoComplete="username" spellCheck={false} autoCapitalize="none"
                 style={{width:'100%',background:'rgba(249,115,22,.04)',border:'1px solid rgba(249,115,22,.18)',borderRadius:'11px',padding:'11px 15px',color:'#e8edf5',fontFamily:"'Sora',system-ui",fontSize:'12px',transition:'all .2s',boxSizing:'border-box'}}/>
             </div>
 
