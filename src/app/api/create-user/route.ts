@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     })
 
     const cleanUsername = String(username).trim().toLowerCase().replace(/[^a-z0-9._-]/g, '')
-    const email = `${cleanUsername}@industrial8.local`
+    const email = `${cleanUsername}@industrial8-internal.com`
 
     // Cria o usuário já confirmado, sem disparar e-mail nenhum
     const { data, error } = await admin.auth.admin.createUser({
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     if (error) {
       const msg = error.message?.includes('already registered') || error.message?.includes('already been registered')
         ? 'Esse nome de usuário já existe.'
-        : error.message
+        : `${error.message} (code: ${(error as any).code || 'n/a'}, status: ${(error as any).status || 'n/a'})`
       return NextResponse.json({ error: msg }, { status: 400 })
     }
 

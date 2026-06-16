@@ -6,7 +6,7 @@ import { ROLES } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import type { UserProfile } from '@/types'
 
-const INTERNAL_DOMAIN = 'industrial8.local'
+const INTERNAL_DOMAIN = 'industrial8-internal.com'
 function usernameToEmail(u: string) {
   return `${(u||'').trim().toLowerCase().replace(/[^a-z0-9._-]/g,'')}@${INTERNAL_DOMAIN}`
 }

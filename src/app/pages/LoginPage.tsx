@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useLoginRateLimit } from '@/hooks/useRateLimit'
 
 // Domínio interno usado para converter username -> email (invisível ao usuário)
-const INTERNAL_DOMAIN = 'industrial8.local'
+const INTERNAL_DOMAIN = 'industrial8-internal.com'
 
 export default function LoginPage({ onLogin }: { onLogin?: () => void }) {
   const [username, setUsername] = useState('')

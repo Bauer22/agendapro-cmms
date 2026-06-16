@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { Btn, Modal, Input, Select, SH, Empty, Badge, useConfirm } from '@/components/ui'
 import { fmtD, td } from '@/lib/utils'
 
-const INTERNAL_DOMAIN = 'industrial8.local'
+const INTERNAL_DOMAIN = 'industrial8-internal.com'
 function usernameToEmail(u: string) {
   return `${(u||'').trim().toLowerCase().replace(/[^a-z0-9._-]/g,'')}@${INTERNAL_DOMAIN}`
 }
