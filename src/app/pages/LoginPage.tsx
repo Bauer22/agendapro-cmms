@@ -20,7 +20,11 @@ export default function LoginPage({ onLogin }: { onLogin?: () => void }) {
   const dateStr = `${DAYS[now.getDay()]}, ${now.getDate()} ${MTHS[now.getMonth()]} ${now.getFullYear()}`
 
   function usernameToEmail(u: string) {
-    const clean = u.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '')
+    const v = u.trim().toLowerCase()
+    // Se já contém @ (e-mail real, ex: usuários antigos), usa direto
+    if (v.includes('@')) return v
+    // Senão, converte username -> e-mail interno fictício
+    const clean = v.replace(/[^a-z0-9._-]/g, '')
     return `${clean}@${INTERNAL_DOMAIN}`
   }
 
