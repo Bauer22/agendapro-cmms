@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, createIsolatedClient } from '@/lib/supabase'
 import { Btn, Modal, Input, Select, SH, Empty, Badge, useConfirm } from '@/components/ui'
 import { fmtD, td } from '@/lib/utils'
 
@@ -86,7 +86,8 @@ export default function SuperAdminPage({ profile }: Props) {
     if (!newUser.password || newUser.password.length < 6) { toast.error('Senha deve ter ao menos 6 caracteres'); return }
     try {
       const email = usernameToEmail(newUser.username)
-      const { data, error } = await supabase.auth.signUp({
+      const tempClient = createIsolatedClient()
+      const { data, error } = await tempClient.auth.signUp({
         email, password: newUser.password,
         options: { data: {
           company_id: newUser.company_id, role: newUser.role||'operator', display_name: newUser.display_name || newUser.username
@@ -98,13 +99,15 @@ export default function SuperAdminPage({ profile }: Props) {
         return
       }
       if (data.user) {
-        await new Promise(r => setTimeout(r, 800))
-        await supabase.from('profiles').update({
+        await new Promise(r => setTimeout(r, 900))
+        const { error: eUp } = await supabase.from('profiles').update({
           display_name: newUser.display_name || newUser.username,
           role: newUser.role || 'operator',
           company_id: newUser.company_id,
         }).eq('id', data.user.id)
+        if (eUp) toast.error('Usuário criado, mas erro ao definir perfil: '+eUp.message)
       }
+      await tempClient.auth.signOut().catch(()=>{})
       toast.success(`Usuário "${newUser.username}" criado ✅`)
       setUserModal(false); setNewUser({}); load()
     } catch(e:any) {

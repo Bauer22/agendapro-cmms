@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, createIsolatedClient } from '@/lib/supabase'
 import { Btn, Modal, Input, Select, SH, Empty, Badge, useConfirm } from '@/components/ui'
 import { ROLES } from '@/lib/utils'
 import toast from 'react-hot-toast'
@@ -12,9 +12,16 @@ function usernameToEmail(u: string) {
 }
 
 interface Props { profile: UserProfile|null; can:(p:string)=>boolean }
-const ROLE_OPTS = Object.entries(ROLES).map(([k,v])=>({value:k,label:v.label}))
+const ROLE_LABELS: Record<string,string> = {
+  superadmin: '🌐 Super Admin',
+  admin:      '👑 Administrador',
+  supervisor: '🛠️ Supervisor',
+  operator:   '🔧 Operador',
+  viewer:     '👁️ Consulta',
+}
+const ROLE_OPTS = Object.keys(ROLES).filter(k=>k!=='superadmin').map(k=>({value:k,label:ROLE_LABELS[k]||k}))
 const SHIFTS = ['A','B','C','D','ADM']
-const ROLE_COLORS: Record<string,string> = {admin:'purple',supervisor:'amber',operator:'green',viewer:'gray'}
+const ROLE_COLORS: Record<string,string> = {superadmin:'orange',admin:'purple',supervisor:'amber',operator:'green',viewer:'gray'}
 
 export default function UsersPage({ profile, can }: Props) {
   const [users, setUsers]   = useState<UserProfile[]>([])
@@ -46,7 +53,9 @@ export default function UsersPage({ profile, can }: Props) {
     try {
       if (isNew) {
         const email = usernameToEmail(editing.username)
-        const { data: signData, error: signErr } = await supabase.auth.signUp({
+        // Cliente isolado: cria o novo usuário SEM afetar a sessão do admin logado
+        const tempClient = createIsolatedClient()
+        const { data: signData, error: signErr } = await tempClient.auth.signUp({
           email, password: editing.password,
           options: { data: {
             display_name: editing.display_name,
@@ -63,8 +72,9 @@ export default function UsersPage({ profile, can }: Props) {
           setSaving(false); return
         }
         if (signData.user) {
-          await new Promise(r => setTimeout(r, 800))
-          await supabase.from('profiles').update({
+          await new Promise(r => setTimeout(r, 900))
+          // Usa o client PRINCIPAL (sessão do admin) para atualizar o profile
+          const { error: eUp } = await supabase.from('profiles').update({
             display_name: editing.display_name,
             role: editing.role || 'operator',
             shift: editing.shift,
@@ -72,7 +82,10 @@ export default function UsersPage({ profile, can }: Props) {
             code: editing.code,
             company_id: profile?.company_id || null,
           }).eq('id', signData.user.id)
+          if (eUp) toast.error('Usuário criado, mas erro ao definir perfil: '+eUp.message)
         }
+        // Garante que a sessão do tempClient não fique pendurada
+        await tempClient.auth.signOut().catch(()=>{})
         toast.success(`Usuário "${editing.username}" criado ✅`)
       } else {
         const { error } = await supabase.from('profiles').update({
@@ -128,7 +141,7 @@ export default function UsersPage({ profile, can }: Props) {
                 <div className="text-xs font-bold">{u.display_name||'Sem nome'}</div>
                 <div className="text-xs" style={{color:'var(--t2)'}}>@{(u.email||"").split("@")[0]}</div>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <Badge color={ROLE_COLORS[u.role] as any}>{ROLES[u.role]?.label||u.role}</Badge>
+                  <Badge color={ROLE_COLORS[u.role] as any}>{ROLE_LABELS[u.role]||u.role}</Badge>
                   {u.shift && <span className="text-xs" style={{color:'var(--t3)'}}>Turno {u.shift}</span>}
                   {u.blocked && <Badge color="red">Bloqueado</Badge>}
                 </div>
