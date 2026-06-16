@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { supabase, createIsolatedClient } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import { Btn, Modal, Input, Select, SH, Empty, Badge, useConfirm } from '@/components/ui'
 import { fmtD, td } from '@/lib/utils'
 
@@ -85,30 +85,23 @@ export default function SuperAdminPage({ profile }: Props) {
     if (!/^[a-z0-9._-]{3,}$/i.test(newUser.username)) { toast.error('Usuário inválido (mín. 3 caracteres, sem espaços)'); return }
     if (!newUser.password || newUser.password.length < 6) { toast.error('Senha deve ter ao menos 6 caracteres'); return }
     try {
-      const email = usernameToEmail(newUser.username)
-      const tempClient = createIsolatedClient()
-      const { data, error } = await tempClient.auth.signUp({
-        email, password: newUser.password,
-        options: { data: {
-          company_id: newUser.company_id, role: newUser.role||'operator', display_name: newUser.display_name || newUser.username
-        }}
-      })
-      if (error) {
-        if (error.message?.includes('already registered')) toast.error('Esse nome de usuário já existe.')
-        else toast.error('Erro: '+error.message)
-        return
-      }
-      if (data.user) {
-        await new Promise(r => setTimeout(r, 900))
-        const { error: eUp } = await supabase.from('profiles').update({
+      const res = await fetch('/api/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: newUser.username,
+          password: newUser.password,
           display_name: newUser.display_name || newUser.username,
           role: newUser.role || 'operator',
           company_id: newUser.company_id,
-        }).eq('id', data.user.id)
-        if (eUp) toast.error('Usuário criado, mas erro ao definir perfil: '+eUp.message)
+        })
+      })
+      const result = await res.json()
+      if (!res.ok) {
+        toast.error('Erro: ' + (result.error || 'Falha ao criar usuário'))
+        return
       }
-      await tempClient.auth.signOut().catch(()=>{})
-      toast.success(`Usuário "${newUser.username}" criado ✅`)
+      toast.success(`Usuário "${result.username}" criado ✅`)
       setUserModal(false); setNewUser({}); load()
     } catch(e:any) {
       toast.error('Erro: '+e.message)

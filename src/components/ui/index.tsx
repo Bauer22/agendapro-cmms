@@ -98,8 +98,8 @@ export function Select({ label, value, onChange, options, className }: any) {
     <div style={{marginBottom:'10px'}} className={className}>
       {label&&<label style={{display:'block',fontSize:'9px',fontWeight:700,letterSpacing:'1.2px',color:'rgba(249,115,22,.65)',textTransform:'uppercase',marginBottom:'4px'}}>{label}</label>}
       <select value={value||''} onChange={e=>onChange(e.target.value)}
-        style={{width:'100%',background:'var(--s2)',border:'1px solid var(--bd)',borderRadius:'10px',padding:'9px 12px',color:'var(--t1)',fontFamily:"'Sora',system-ui",fontSize:'12px',outline:'none',WebkitAppearance:'none'}}>
-        {opts.map((o:any,i:number)=><option key={i} value={o.value}>{o.label}</option>)}
+        style={{width:'100%',background:'#16284a',border:'1px solid var(--bd)',borderRadius:'10px',padding:'9px 12px',color:'#ffffff',fontFamily:"'Sora',system-ui",fontSize:'12px',outline:'none',WebkitAppearance:'none',colorScheme:'dark'}}>
+        {opts.map((o:any,i:number)=><option key={i} value={o.value} style={{background:'#16284a',color:'#ffffff'}}>{o.label}</option>)}
       </select>
     </div>
   )

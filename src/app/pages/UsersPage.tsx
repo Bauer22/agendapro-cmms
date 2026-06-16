@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { supabase, createIsolatedClient } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import { Btn, Modal, Input, Select, SH, Empty, Badge, useConfirm } from '@/components/ui'
 import { ROLES } from '@/lib/utils'
 import toast from 'react-hot-toast'
@@ -52,41 +52,28 @@ export default function UsersPage({ profile, can }: Props) {
     setSaving(true)
     try {
       if (isNew) {
-        const email = usernameToEmail(editing.username)
-        // Cliente isolado: cria o novo usuário SEM afetar a sessão do admin logado
-        const tempClient = createIsolatedClient()
-        const { data: signData, error: signErr } = await tempClient.auth.signUp({
-          email, password: editing.password,
-          options: { data: {
+        // Chama rota server-side que usa Service Role Key (Admin API) —
+        // cria o usuário SEM enviar e-mail e SEM afetar a sessão do admin
+        const res = await fetch('/api/create-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: editing.username,
+            password: editing.password,
             display_name: editing.display_name,
             role: editing.role || 'operator',
             company_id: profile?.company_id || null,
-          }}
-        })
-        if (signErr) {
-          if (signErr.message?.includes('already registered') || signErr.message?.includes('already been registered')) {
-            toast.error('Esse nome de usuário já existe.')
-          } else {
-            toast.error('Erro: '+signErr.message)
-          }
-          setSaving(false); return
-        }
-        if (signData.user) {
-          await new Promise(r => setTimeout(r, 900))
-          // Usa o client PRINCIPAL (sessão do admin) para atualizar o profile
-          const { error: eUp } = await supabase.from('profiles').update({
-            display_name: editing.display_name,
-            role: editing.role || 'operator',
             shift: editing.shift,
             sector: editing.sector,
             code: editing.code,
-            company_id: profile?.company_id || null,
-          }).eq('id', signData.user.id)
-          if (eUp) toast.error('Usuário criado, mas erro ao definir perfil: '+eUp.message)
+          })
+        })
+        const result = await res.json()
+        if (!res.ok) {
+          toast.error('Erro: ' + (result.error || 'Falha ao criar usuário'))
+          setSaving(false); return
         }
-        // Garante que a sessão do tempClient não fique pendurada
-        await tempClient.auth.signOut().catch(()=>{})
-        toast.success(`Usuário "${editing.username}" criado ✅`)
+        toast.success(`Usuário "${result.username}" criado ✅`)
       } else {
         const { error } = await supabase.from('profiles').update({
           display_name: editing.display_name, role: editing.role,
