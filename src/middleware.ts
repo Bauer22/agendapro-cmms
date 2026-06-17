@@ -28,6 +28,8 @@ export function middleware(request: NextRequest) {
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: blob: https://api.qrserver.com https://*.supabase.co",
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+    "worker-src 'self'",
+    "manifest-src 'self'",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -37,5 +39,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|logo.png|manifest.json).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|favicon.png|logo.png|manifest.json|sw.js|icons/).*)'],
 }
