@@ -1,7 +1,24 @@
 {
-  "name":"Industrial8","short_name":"I8",
-  "description":"Manutenção Industrial Inteligente",
-  "start_url":"/","display":"standalone",
-  "theme_color":"#06101e","background_color":"#06101e",
-  "icons":[{"src":"/logo.png","sizes":"192x192","type":"image/png"}]
+  "name": "Industrial8 - Manutenção Industrial Inteligente",
+  "short_name": "Industrial8",
+  "description": "Sistema de gestão de manutenção industrial multi-tenant",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#06101e",
+  "background_color": "#06101e",
+  "lang": "pt-BR",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    { "src": "/icons/icon-72.png",  "sizes": "72x72",   "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-96.png",  "sizes": "96x96",   "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-128.png", "sizes": "128x128", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-144.png", "sizes": "144x144", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-152.png", "sizes": "152x152", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-384.png", "sizes": "384x384", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
 }
