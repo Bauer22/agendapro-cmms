@@ -65,6 +65,12 @@ export default function ChatPage({ profile }: Props) {
     if (error) toast.error('Erro ao enviar: ' + error.message)
   }
 
+  function resolveSenderName(m: Msg) {
+    if (m.sender_name) return m.sender_name
+    const u = users.find(x => x.id === m.sender_id)
+    return u?.display_name || u?.email?.split('@')[0] || 'Usuário'
+  }
+
   function initials(name: string) {
     return (name || '?').trim().split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase()
   }
@@ -120,13 +126,11 @@ export default function ChatPage({ profile }: Props) {
                   const mine = m.sender_id === profile?.id
                   return (
                     <div key={m.id} className={`flex items-end gap-2 mb-2.5 ${mine ? 'flex-row-reverse' : ''}`}>
-                      {!mine && (
-                        <div style={{width:'26px',height:'26px',borderRadius:'50%',background:avatarColor(m.sender_id),display:'flex',alignItems:'center',justifyContent:'center',fontSize:'9px',fontWeight:700,color:'#fff',flexShrink:0}}>
-                          {initials(m.sender_name)}
-                        </div>
-                      )}
+                      <div style={{width:'26px',height:'26px',borderRadius:'50%',background:avatarColor(m.sender_id),display:'flex',alignItems:'center',justifyContent:'center',fontSize:'9px',fontWeight:700,color:'#fff',flexShrink:0}}>
+                        {initials(resolveSenderName(m))}
+                      </div>
                       <div style={{maxWidth:'74%'}}>
-                        {!mine && <div style={{fontSize:'9px',color:'var(--t3)',marginBottom:'2px',marginLeft:'2px'}}>{m.sender_name}</div>}
+                        <div style={{fontSize:'9px',color: mine ? 'rgba(249,115,22,.7)' : 'var(--t3)',marginBottom:'2px',marginLeft: mine?0:'2px',marginRight: mine?'2px':0,textAlign: mine?'right':'left'}}>{mine ? 'Você' : resolveSenderName(m)}</div>
                         <div style={{
                           background: mine ? 'linear-gradient(135deg,#f97316,#c85a00)' : 'var(--s1)',
                           color: mine ? '#fff' : 'var(--t1)',

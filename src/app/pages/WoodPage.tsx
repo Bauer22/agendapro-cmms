@@ -1,160 +1,108 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Btn, Modal, Input, Select, Textarea, SH, Empty, useConfirm } from '@/components/ui'
+import { Btn, Modal, Input, Select, SH, Empty, KPI, Badge, useConfirm } from '@/components/ui'
 import { fmtD, td } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import type { UserProfile } from '@/types'
 
 interface Props { profile: UserProfile|null; can:(p:string)=>boolean }
-const CLASSES = ['Classe A','Classe B','Classe C','Resíduo','Outro']
-
 export default function WoodPage({ profile, can }: Props) {
   const [entries, setEntries] = useState<any[]>([])
   const [suppliers, setSuppliers] = useState<any[]>([])
-  const [drivers, setDrivers] = useState<any[]>([])
-  const [vehicles, setVehicles] = useState<any[]>([])
-  const [loading, setLoad] = useState(true)
   const [modal, setModal] = useState(false)
-  const [editing, setEdit] = useState<any>({})
+  const [editing, setEditing] = useState<any>({})
+  const [loading, setLoading] = useState(true)
   const { confirm, dialog } = useConfirm()
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); supabase.from('suppliers').select('id,name').then(({data})=>setSuppliers(data||[])) }, [])
 
   async function load() {
-    const [e, s, d, v] = await Promise.all([
-      supabase.from('wood_entries').select('*').order('data_entrada',{ascending:false}).limit(50),
-      supabase.from('suppliers').select('id,razao_social,nome_fantasia'),
-      supabase.from('drivers').select('id,nome').eq('ativo',true),
-      supabase.from('vehicles').select('id,placa,descricao').eq('ativo',true),
-    ])
-    setEntries(e.data||[]); setSuppliers(s.data||[]); setDrivers(d.data||[]); setVehicles(v.data||[])
-    setLoad(false)
-  }
-
-  // Auto-calculate peso_estimado
-  function calcPeso(e: any) {
-    const { altura_media, comprimento, largura } = e
-    if (altura_media && comprimento && largura) {
-      return parseFloat(((altura_media * comprimento * largura) / 1.4).toFixed(2))
-    }
-    return undefined
+    const { data, error } = await supabase.from('wood_entries').select('*').order('entry_date',{ascending:false}).limit(100)
+    if (error) toast.error(error.message)
+    setEntries(data||[]); setLoading(false)
   }
 
   async function save() {
-    if (!editing.fornecedor_id) { toast.error('Selecione o fornecedor'); return }
-    if (!editing.data_entrada)  { toast.error('Informe a data'); return }
-    const peso_estimado = calcPeso(editing)
-    const obj = { ...editing, peso_estimado, created_by: profile?.display_name||profile?.email, created_at: new Date().toISOString() }
-    try {
-      if (editing.id) {
-        const { error } = await supabase.from('wood_entries').update(obj).eq('id', editing.id)
-        if (error) throw error
-      } else {
-        const { error } = await supabase.from('wood_entries').insert(obj)
-        if (error) throw error
-      }
-      toast.success('Entrada registrada ✅'); setModal(false); load()
-    } catch(e:any) { toast.error('Erro: '+e.message) }
+    if (!editing.species||!editing.entry_date) { toast.error('Informe espécie e data'); return }
+    const obj = { species:editing.species, origin:editing.origin||'', supplier_id:editing.supplier_id||null, supplier_name:suppliers.find(s=>s.id===editing.supplier_id)?.name||editing.origin||'', entry_date:editing.entry_date, truck_plate:editing.truck_plate||'', volume_m3:parseFloat(editing.volume_m3)||0, log_count:parseInt(editing.log_count)||0, avg_length:parseFloat(editing.avg_length)||0, avg_diameter:parseFloat(editing.avg_diameter)||0, unit_value:parseFloat(editing.unit_value)||0, total_value:parseFloat(editing.volume_m3||0)*parseFloat(editing.unit_value||0), romaneio:editing.romaneio||'', quality:editing.quality||'Normal', notes:editing.notes, created_by:profile?.display_name }
+    const { error } = editing.id ? await supabase.from('wood_entries').update(obj).eq('id',editing.id) : await supabase.from('wood_entries').insert(obj)
+    if (error) { toast.error(error.message); return }
+    toast.success('Entrada registrada ✅'); setModal(false); load()
   }
 
-  async function del(id: string) {
+  async function del(id:string) {
     if (!await confirm('Excluir esta entrada?')) return
-    await supabase.from('wood_entries').delete().eq('id', id)
-    toast.success('Excluída'); load()
+    const { error } = await supabase.from('wood_entries').delete().eq('id',id)
+    if (error) { toast.error(error.message); return }
+    toast.success('Excluído'); load()
   }
 
-  // Summary
-  const totalVol = entries.reduce((s,e)=>s+(e.volume_estereo||0),0)
-  const totalPeso = entries.reduce((s,e)=>s+(e.peso_liquido||0),0)
+  const totalM3 = entries.slice(0,30).reduce((s,e)=>s+(e.volume_m3||0),0)
+  const totalVal = entries.slice(0,30).reduce((s,e)=>s+(e.total_value||0),0)
 
   return (
-    <div>
+    <div className="page-enter p-3">
       {dialog}
-      {/* KPIs */}
-      <div className="grid grid-cols-3 gap-1.5 mb-3">
-        <div className="rounded-xl p-2.5 text-center relative overflow-hidden" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
-          <div className="absolute top-0 inset-x-0 h-0.5" style={{background:'var(--gn)'}}/>
-          <div className="text-lg font-bold" style={{color:'var(--gn)'}}>{entries.length}</div>
-          <div style={{fontSize:'8px',color:'var(--t3)',textTransform:'uppercase'}}>Entradas</div>
-        </div>
-        <div className="rounded-xl p-2.5 text-center relative overflow-hidden" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
-          <div className="absolute top-0 inset-x-0 h-0.5" style={{background:'var(--cy)'}}/>
-          <div className="text-lg font-bold" style={{color:'var(--cy)'}}>{totalVol.toFixed(1)} m³</div>
-          <div style={{fontSize:'8px',color:'var(--t3)',textTransform:'uppercase'}}>Volume Estéreo</div>
-        </div>
-        <div className="rounded-xl p-2.5 text-center relative overflow-hidden" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
-          <div className="absolute top-0 inset-x-0 h-0.5" style={{background:'var(--am)'}}/>
-          <div className="text-lg font-bold" style={{color:'var(--am)'}}>{(totalPeso/1000).toFixed(1)} t</div>
-          <div style={{fontSize:'8px',color:'var(--t3)',textTransform:'uppercase'}}>Peso Líquido</div>
-        </div>
+      <SH label="🪵 Entrada de Madeira" action={<Btn onClick={()=>{setEditing({entry_date:td(),quality:'Normal'});setModal(true)}} variant="primary" size="sm">+ Entrada</Btn>} />
+
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <KPI num={`${totalM3.toFixed(1)} m³`} label="Volume (30 últ.)" color="green" />
+        <KPI num={`R$ ${(totalVal/1000).toFixed(0)}k`} label="Valor total" color="orange" />
       </div>
 
-      <SH label="Entradas de Madeira" action={can('os')&&<Btn onClick={()=>{setEdit({data_entrada:td(),classe:'Classe A'});setModal(true)}} size="sm" variant="primary">+ Entrada</Btn>} />
-
-      {loading ? <div className="text-center py-8" style={{color:'var(--t3)'}}>Carregando...</div> : entries.length===0 ? <Empty icon="🪵" text="Nenhuma entrada registrada" /> : (
+      {loading ? <Empty icon="⏳" text="Carregando..." /> : entries.length===0 ? <Empty icon="🪵" text="Nenhuma entrada registrada." /> : (
         <div className="flex flex-col gap-2">
-          {entries.map(e => {
-            const sup = suppliers.find(s=>s.id===e.fornecedor_id)
-            const drv = drivers.find(d=>d.id===e.motorista_id)
-            const veh = vehicles.find(v=>v.id===e.veiculo_id)
-            return (
-              <div key={e.id} className="p-2.5 rounded-xl" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-base">🪵</span>
-                      <div className="text-xs font-bold">{sup?.razao_social||'Fornecedor'}</div>
-                      <span className="text-xs px-1.5 py-0.5 rounded" style={{background:'rgba(16,185,129,.12)',color:'var(--gn)',fontSize:'9px',fontWeight:700}}>{e.classe}</span>
-                    </div>
-                    <div className="text-xs mt-1" style={{color:'var(--t2)'}}>📅 {fmtD(e.data_entrada)}{drv?` · 👤 ${drv.nome}`:''}{veh?` · 🚛 ${veh.placa}`:''}</div>
-                    <div className="flex gap-3 mt-1 flex-wrap">
-                      {e.peso_liquido&&<span className="text-xs font-bold" style={{color:'var(--am)'}}>{e.peso_liquido} kg</span>}
-                      {e.volume_estereo&&<span className="text-xs font-bold" style={{color:'var(--cy)'}}>{e.volume_estereo} m³</span>}
-                      {e.peso_estimado&&<span className="text-xs" style={{color:'var(--t3)'}}>≈{e.peso_estimado} kg est.</span>}
-                    </div>
+          {entries.map(e=>(
+            <div key={e.id} className="rounded-xl p-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge color="green">{e.species}</Badge>
+                    {e.quality&&e.quality!=='Normal'&&<Badge color="amber">{e.quality}</Badge>}
                   </div>
-                  <div className="flex gap-1">
-                    {can('os')&&<button onClick={()=>{setEdit({...e});setModal(true)}} style={{background:'none',border:'none',color:'var(--t2)',cursor:'pointer',fontSize:'14px'}}>✏️</button>}
-                    {can('admin')&&<button onClick={()=>del(e.id)} style={{background:'none',border:'none',color:'var(--rd)',cursor:'pointer',fontSize:'14px'}}>🗑️</button>}
-                  </div>
+                  <div className="font-bold text-sm">{e.volume_m3?.toFixed(2)} m³ · {e.log_count} toras</div>
+                  <div className="text-xs mt-0.5" style={{color:'var(--t2)'}}>🏭 {e.supplier_name||e.origin||'—'} · {fmtD(e.entry_date)}</div>
+                  {e.truck_plate&&<div className="text-xs" style={{color:'var(--t3)'}}>🚛 {e.truck_plate}{e.romaneio?' · Romaneio: '+e.romaneio:''}</div>}
+                  {e.total_value>0&&<div className="text-xs font-bold mt-0.5" style={{color:'var(--cy)'}}>R$ {e.total_value.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div>}
+                </div>
+                <div className="flex gap-1 ml-2">
+                  <Btn onClick={()=>{setEditing(e);setModal(true)}} size="sm">✏️</Btn>
+                  <Btn onClick={()=>del(e.id)} variant="danger" size="sm">🗑</Btn>
                 </div>
               </div>
-            )
-          })}
+            </div>
+          ))}
         </div>
       )}
 
       <Modal open={modal} onClose={()=>setModal(false)} title={editing.id?'Editar Entrada':'Nova Entrada de Madeira'}
-        footer={<><Btn onClick={()=>setModal(false)} variant="secondary" size="md">Cancelar</Btn><Btn onClick={save} variant="primary" size="md">Salvar</Btn></>}>
-        <Select label="Fornecedor *" value={editing.fornecedor_id} onChange={(v:string)=>setEdit((e:any)=>({...e,fornecedor_id:v}))}
-          options={[{value:'',label:'Selecione...'},...suppliers.map(s=>({value:s.id,label:s.razao_social||s.nome_fantasia}))]} />
-        <div className="grid grid-cols-2 gap-x-2">
-          <Input label="Data Entrada *" value={editing.data_entrada} onChange={(v:string)=>setEdit((e:any)=>({...e,data_entrada:v}))} type="date" />
-          <Select label="Classe" value={editing.classe} onChange={(v:string)=>setEdit((e:any)=>({...e,classe:v}))} options={CLASSES} />
-          <Select label="Motorista" value={editing.motorista_id} onChange={(v:string)=>setEdit((e:any)=>({...e,motorista_id:v}))}
-            options={[{value:'',label:'Selecione...'},...drivers.map(d=>({value:d.id,label:d.nome}))]} />
-          <Select label="Veículo" value={editing.veiculo_id} onChange={(v:string)=>setEdit((e:any)=>({...e,veiculo_id:v}))}
-            options={[{value:'',label:'Selecione...'},...vehicles.map(v=>({value:v.id,label:`${v.placa} - ${v.descricao}`}))]} />
+        footer={<><Btn onClick={()=>setModal(false)}>Cancelar</Btn><Btn onClick={save} variant="primary" size="md">Salvar</Btn></>}>
+        <div className="grid grid-cols-2 gap-x-3">
+          <Input label="Espécie *" value={editing.species} onChange={(v:string)=>setEditing((e:any)=>({...e,species:v}))} placeholder="Ex: Pinus, Eucalipto" />
+          <Input label="Data *" value={editing.entry_date} onChange={(v:string)=>setEditing((e:any)=>({...e,entry_date:v}))} type="date" />
         </div>
-        <div className="rounded-xl p-2.5 mb-2" style={{background:'rgba(0,212,255,.06)',border:'1px solid rgba(0,212,255,.2)'}}>
-          <div className="text-xs font-bold mb-2" style={{color:'var(--cy)'}}>📐 Dimensões (calcula peso estimado automaticamente)</div>
-          <div className="grid grid-cols-3 gap-x-2">
-            <Input label="Altura Média (m)" value={editing.altura_media} onChange={(v:string)=>setEdit((e:any)=>({...e,altura_media:parseFloat(v)||undefined}))} type="number" placeholder="0.00" />
-            <Input label="Comprimento (m)" value={editing.comprimento} onChange={(v:string)=>setEdit((e:any)=>({...e,comprimento:parseFloat(v)||undefined}))} type="number" placeholder="0.00" />
-            <Input label="Largura (m)" value={editing.largura} onChange={(v:string)=>setEdit((e:any)=>({...e,largura:parseFloat(v)||undefined}))} type="number" placeholder="0.00" />
-          </div>
-          {editing.altura_media&&editing.comprimento&&editing.largura&&(
-            <div className="text-xs mt-1" style={{color:'var(--am)',fontWeight:600}}>
-              Peso estimado: {calcPeso(editing)} kg
-            </div>
-          )}
+        <div className="grid grid-cols-2 gap-x-3">
+          <Select label="Fornecedor" value={editing.supplier_id||''} onChange={(v:string)=>setEditing((e:any)=>({...e,supplier_id:v}))} options={[{value:'',label:'Outro/Manual'}, ...suppliers.map(s=>({value:s.id,label:s.name}))]} />
+          <Input label="Origem (fazenda)" value={editing.origin} onChange={(v:string)=>setEditing((e:any)=>({...e,origin:v}))} placeholder="Ex: Fazenda Silva" />
         </div>
-        <div className="grid grid-cols-2 gap-x-2">
-          <Input label="Peso Líquido (kg)" value={editing.peso_liquido} onChange={(v:string)=>setEdit((e:any)=>({...e,peso_liquido:parseFloat(v)||undefined}))} type="number" />
-          <Input label="Volume Estéreo (m³)" value={editing.volume_estereo} onChange={(v:string)=>setEdit((e:any)=>({...e,volume_estereo:parseFloat(v)||undefined}))} type="number" />
+        <div className="grid grid-cols-2 gap-x-3">
+          <Input label="Volume (m³)" value={editing.volume_m3} onChange={(v:string)=>setEditing((e:any)=>({...e,volume_m3:v}))} type="number" placeholder="0.00" />
+          <Input label="Nº de toras" value={editing.log_count} onChange={(v:string)=>setEditing((e:any)=>({...e,log_count:v}))} type="number" placeholder="0" />
         </div>
-        <Textarea label="Observação" value={editing.observacao} onChange={(v:string)=>setEdit((e:any)=>({...e,observacao:v}))} rows={2} />
+        <div className="grid grid-cols-2 gap-x-3">
+          <Input label="Compr. médio (m)" value={editing.avg_length} onChange={(v:string)=>setEditing((e:any)=>({...e,avg_length:v}))} type="number" placeholder="0.0" />
+          <Input label="Diâm. médio (cm)" value={editing.avg_diameter} onChange={(v:string)=>setEditing((e:any)=>({...e,avg_diameter:v}))} type="number" placeholder="0" />
+        </div>
+        <div className="grid grid-cols-2 gap-x-3">
+          <Input label="Valor/m³ R$" value={editing.unit_value} onChange={(v:string)=>setEditing((e:any)=>({...e,unit_value:v}))} type="number" placeholder="0.00" />
+          <Input label="Placa do caminhão" value={editing.truck_plate} onChange={(v:string)=>setEditing((e:any)=>({...e,truck_plate:v.toUpperCase()}))} placeholder="ABC-0000" />
+        </div>
+        <div className="grid grid-cols-2 gap-x-3">
+          <Input label="Nº Romaneio" value={editing.romaneio} onChange={(v:string)=>setEditing((e:any)=>({...e,romaneio:v}))} placeholder="Ex: R-001" />
+          <Select label="Qualidade" value={editing.quality||'Normal'} onChange={(v:string)=>setEditing((e:any)=>({...e,quality:v}))} options={['Normal','Selecionada','Industrial','Refugo']} />
+        </div>
+        <Input label="Observações" value={editing.notes} onChange={(v:string)=>setEditing((e:any)=>({...e,notes:v}))} placeholder="Observações da carga..." />
       </Modal>
     </div>
   )

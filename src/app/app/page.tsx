@@ -52,9 +52,19 @@ import FinancePage    from '@/app/pages/FinancePage'
 import QRPage         from '@/app/pages/QRPage'
 import DowntimePage   from '@/app/pages/DowntimePage'
 import SuperAdminPage from '@/app/pages/SuperAdminPage'
-import ChatPage       from '@/app/pages/ChatPage'
+import ChatPage        from '@/app/pages/ChatPage'
+import SchedulingPage  from '@/app/pages/SchedulingPage'
+import DocumentsPage   from '@/app/pages/DocumentsPage'
+import EPIPage         from '@/app/pages/EPIPage'
+import OEEPage         from '@/app/pages/OEEPage'
+import TrainingPage    from '@/app/pages/TrainingPage'
+import AuditPage       from '@/app/pages/AuditPage'
+import EnergyPage      from '@/app/pages/EnergyPage'
+import WoodPage        from '@/app/pages/WoodPage'
+import SalesPage       from '@/app/pages/SalesPage'
 
-type Page = 'dashboard'|'os'|'machines'|'pm'|'tasks'|'parts'|'suppliers'|'reports'|'users'|'settings'|'finance'|'qr'|'downtime'|'superadmin'|'chat'
+type Page = 'dashboard'|'os'|'machines'|'pm'|'tasks'|'parts'|'suppliers'|'reports'|'users'|'settings'|'finance'|'qr'|'downtime'|'superadmin'|'chat'|'scheduling'|'documents'|'epi'|'oee'|'training'|'audit'|'energy'|'wood'|'sales'
+
 
 export default function App() {
   const [user, setUser]    = useState<any>(null)
@@ -62,6 +72,7 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [page, setPage]    = useState<Page>('dashboard')
   const [splashDone, setSplashDone] = useState(false)
+  const [userModules, setUserModules] = useState<string[]>([])
 
   // Auth init
   useEffect(() => {
@@ -69,6 +80,7 @@ export default function App() {
       if (data.session?.user) {
         setUser(data.session.user)
         loadProfile(data.session.user.id)
+        loadUserModules(data.session.user.id)
       } else {
         setLoading(false)
         setSplashDone(true)
@@ -78,12 +90,20 @@ export default function App() {
       if (session?.user) {
         setUser(session.user)
         loadProfile(session.user.id)
+        loadUserModules(session.user.id)
       } else {
         setUser(null); setProfile(null); setLoading(false); setSplashDone(true)
       }
     })
     return () => subscription.unsubscribe()
   }, [])
+
+  async function loadUserModules(uid: string) {
+    const { data } = await supabase.from('user_permissions').select('module_id').eq('user_id', uid).eq('enabled', true)
+    if (data && data.length > 0) {
+      setUserModules(data.map((d:any) => d.module_id))
+    }
+  }
 
   async function loadProfile(uid: string) {
     try {
@@ -163,22 +183,38 @@ export default function App() {
   const MPT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const NAV: any[] = [
-    {id:'dashboard' as Page,  label:'Início',    icon:IC.home},
-    {id:'os' as Page,         label:'OS',        icon:IC.os},
-    {id:'machines' as Page,   label:'Máquinas',  icon:IC.mach},
-    {id:'pm' as Page,         label:'MP',        icon:IC.pm},
-    {id:'tasks' as Page,      label:'Tarefas',   icon:IC.task},
-    {id:'parts' as Page,      label:'Peças',     icon:IC.parts},
-    {id:'suppliers' as Page,  label:'Fornec.',   icon:IC.sup},
-    {id:'reports' as Page,    label:'Relatórios',icon:IC.rep},
-    {id:'qr' as Page,          label:'QR Codes',   icon:IC.qr},
-    {id:'downtime' as Page,    label:'Paradas',    icon:IC.down},
-    {id:'chat' as Page,        label:'Conversas',  icon:IC.chat},
-    {id:'users' as Page,       label:'Usuários',   icon:IC.users, perm:'admin'},
-    {id:'superadmin' as Page,  label:'Super Admin',icon:IC.sadm,  perm:'superadmin'},
-    {id:'settings' as Page,   label:'Config',    icon:IC.cfg},
-  ].filter(n => !n.perm || profile?.role === n.perm || (n.perm === 'admin' && profile?.role === 'superadmin'))
+  const ALL_NAV: any[] = [
+    {id:'dashboard' as Page,  label:'Início',      icon:IC.home},
+    {id:'os' as Page,         label:'OS',          icon:IC.os},
+    {id:'machines' as Page,   label:'Máquinas',    icon:IC.mach},
+    {id:'pm' as Page,         label:'MP',          icon:IC.pm},
+    {id:'tasks' as Page,      label:'Tarefas',     icon:IC.task},
+    {id:'parts' as Page,      label:'Peças',       icon:IC.parts},
+    {id:'suppliers' as Page,  label:'Fornec.',     icon:IC.sup},
+    {id:'downtime' as Page,   label:'Paradas',     icon:IC.down},
+    {id:'finance' as Page,    label:'Financeiro',  icon:IC.fin},
+    {id:'reports' as Page,    label:'Relatórios',  icon:IC.rep},
+    {id:'qr' as Page,         label:'QR Codes',    icon:IC.qr},
+    {id:'chat' as Page,       label:'Conversas',   icon:IC.chat},
+    {id:'scheduling' as Page, label:'Agendamentos',icon:<span>📅</span>},
+    {id:'documents' as Page,  label:'Documentos',  icon:<span>📄</span>},
+    {id:'epi' as Page,        label:'EPI/Seg.',    icon:<span>🦺</span>},
+    {id:'oee' as Page,        label:'OEE',         icon:<span>📈</span>},
+    {id:'training' as Page,   label:'Treinamentos',icon:<span>🎓</span>},
+    {id:'audit' as Page,      label:'Auditorias',  icon:<span>🔍</span>},
+    {id:'energy' as Page,     label:'Energia',     icon:<span>⚡</span>},
+    {id:'wood' as Page,       label:'Madeira',     icon:<span>🪵</span>},
+    {id:'sales' as Page,      label:'Vendas',      icon:<span>🛒</span>},
+    {id:'users' as Page,      label:'Usuários',    icon:IC.users},
+    {id:'superadmin' as Page, label:'Super Admin', icon:IC.sadm},
+    {id:'settings' as Page,   label:'Config',      icon:IC.cfg},
+  ]
+
+  const NAV = ALL_NAV.filter(n => {
+    if (profile?.role === 'superadmin' || profile?.role === 'admin') return true
+    if (userModules.length === 0) return ['dashboard','os','pm','tasks'].includes(n.id)
+    return userModules.includes(n.id)
+  })
 
   const PageMap: Record<Page, React.ReactNode> = {
     dashboard:   <DashPage    profile={profile} can={can} onNavigate={setPage} />,
@@ -194,6 +230,16 @@ export default function App() {
     qr:          <QRPage        profile={profile} can={can} onNavigate={setPage} />,
     downtime:    <DowntimePage  profile={profile} can={can} />,
     chat:        <ChatPage      profile={profile} />,
+    finance:     <FinancePage   profile={profile} can={can} />,
+    scheduling:  <SchedulingPage  profile={profile} can={can} />,
+    documents:   <DocumentsPage   profile={profile} can={can} />,
+    epi:         <EPIPage         profile={profile} can={can} />,
+    oee:         <OEEPage         profile={profile} can={can} />,
+    training:    <TrainingPage    profile={profile} can={can} />,
+    audit:       <AuditPage       profile={profile} can={can} />,
+    energy:      <EnergyPage      profile={profile} can={can} />,
+    wood:        <WoodPage        profile={profile} can={can} />,
+    sales:       <SalesPage       profile={profile} can={can} />,
     superadmin:  <SuperAdminPage profile={profile} />,
   }
 
