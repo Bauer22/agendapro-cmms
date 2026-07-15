@@ -31,7 +31,7 @@ export default function FinancePage({ profile, can }: Props) {
       const [b, c, s] = await Promise.all([
         supabase.from('accounts_payable').select('*').order('due_date'),
         supabase.from('cost_centers').select('*').eq('active', true),
-        supabase.from('suppliers').select('id,razao_social,nome_fantasia'),
+        supabase.from('cadastros').select('id,nome_razao,nome_fantasia').eq('is_fornecedor',true).eq('status',true),
       ])
       setBills(b.data||[]); setCenters(c.data||[]); setSuppliers(s.data||[])
     } else {
@@ -95,7 +95,7 @@ export default function FinancePage({ profile, can }: Props) {
     const sup = suppliers.find(s=>s.id===b.fornecedor_id)
     const q = search.toLowerCase()
     return (!fStatus||b.status===fStatus) &&
-      (!q||(sup?.razao_social||'').toLowerCase().includes(q)||(b.numero_documento||'').toLowerCase().includes(q))
+      (!q||(sup?.nome_razao||'').toLowerCase().includes(q)||(b.numero_documento||'').toLowerCase().includes(q))
   })
 
   return (
@@ -158,7 +158,7 @@ export default function FinancePage({ profile, can }: Props) {
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <div className="text-xs font-bold truncate">{sup?.razao_social||sup?.nome_fantasia||'Fornecedor'}</div>
+                          <div className="text-xs font-bold truncate">{sup?.nome_razao||sup?.nome_fantasia||'Fornecedor'}</div>
                           <Badge color={STATUS_COLOR[status] as any}>{STATUS_LABEL[status]}</Badge>
                         </div>
                         <div className="text-xs mt-0.5" style={{color:'var(--t2)'}}>
@@ -186,7 +186,7 @@ export default function FinancePage({ profile, can }: Props) {
           <Modal open={modal&&tab==='bills'} onClose={()=>setModal(false)} title={editing.id?'Editar Conta':'Nova Conta a Pagar'}
             footer={<><Btn onClick={()=>setModal(false)} variant="secondary" size="md">Cancelar</Btn><Btn onClick={saveBill} variant="primary" size="md">Salvar</Btn></>}>
             <Select label="Fornecedor *" value={editing.fornecedor_id} onChange={(v:string)=>setEdit((e:any)=>({...e,fornecedor_id:v}))}
-              options={[{value:'',label:'Selecione...'},...suppliers.map(s=>({value:s.id,label:s.razao_social||s.nome_fantasia}))]} />
+              options={[{value:'',label:'Selecione...'},...suppliers.map(s=>({value:s.id,label:s.nome_razao||s.nome_fantasia}))]} />
             <Select label="Centro de Custo" value={editing.centro_custo_id} onChange={(v:string)=>setEdit((e:any)=>({...e,centro_custo_id:v}))}
               options={[{value:'',label:'Nenhum'},...centers.map(c=>({value:c.id,label:`${c.codigo} - ${c.descricao}`}))]} />
             <div className="grid grid-cols-2 gap-x-2">

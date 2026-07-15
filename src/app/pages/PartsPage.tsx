@@ -43,7 +43,7 @@ export default function PartsPage({ profile, can }: Props) {
   async function load() {
     const [p, s, os] = await Promise.all([
       supabase.from('parts').select('*').order('category,name'),
-      supabase.from('suppliers').select('id,name,razao_social'),
+      supabase.from('cadastros').select('id,nome_razao').eq('is_fornecedor',true).eq('status',true),
       supabase.from('work_orders').select('id,number,title,status').neq('status','done').neq('status','cancelled'),
     ])
     setParts(p.data||[]); setSuppliers(s.data||[]); setOsList(os.data||[])
@@ -352,7 +352,7 @@ export default function PartsPage({ profile, can }: Props) {
         </div>
         {move.type==='in' && (
           <Select label="Fornecedor (opcional)" value={move.supplier_id} onChange={(v:string)=>setMove((e:any)=>({...e,supplier_id:v}))}
-            options={[{value:'',label:'Nenhum'},...suppliers.map(s=>({value:s.id,label:s.razao_social||s.name}))]} />
+            options={[{value:'',label:'Nenhum'},...suppliers.map(s=>({value:s.id,label:s.nome_razao}))]} />
         )}
         <Select label="Vincular a OS" value={move.os_id} onChange={(v:string)=>setMove((e:any)=>({...e,os_id:v}))}
           options={[{value:'',label:'Nenhuma'},...osList.map(o=>({value:o.id,label:`${o.number} — ${o.title?.slice(0,30)}`}))]} />
@@ -391,7 +391,7 @@ export default function PartsPage({ profile, can }: Props) {
           <Input label="Previsão" value={editPO.date_expected} onChange={(v:string)=>setEditPO((e:any)=>({...e,date_expected:v}))} type="date" />
         </div>
         <Select label="Fornecedor" value={editPO.supplier_id} onChange={(v:string)=>setEditPO((e:any)=>({...e,supplier_id:v}))}
-          options={[{value:'',label:'Nenhum'},...suppliers.map(s=>({value:s.id,label:s.razao_social||s.name}))]} />
+          options={[{value:'',label:'Nenhum'},...suppliers.map(s=>({value:s.id,label:s.nome_razao}))]} />
         <Select label="Status" value={editPO.status||'pending'} onChange={(v:string)=>setEditPO((e:any)=>({...e,status:v}))} options={PO_STATUS} />
         {editPO.status==='received' && (
           <div className="rounded-xl p-2.5 mb-2" style={{background:'rgba(16,185,129,.08)',border:'1px solid rgba(16,185,129,.25)'}}>

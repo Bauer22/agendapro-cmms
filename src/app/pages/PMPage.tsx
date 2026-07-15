@@ -25,6 +25,7 @@ export default function PMPage({ profile, can }: Props) {
   const [repairs, setRepairs]   = useState<any[]>([])
   const [machines, setMach]     = useState<any[]>([])
   const [parts, setParts]       = useState<any[]>([])
+  const [fornecedores, setFornecedores] = useState<any[]>([])
   const [users, setUsers]       = useState<any[]>([])
   const [loading, setLoad]      = useState(true)
   const [tab, setTab]           = useState('pm')
@@ -54,6 +55,7 @@ export default function PMPage({ profile, can }: Props) {
       supabase.from('profiles').select('id,display_name,email,role,shift'),
     ])
     setMach(m.data||[]); setParts(p.data||[])
+    supabase.from('cadastros').select('id,nome_razao').eq('is_fornecedor',true).eq('status',true).order('nome_razao').then(({data})=>setFornecedores(data||[]))
     const userList = (u.data||[]).map((x:any) => {
       let name = x.display_name || ''
       if (!name || (name.includes('-') && name.length > 30)) name = x.email?.split('@')[0] || 'Usuário'
@@ -491,7 +493,14 @@ export default function PMPage({ profile, can }: Props) {
           <Input label="Data Retorno" value={editRepair.return_date} onChange={(v:string)=>setEditRepair((e:any)=>({...e,return_date:v,_was_status:editRepair.status}))} type="date" />
         </div>
         <div className="grid grid-cols-2 gap-x-2">
+          {fornecedores.length > 0 ? (
+          <Select label="Fornecedor/Oficina" value={editRepair.supplier_id||''} onChange={(v:string)=>{
+            const f = fornecedores.find((x:any)=>x.id===v)
+            setEditRepair((e:any)=>({...e,supplier_id:v,supplier_name:f?.nome_razao||''}))
+          }} options={[{value:'',label:'Selecione...'}, ...fornecedores.map((f:any)=>({value:f.id,label:f.nome_razao}))]} />
+        ) : (
           <Input label="Fornecedor/Oficina" value={editRepair.supplier_name} onChange={(v:string)=>setEditRepair((e:any)=>({...e,supplier_name:v}))} placeholder="Nome da oficina" />
+        )}
           <Input label="Custo R$" value={editRepair.cost} onChange={(v:string)=>setEditRepair((e:any)=>({...e,cost:parseFloat(v)||undefined}))} type="number" placeholder="0.00" />
         </div>
         <Select label="Status" value={editRepair.status||'open'} onChange={(v:string)=>setEditRepair((e:any)=>({...e,status:v,_was_status:editRepair.status}))} options={REP_STATUS_OPTS} />

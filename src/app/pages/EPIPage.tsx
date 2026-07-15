@@ -17,7 +17,15 @@ export default function EPIPage({ profile, can }: Props) {
   const [loading, setLoading] = useState(true)
   const { confirm, dialog } = useConfirm()
 
-  useEffect(() => { load(); supabase.from('profiles').select('id,display_name,email').then(({data})=>setUsers((data||[]).map((x:any)=>({...x,display_name:x.display_name||x.email?.split('@')[0]})))) }, [tab])
+  useEffect(() => { load(); Promise.all([
+    supabase.from('profiles').select('id,display_name,email'),
+    supabase.from('cadastros').select('id,nome_razao').eq('is_funcionario',true).eq('status',true),
+  ]).then(([p,f])=>{
+    const sys = (p.data||[]).map((x:any)=>({id:x.id,display_name:x.display_name||x.email?.split('@')[0]}))
+    const func = (f.data||[]).map((x:any)=>({id:x.id,display_name:x.nome_razao}))
+    const seen = new Set(sys.map((s:any)=>s.display_name?.toLowerCase()))
+    setUsers([...sys, ...func.filter((x:any)=>!seen.has(x.display_name?.toLowerCase()))])
+  }) }, [tab])
 
   async function load() {
     if (tab==='stock') {

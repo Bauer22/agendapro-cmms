@@ -20,6 +20,7 @@ export default function WoodPage({ profile, can }: Props) {
   const [entries, setEntries] = useState<any[]>([])
   const [suppliers, setSuppliers] = useState<any[]>([])
   const [motoristas, setMotoristas] = useState<any[]>([])
+  const [veiculos, setVeiculos] = useState<any[]>([])
   const [modal, setModal] = useState(false)
   const [view, setView] = useState<any>(null)
   const [editing, setEditing] = useState<any>({})
@@ -41,12 +42,14 @@ export default function WoodPage({ profile, can }: Props) {
   }
 
   async function loadSuppliers() {
-    const [forn, mots] = await Promise.all([
+    const [forn, mots, veic] = await Promise.all([
       supabase.from('cadastros').select('id,nome_razao').eq('is_fornecedor', true).eq('status', true).order('nome_razao'),
       supabase.from('cadastros').select('id,nome_razao').eq('is_motorista', true).eq('status', true).order('nome_razao'),
+      supabase.from('veiculos').select('id,placa,tipo').eq('status', true).order('placa'),
     ])
     setSuppliers((forn.data||[]).map((x:any)=>({id:x.id,name:x.nome_razao})))
     setMotoristas((mots.data||[]).map((x:any)=>({id:x.id,name:x.nome_razao})))
+    setVeiculos(veic.data||[])
   }
 
   function openNew() {
@@ -221,7 +224,14 @@ export default function WoodPage({ profile, can }: Props) {
           <Input label="Motorista *" value={editing.driver} onChange={(v:string) => setEditing((e:any) => ({...e, driver: v}))} placeholder="Nome completo do motorista" />
         )}
 
-        <Input label="Placa *" value={editing.plate} onChange={(v:string) => setEditing((e:any) => ({...e, plate: maskPlate(v)}))} placeholder="AAA0A00 ou AAA0000" />
+        {veiculos.length > 0 ? (
+          <Select label="Placa / Veículo *" value={editing.veiculo_id||''} onChange={(v:string) => {
+            const ve = veiculos.find(x=>x.id===v)
+            setEditing((e:any)=>({...e, veiculo_id:v, plate: ve?.placa||''}))
+          }} options={[{value:'',label:'Selecione o veículo...'}, ...veiculos.map(ve=>({value:ve.id,label:`${ve.placa} (${ve.tipo})`}))]} />
+        ) : (
+          <Input label="Placa *" value={editing.plate} onChange={(v:string) => setEditing((e:any) => ({...e, plate: maskPlate(v)}))} placeholder="AAA0A00 ou AAA0000" />
+        )}
 
         <Input label="Toneladas *" value={editing.weight_tons} onChange={(v:string) => setEditing((e:any) => ({...e, weight_tons: v}))} type="number" placeholder="0.000" />
 
