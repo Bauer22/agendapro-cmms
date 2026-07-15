@@ -7,7 +7,7 @@ import toast from 'react-hot-toast'
 import type { UserProfile } from '@/types'
 
 interface Props { profile: UserProfile|null; can:(p:string)=>boolean }
-type Tab = 'abast'|'entradas'|'despesas'|'relatorio'
+type Tab = 'abast'|'entradas'|'despesas'|'placas'|'relatorio'
 
 const EXP_CATS = ['Manutenção','Pneus','Seguro','IPVA','Licenciamento','Multa','Lavagem','Peças','Outros']
 const money = (v:number) => `R$ ${(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}`
@@ -46,9 +46,9 @@ export default function FuelPage({ profile, can }: Props) {
   async function loadAll() {
     setLoading(true)
     const [r, e, x] = await Promise.all([
-      supabase.from('fuel_records').select('*').order('record_date',{ascending:false}).limit(300),
-      supabase.from('fuel_entries').select('*').order('entry_date',{ascending:false}).limit(200),
-      supabase.from('vehicle_expenses').select('*').order('expense_date',{ascending:false}).limit(200),
+      supabase.from('fuel_records').select('*').order('record_date',{ascending:false}).limit(2000),
+      supabase.from('fuel_entries').select('*').order('created_at',{ascending:false}).limit(1000),
+      supabase.from('vehicle_expenses').select('*').order('expense_date',{ascending:false}).limit(1000),
     ])
     if (r.error) toast.error('Erro: '+r.error.message)
     setRecords(r.data||[]); setEntries(e.data||[]); setExpenses(x.data||[])
@@ -56,10 +56,16 @@ export default function FuelPage({ profile, can }: Props) {
   }
 
   // ── Estoque = entradas − abastecimentos ──
-  const totalIn   = entries.reduce((s,e)=>s+(parseFloat(e.liters)||0),0)
+  // Lê tanto colunas em inglês quanto as legadas em português
+  const eLit = (e:any) => parseFloat(e.liters ?? e.litros) || 0
+  const eVal = (e:any) => parseFloat(e.total_value ?? e.valor_total) || 0
+  const ePri = (e:any) => parseFloat(e.unit_price ?? e.valor_litro) || 0
+  const eDat = (e:any) => e.entry_date || e.vencimento || (e.created_at||'').slice(0,10)
+
+  const totalIn   = entries.reduce((s,e)=>s+eLit(e),0)
   const totalOut  = records.reduce((s,r)=>s+(parseFloat(r.liters)||0),0)
   const stock     = totalIn - totalOut
-  const avgPrice  = totalIn > 0 ? entries.reduce((s,e)=>s+(parseFloat(e.total_value)||0),0)/totalIn : 0
+  const avgPrice  = totalIn > 0 ? entries.reduce((s,e)=>s+eVal(e),0)/totalIn : 0
 
   function openNew() {
     const now = new Date()
@@ -171,6 +177,82 @@ export default function FuelPage({ profile, can }: Props) {
   })
   const veicRows = Object.values(byVeic).sort((a,b)=>(b.fuel+b.exp)-(a.fuel+a.exp))
 
+  // ── Consolidado por placa/máquina (todo o histórico) ──
+  const placaStats = (() => {
+    const m: Record<string, {
+      unidade:string; isVeic:boolean; abast:number; litros:number;
+      custo:number; desp:number; kmMin:number; kmMax:number; hmMin:number; hmMax:number;
+    }> = {}
+    records.forEach(r => {
+      const k = r.veiculo_placa || r.machine_name || r.driver_name || '—'
+      if (!m[k]) m[k] = { unidade:k, isVeic: !!r.veiculo_placa, abast:0, litros:0, custo:0, desp:0,
+                          kmMin:Infinity, kmMax:0, hmMin:Infinity, hmMax:0 }
+      const e = m[k]
+      const lt = parseFloat(r.liters)||0
+      e.abast += 1
+      e.litros += lt
+      e.custo += (parseFloat(r.total_value) || (lt * (parseFloat(r.unit_price)||0)) || 0)
+      const km = parseFloat(r.km)
+      if (km > 0) { e.kmMin = Math.min(e.kmMin, km); e.kmMax = Math.max(e.kmMax, km) }
+      const hm = parseFloat(r.hour_meter)
+      if (hm > 0) { e.hmMin = Math.min(e.hmMin, hm); e.hmMax = Math.max(e.hmMax, hm) }
+    })
+    expenses.forEach(x => {
+      const k = x.veiculo_placa || '—'
+      if (!m[k]) m[k] = { unidade:k, isVeic:true, abast:0, litros:0, custo:0, desp:0,
+                          kmMin:Infinity, kmMax:0, hmMin:Infinity, hmMax:0 }
+      m[k].desp += parseFloat(x.value)||0
+    })
+    return Object.values(m).map(e => {
+      const kmRod = (e.kmMax > 0 && e.kmMin < Infinity && e.kmMax > e.kmMin) ? e.kmMax - e.kmMin : 0
+      const hmRod = (e.hmMax > 0 && e.hmMin < Infinity && e.hmMax > e.hmMin) ? e.hmMax - e.hmMin : 0
+      const total = e.custo + e.desp
+      return {
+        ...e, kmRod, hmRod, total,
+        precoMedio: e.litros > 0 ? e.custo/e.litros : 0,
+        kmPorL:  kmRod > 0 && e.litros > 0 ? kmRod/e.litros : 0,
+        custoKm: kmRod > 0 ? total/kmRod : 0,
+        lPorH:   hmRod > 0 && e.litros > 0 ? e.litros/hmRod : 0,
+        custoH:  hmRod > 0 ? total/hmRod : 0,
+      }
+    }).sort((a,b) => b.total - a.total)
+  })()
+
+  const placaTotals = placaStats.reduce((s,p) => ({
+    litros: s.litros + p.litros, custo: s.custo + p.custo,
+    desp: s.desp + p.desp, total: s.total + p.total,
+  }), {litros:0, custo:0, desp:0, total:0})
+
+  async function exportPlacasPDF() {
+    try {
+      const { default: jsPDF } = await import('jspdf')
+      const { default: autoTable } = await import('jspdf-autotable')
+      const doc = new jsPDF({ orientation:'landscape' })
+      doc.setFillColor(6,13,26); doc.rect(0,0,297,25,'F')
+      doc.setTextColor(249,115,22); doc.setFontSize(14); doc.setFont('helvetica','bold')
+      doc.text('Industrial8 — Custo por Placa / Máquina', 12, 11)
+      doc.setTextColor(148,163,184); doc.setFontSize(8); doc.setFont('helvetica','normal')
+      doc.text(`Histórico completo · Gerado em ${new Date().toLocaleDateString('pt-BR')}`, 12, 18)
+      autoTable(doc, {
+        startY: 30,
+        head: [['Placa/Máquina','Abast.','Litros','Custo Combustível','Outras Despesas','Custo Total','R$/L','Km rodados','Km/L','R$/km']],
+        body: placaStats.map(p => [
+          p.unidade, String(p.abast), p.litros.toFixed(1),
+          money(p.custo), money(p.desp), money(p.total),
+          p.precoMedio > 0 ? p.precoMedio.toFixed(3) : '—',
+          p.kmRod > 0 ? p.kmRod.toFixed(0) : '—',
+          p.kmPorL > 0 ? p.kmPorL.toFixed(2) : '—',
+          p.custoKm > 0 ? p.custoKm.toFixed(2) : '—',
+        ]),
+        foot: [['TOTAL', String(records.length), placaTotals.litros.toFixed(1),
+                money(placaTotals.custo), money(placaTotals.desp), money(placaTotals.total), '', '', '', '']],
+        theme:'grid', headStyles:{fillColor:[249,115,22]}, footStyles:{fillColor:[30,58,110]}, styles:{fontSize:8},
+      })
+      doc.save(`custo_por_placa_${td()}.pdf`)
+      toast.success('PDF gerado ✅')
+    } catch(e:any) { toast.error('Erro ao gerar PDF: '+e.message) }
+  }
+
   async function exportPDF() {
     try {
       const { default: jsPDF } = await import('jspdf')
@@ -205,21 +287,33 @@ export default function FuelPage({ profile, can }: Props) {
     } catch(e:any) { toast.error('Erro ao gerar PDF: '+e.message) }
   }
 
-  const TABS: [Tab,string][] = [['abast','⛽ Abastec.'],['entradas','📥 Entradas'],['despesas','🔧 Despesas'],['relatorio','📊 Relatório']]
+  const TABS: [Tab,string][] = [['abast','⛽ Abastec.'],['entradas','📥 Entradas'],['despesas','🔧 Despesas'],['placas','🚛 Por Placa'],['relatorio','📊 Relatório']]
 
   return (
     <div className="page-enter p-3">
       {dialog}
       <SH label="⛽ Combustível" action={
-        tab!=='relatorio' ? <Btn onClick={openNew} variant="primary" size="sm">+ Novo</Btn>
-                          : <Btn onClick={exportPDF} variant="primary" size="sm">📄 PDF</Btn>
+        (tab==='relatorio'||tab==='placas') ? <Btn onClick={tab==='placas'?exportPlacasPDF:exportPDF} variant="primary" size="sm">📄 PDF</Btn>
+                                            : <Btn onClick={openNew} variant="primary" size="sm">+ Novo</Btn>
       } />
 
       {/* KPIs de estoque */}
-      <div className="grid grid-cols-3 gap-2 mb-3">
+      <div className="grid grid-cols-3 gap-2 mb-2">
         <KPI num={`${stock.toFixed(0)} L`} label="Estoque atual" color={stock<500?'red':'green'} />
         <KPI num={`${totalOut.toFixed(0)} L`} label="Total consumido" color="amber" />
         <KPI num={money(avgPrice)} label="Preço médio/L" color="orange" />
+      </div>
+
+      {/* Cálculo do estoque explícito */}
+      <div className="rounded-xl px-3 py-2 mb-3 flex items-center justify-center gap-2"
+        style={{background:'var(--s1)',border:'1px solid var(--bd)',fontSize:'11px'}}>
+        <span style={{color:'var(--gn)',fontWeight:700}}>+{totalIn.toFixed(0)} L</span>
+        <span style={{color:'var(--t3)'}}>entradas</span>
+        <span style={{color:'var(--t3)'}}>−</span>
+        <span style={{color:'var(--am)',fontWeight:700}}>{totalOut.toFixed(0)} L</span>
+        <span style={{color:'var(--t3)'}}>abastecidos</span>
+        <span style={{color:'var(--t3)'}}>=</span>
+        <span style={{color:stock<500?'var(--rd)':'var(--cy)',fontWeight:700}}>{stock.toFixed(1)} L</span>
       </div>
 
       {/* Tabs */}
@@ -273,12 +367,12 @@ export default function FuelPage({ profile, can }: Props) {
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="font-bold text-sm" style={{color:'var(--gn)'}}>+{(parseFloat(e.liters)||0).toFixed(2)} L</span>
-                      <Badge color="orange">{money(e.total_value)}</Badge>
-                      {e.unit_price && <span className="text-xs" style={{color:'var(--t3)'}}>{money(e.unit_price)}/L</span>}
+                      <span className="font-bold text-sm" style={{color:'var(--gn)'}}>+{eLit(e).toFixed(2)} L</span>
+                      <Badge color="orange">{money(eVal(e))}</Badge>
+                      {ePri(e) > 0 && <span className="text-xs" style={{color:'var(--t3)'}}>{money(ePri(e))}/L</span>}
                     </div>
                     <div className="text-xs" style={{color:'var(--t2)'}}>
-                      📅 {fmtD(e.entry_date)}{e.supplier_name?' · 🏭 '+e.supplier_name:''}
+                      📅 {fmtD(eDat(e))}{e.supplier_name?' · 🏭 '+e.supplier_name:''}
                     </div>
                     {e.invoice && <div className="text-xs" style={{color:'var(--t3)'}}>📄 NF {e.invoice}</div>}
                   </div>
@@ -317,6 +411,86 @@ export default function FuelPage({ profile, can }: Props) {
               </div>
             ))}
           </div>
+        ))}
+
+        {/* ═══ POR PLACA ═══ */}
+        {tab==='placas' && (placaStats.length===0 ? <Empty icon="🚛" text="Nenhum abastecimento registrado." /> : (
+          <>
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              <KPI num={`${placaTotals.litros.toFixed(0)}L`} label="Litros totais" color="blue" />
+              <KPI num={money(placaTotals.custo).replace('R$ ','R$')} label="Combustível" color="orange" />
+              <KPI num={money(placaTotals.total).replace('R$ ','R$')} label="Custo total" color="purple" />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              {placaStats.map((p,i) => {
+                const pct = placaTotals.total > 0 ? (p.total/placaTotals.total*100) : 0
+                return (
+                  <div key={i} className="rounded-xl p-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold" style={{fontSize:'14px',color:'var(--cy)',letterSpacing:'.5px'}}>{p.unidade}</span>
+                          <Badge color={p.isVeic?'blue':'purple'}>{p.isVeic?'🚛 Veículo':'⚙️ Máquina'}</Badge>
+                        </div>
+                        <div className="text-xs mt-0.5" style={{color:'var(--t3)'}}>
+                          {p.abast} abastecimento{p.abast!==1?'s':''} · {p.litros.toFixed(1)} L
+                          {p.precoMedio>0?` · ${money(p.precoMedio)}/L`:''}
+                        </div>
+                      </div>
+                      <div style={{textAlign:'right'}}>
+                        <div className="font-bold text-sm" style={{color:'#f97316'}}>{money(p.total)}</div>
+                        <div className="text-xs" style={{color:'var(--t3)'}}>{pct.toFixed(1)}% do total</div>
+                      </div>
+                    </div>
+
+                    <div style={{height:'5px',background:'rgba(255,255,255,.05)',borderRadius:'3px',overflow:'hidden',marginBottom:'8px'}}>
+                      <div style={{height:'100%',width:`${Math.min(pct,100)}%`,background:'linear-gradient(90deg,#f97316,#fb923c)',borderRadius:'3px'}} />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                      <div className="flex justify-between" style={{fontSize:'11px'}}>
+                        <span style={{color:'var(--t3)'}}>⛽ Combustível</span>
+                        <span style={{fontWeight:700,color:'var(--cy)'}}>{money(p.custo)}</span>
+                      </div>
+                      <div className="flex justify-between" style={{fontSize:'11px'}}>
+                        <span style={{color:'var(--t3)'}}>🔧 Outras desp.</span>
+                        <span style={{fontWeight:700,color:p.desp>0?'var(--pp)':'var(--t3)'}}>{money(p.desp)}</span>
+                      </div>
+                      {p.kmRod > 0 && <>
+                        <div className="flex justify-between" style={{fontSize:'11px'}}>
+                          <span style={{color:'var(--t3)'}}>🛣 Km rodados</span>
+                          <span style={{fontWeight:700}}>{p.kmRod.toLocaleString('pt-BR',{maximumFractionDigits:0})}</span>
+                        </div>
+                        <div className="flex justify-between" style={{fontSize:'11px'}}>
+                          <span style={{color:'var(--t3)'}}>📊 Km/L</span>
+                          <span style={{fontWeight:700,color:'var(--gn)'}}>{p.kmPorL.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between" style={{fontSize:'11px'}}>
+                          <span style={{color:'var(--t3)'}}>💰 Custo/km</span>
+                          <span style={{fontWeight:700,color:'var(--am)'}}>{money(p.custoKm)}</span>
+                        </div>
+                      </>}
+                      {p.hmRod > 0 && <>
+                        <div className="flex justify-between" style={{fontSize:'11px'}}>
+                          <span style={{color:'var(--t3)'}}>⏱ Horas trab.</span>
+                          <span style={{fontWeight:700}}>{p.hmRod.toFixed(1)} h</span>
+                        </div>
+                        <div className="flex justify-between" style={{fontSize:'11px'}}>
+                          <span style={{color:'var(--t3)'}}>📊 L/hora</span>
+                          <span style={{fontWeight:700,color:'var(--gn)'}}>{p.lPorH.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between" style={{fontSize:'11px'}}>
+                          <span style={{color:'var(--t3)'}}>💰 Custo/hora</span>
+                          <span style={{fontWeight:700,color:'var(--am)'}}>{money(p.custoH)}</span>
+                        </div>
+                      </>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </>
         ))}
 
         {/* ═══ RELATÓRIO ═══ */}
