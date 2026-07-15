@@ -19,6 +19,7 @@ function maskPlate(v: string) {
 export default function WoodPage({ profile, can }: Props) {
   const [entries, setEntries] = useState<any[]>([])
   const [suppliers, setSuppliers] = useState<any[]>([])
+  const [motoristas, setMotoristas] = useState<any[]>([])
   const [modal, setModal] = useState(false)
   const [view, setView] = useState<any>(null)
   const [editing, setEditing] = useState<any>({})
@@ -40,8 +41,12 @@ export default function WoodPage({ profile, can }: Props) {
   }
 
   async function loadSuppliers() {
-    const { data } = await supabase.from('suppliers').select('id,name')
-    setSuppliers(data || [])
+    const [forn, mots] = await Promise.all([
+      supabase.from('cadastros').select('id,nome_razao').eq('is_fornecedor', true).eq('status', true).order('nome_razao'),
+      supabase.from('cadastros').select('id,nome_razao').eq('is_motorista', true).eq('status', true).order('nome_razao'),
+    ])
+    setSuppliers((forn.data||[]).map((x:any)=>({id:x.id,name:x.nome_razao})))
+    setMotoristas((mots.data||[]).map((x:any)=>({id:x.id,name:x.nome_razao})))
   }
 
   function openNew() {
@@ -66,6 +71,7 @@ export default function WoodPage({ profile, can }: Props) {
     setSaving(true)
 
     const sup = suppliers.find(s => s.id === editing.supplier_id)
+    const mot = editing.driver_id ? motoristas.find(m => m.id === editing.driver_id) : null
     const obj = {
       entry_date:    editing.entry_date || td(),
       arrival_time:  editing.arrival_time,
@@ -206,7 +212,14 @@ export default function WoodPage({ profile, can }: Props) {
         <Select label="Classe da Madeira *" value={editing.wood_class || '18 a 24'} onChange={(v:string) => setEditing((e:any) => ({...e, wood_class: v}))}
           options={WOOD_CLASSES} />
 
-        <Input label="Motorista *" value={editing.driver} onChange={(v:string) => setEditing((e:any) => ({...e, driver: v}))} placeholder="Nome completo do motorista" />
+        {motoristas.length > 0 ? (
+          <Select label="Motorista *" value={editing.driver_id||''} onChange={(v:string) => {
+            const m = motoristas.find(x=>x.id===v)
+            setEditing((e:any)=>({...e, driver_id:v, driver: m?.name||''}))
+          }} options={[{value:'',label:'Selecione o motorista...'}, ...motoristas.map(m=>({value:m.id,label:m.name}))]} />
+        ) : (
+          <Input label="Motorista *" value={editing.driver} onChange={(v:string) => setEditing((e:any) => ({...e, driver: v}))} placeholder="Nome completo do motorista" />
+        )}
 
         <Input label="Placa *" value={editing.plate} onChange={(v:string) => setEditing((e:any) => ({...e, plate: maskPlate(v)}))} placeholder="AAA0A00 ou AAA0000" />
 

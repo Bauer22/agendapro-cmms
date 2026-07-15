@@ -66,7 +66,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
     const text = encodeURIComponent(
       `Olá! Tenho interesse no Industrial8.\nNome: ${form.name}\nEmpresa: ${form.company || '-'}\nTelefone: ${form.phone}\nMensagem: ${form.message || '-'}`
     )
-    window.open(`https://wa.me/?text=${text}`, '_blank')
+    window.open(`https://wa.me/5554999999999?text=${text}`, '_blank')
     setSent(true)
   }
 

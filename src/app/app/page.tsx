@@ -61,9 +61,10 @@ import TrainingPage    from '@/app/pages/TrainingPage'
 import AuditPage       from '@/app/pages/AuditPage'
 import EnergyPage      from '@/app/pages/EnergyPage'
 import WoodPage        from '@/app/pages/WoodPage'
+import CadastrosPage   from '@/app/pages/CadastrosPage'
 import SalesPage       from '@/app/pages/SalesPage'
 
-type Page = 'dashboard'|'os'|'machines'|'pm'|'tasks'|'parts'|'suppliers'|'reports'|'users'|'settings'|'finance'|'qr'|'downtime'|'superadmin'|'chat'|'scheduling'|'documents'|'epi'|'oee'|'training'|'audit'|'energy'|'wood'|'sales'
+type Page = 'dashboard'|'os'|'machines'|'pm'|'tasks'|'parts'|'suppliers'|'cadastros'|'reports'|'users'|'settings'|'finance'|'qr'|'downtime'|'superadmin'|'chat'|'scheduling'|'documents'|'epi'|'oee'|'training'|'audit'|'energy'|'wood'|'sales'
 
 
 export default function App() {
@@ -191,6 +192,7 @@ export default function App() {
     {id:'tasks' as Page,      label:'Tarefas',     icon:IC.task},
     {id:'parts' as Page,      label:'Peças',       icon:IC.parts},
     {id:'suppliers' as Page,  label:'Fornec.',     icon:IC.sup},
+    {id:'cadastros' as Page,  label:'Cadastros',   icon:<span>👥</span>},
     {id:'downtime' as Page,   label:'Paradas',     icon:IC.down},
     {id:'finance' as Page,    label:'Financeiro',  icon:IC.fin},
     {id:'reports' as Page,    label:'Relatórios',  icon:IC.rep},
@@ -239,6 +241,7 @@ export default function App() {
     audit:       <AuditPage       profile={profile} can={can} />,
     energy:      <EnergyPage      profile={profile} can={can} />,
     wood:        <WoodPage        profile={profile} can={can} />,
+    cadastros:   <CadastrosPage   profile={profile} can={can} />,
     sales:       <SalesPage       profile={profile} can={can} />,
     superadmin:  <SuperAdminPage profile={profile} />,
   }

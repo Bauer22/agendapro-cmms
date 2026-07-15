@@ -16,6 +16,13 @@ const REPORT_MODULES = [
   {id:'po',       icon:'🛒', title:'Pedidos de Compra',    desc:'Pedidos por status e fornecedor'},
   {id:'finance',  icon:'💰', title:'Contas a Pagar',       desc:'Pagamentos por status e vencimento'},
   {id:'backup',   icon:'💾', title:'Backup Completo',      desc:'Exportar todos os dados em JSON'},
+  {id:'oee',      icon:'📈', title:'Relatório OEE',         desc:'Disponibilidade, performance e qualidade por máquina'},
+  {id:'wood',     icon:'🪵', title:'Entrada de Madeira',    desc:'Volume, espécie, origem e valor por período'},
+  {id:'sales',    icon:'🛒', title:'Pedidos de Venda',      desc:'Pedidos por status, cliente e período'},
+  {id:'epi',      icon:'🦺', title:'Entregas de EPI',       desc:'Histórico de entregas por funcionário'},
+  {id:'training', icon:'🎓', title:'Treinamentos',          desc:'Status e validade por funcionário'},
+  {id:'audit',    icon:'🔍', title:'Auditorias',            desc:'Scores e pendências por período'},
+  {id:'energy',   icon:'⚡', title:'Consumo de Energia',    desc:'Consumo e custo por fonte e setor'},
 ]
 
 export default function ReportsPage({ profile, can }: Props) {
@@ -211,8 +218,49 @@ export default function ReportsPage({ profile, can }: Props) {
         })
         doc.save(`Financeiro_${dateStr.replace(/\//g,'-')}.pdf`)
 
+      } else if (moduleId === 'oee') {
+        const { data } = await supabase.from('oee_records').select('*').order('record_date',{ascending:false})
+        const rows = (data||[]).map((r:any) => {
+          const av = r.planned_time>0?(r.operating_time/r.planned_time*100).toFixed(1):0
+          const pf = r.operating_time>0?(r.ideal_cycle_time*r.total_pieces/r.operating_time*100).toFixed(1):0
+          const ql = r.total_pieces>0?((r.total_pieces-r.defect_pieces)/r.total_pieces*100).toFixed(1):0
+          const oee = (parseFloat(String(av))/100*parseFloat(String(pf))/100*parseFloat(String(ql))/100*100).toFixed(1)
+          return [r.record_date, r.machine_name, r.shift, `${av}%`, `${pf}%`, `${ql}%`, `${oee}%`, r.notes||'']
+        })
+        addTable(doc, 'Relatório OEE', ['Data','Máquina','Turno','Disponib.','Perform.','Qualidade','OEE','Obs'], rows)
+
+      } else if (moduleId === 'wood') {
+        const { data } = await supabase.from('wood_entries').select('*').order('entry_date',{ascending:false})
+        const rows = (data||[]).map((r:any) => [r.entry_date, r.species, r.origin||'', r.supplier_name||'', `${r.volume_m3||0} m³`, `${r.log_count||0}`, r.quality||'', `R$ ${(r.total_value||0).toFixed(2)}`, r.truck_plate||'', r.romaneio||''])
+        addTable(doc, 'Entrada de Madeira', ['Data','Espécie','Origem','Fornecedor','Volume','Toras','Qualidade','Valor','Placa','Romaneio'], rows)
+
+      } else if (moduleId === 'sales') {
+        const { data } = await supabase.from('sales_orders').select('*').order('order_date',{ascending:false})
+        const rows = (data||[]).map((r:any) => [r.order_number||'', r.order_date, r.client_name, r.status, `R$ ${(r.total_value||0).toFixed(2)}`, r.delivery_date||'', r.notes||''])
+        addTable(doc, 'Pedidos de Venda', ['Nº Pedido','Data','Cliente','Status','Total','Entrega','Obs'], rows)
+
+      } else if (moduleId === 'epi') {
+        const { data } = await supabase.from('epi_deliveries').select('*').order('delivery_date',{ascending:false})
+        const rows = (data||[]).map((r:any) => [r.delivery_date, r.user_name, r.epi_name, `${r.quantity||1}`, r.validity_date||'', r.notes||''])
+        addTable(doc, 'Entregas de EPI', ['Data','Funcionário','EPI','Qtd','Validade','Obs'], rows)
+
+      } else if (moduleId === 'training') {
+        const { data } = await supabase.from('trainings').select('*').order('training_date',{ascending:false})
+        const rows = (data||[]).map((r:any) => [r.training_date, r.user_name, r.title, r.category||'', r.status, `${r.hours||0}h`, r.expiry_date||''])
+        addTable(doc, 'Treinamentos', ['Data','Funcionário','Treinamento','Categoria','Status','Horas','Validade'], rows)
+
+      } else if (moduleId === 'audit') {
+        const { data } = await supabase.from('audits').select('*').order('audit_date',{ascending:false})
+        const rows = (data||[]).map((r:any) => [r.audit_date, r.title||r.type||'', r.machine_name||'Geral', r.auditor||'', `${r.score||0}%`, `${r.passed_items||0}/${r.total_items||0}`, r.status||''])
+        addTable(doc, 'Auditorias', ['Data','Título','Máquina','Auditor','Score','Itens OK','Status'], rows)
+
+      } else if (moduleId === 'energy') {
+        const { data } = await supabase.from('energy_records').select('*').order('record_date',{ascending:false})
+        const rows = (data||[]).map((r:any) => [r.record_date, r.source, r.sector||'Geral', `${r.reading||0} ${r.unit||'kWh'}`, `R$ ${(r.cost||0).toFixed(2)}`, r.notes||''])
+        addTable(doc, 'Consumo de Energia', ['Data','Fonte','Setor','Leitura/Consumo','Custo','Obs'], rows)
+
       } else if (moduleId === 'backup') {
-        const tables = ['work_orders','maintenance','machines','parts','pm_reports','tasks','accounts_payable','purchase_orders','stock_movements','suppliers','downtime_records','repair_orders','tasks']
+        const tables = ['work_orders','maintenance','machines','parts','pm_reports','tasks','accounts_payable','purchase_orders','stock_movements','suppliers','downtime_records','repair_orders','oee_records','wood_entries','sales_orders','epi_items','epi_deliveries','trainings','audits','energy_records','scheduling','documents','chat_messages']
         const result: any = { _date: new Date().toISOString(), _version: '4.0' }
         for (const t of tables) {
           const { data } = await supabase.from(t).select('*')

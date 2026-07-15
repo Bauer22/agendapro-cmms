@@ -17,13 +17,20 @@ export default function DashPage({ profile, can, onNavigate }: Props) {
   async function load() {
     try {
       const today = new Date().toISOString().split('T')[0]
-      const [os, mach, maint, tasks, parts, downtime] = await Promise.all([
+      const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
+      const [os, mach, maint, tasks, parts, downtime, oeeRecs, woodRecs, salesRecs, audits, trainings, epis] = await Promise.all([
         supabase.from('work_orders').select('*'),
         supabase.from('machines').select('*'),
         supabase.from('maintenance').select('*').order('date',{ascending:false}).limit(5),
         supabase.from('tasks').select('*').eq('date', today),
         supabase.from('parts').select('stock,min_stock,name,unit,code'),
         supabase.from('downtime_records').select('*').eq('status','open'),
+        supabase.from('oee_records').select('planned_time,operating_time,total_pieces,defect_pieces,ideal_cycle_time').gte('record_date', monthStart),
+        supabase.from('wood_entries').select('volume_m3,total_value,entry_date').gte('entry_date', monthStart),
+        supabase.from('sales_orders').select('status,total_value,order_date').in('status',['quote','confirmed','production','delivered']).gte('order_date', monthStart),
+        supabase.from('audits').select('score,status,created_at').gte('created_at', new Date(Date.now()-30*86400000).toISOString()),
+        supabase.from('trainings').select('status,expiry_date').lte('expiry_date', today),
+        supabase.from('epi_items').select('stock,min_stock'),
       ])
 
       const osList   = os.data||[]
@@ -69,6 +76,35 @@ export default function DashPage({ profile, can, onNavigate }: Props) {
       })
       const pareto = Object.entries(failureMap).sort((a:any,b:any)=>b[1]-a[1]).slice(0,5)
 
+      // OEE calculation
+      const oeeList = oeeRecs.data||[]
+      const avgOEE = oeeList.length > 0 ? (() => {
+        const total = oeeList.reduce((s:any,r:any)=>{
+          const av = r.planned_time>0?r.operating_time/r.planned_time:0
+          const pf = r.operating_time>0?(r.ideal_cycle_time*r.total_pieces/r.operating_time):0
+          const ql = r.total_pieces>0?(r.total_pieces-r.defect_pieces)/r.total_pieces:0
+          return s + av*pf*ql*100
+        }, 0)
+        return (total/oeeList.length).toFixed(1)
+      })() : '—'
+
+      // Wood and sales totals this month
+      const woodM3 = (woodRecs.data||[]).reduce((s:any,r:any)=>s+(r.volume_m3||0),0).toFixed(1)
+      const salesTotal = (salesRecs.data||[]).reduce((s:any,r:any)=>s+(r.total_value||0),0)
+      const salesOpen = (salesRecs.data||[]).filter((r:any)=>['confirmed','production'].includes(r.status)).length
+
+      // Audit score
+      const auditList = audits.data||[]
+      const avgAudit = auditList.length > 0 ? Math.round(auditList.reduce((s:any,r:any)=>s+(r.score||0),0)/auditList.length) : null
+
+      // Trainings expiring
+      const trainExp = (trainings.data||[]).filter((t:any)=>t.status!=='cancelled').length
+
+      // EPI alerts
+      const epiLow = (epis.data||[]).filter((e:any)=>e.stock<=e.min_stock).length
+      if (epiLow > 0) alerts.push({level:'am',icon:'🦺',title:`${epiLow} EPI(s) com estoque baixo`,sub:'Verifique o módulo EPI'})
+      if (trainExp > 0) alerts.push({level:'am',icon:'🎓',title:`${trainExp} treinamento(s) vencido(s)`,sub:'Renovar certificações'})
+
       setData({
         osOpen:     osList.filter((o:any)=>o.status==='open').length,
         osProgress: osList.filter((o:any)=>o.status==='progress').length,
@@ -77,13 +113,14 @@ export default function DashPage({ profile, can, onNavigate }: Props) {
         machines:   machList.length,
         openDowntime:(downtime.data||[]).length,
         avgMTTR, availPct,
-        alerts: alerts.sort((a:any,b:any)=>a.level==='rd'?-1:1).slice(0,6),
+        alerts: alerts.sort((a:any,b:any)=>a.level==='rd'?-1:1).slice(0,8),
         recentOS: osList.filter((o:any)=>o.open_date===today||o.status==='progress').slice(0,5),
         todayTasks:(tasks.data||[]),
         recentMaint:(maint.data||[]),
         pareto,
         pendingBills: 0,
         osAll: osList,
+        avgOEE, woodM3, salesTotal, salesOpen, avgAudit, trainExp, epiLow,
       })
     } catch(e) { console.error(e) }
     finally { setLoad(false) }
@@ -116,6 +153,14 @@ export default function DashPage({ profile, can, onNavigate }: Props) {
         <KPI num={data.osProgress||0} label="Andamento"   color="amber" />
         <KPI num={data.osDone||0}    label="Concluídas"   color="green" />
         <KPI num={data.osOverdue||0} label="Atrasadas"    color={data.osOverdue>0?'red':'green'} />
+      </div>
+
+      {/* New Modules KPIs */}
+      <div className="grid grid-cols-4 gap-1.5 mb-3">
+        {data.avgOEE&&data.avgOEE!=='—'&&<KPI num={`${data.avgOEE}%`} label="OEE Médio" color="purple" />}
+        {data.woodM3&&parseFloat(data.woodM3)>0&&<KPI num={`${data.woodM3}m³`} label="Madeira/mês" color="green" />}
+        {data.salesOpen>0&&<KPI num={data.salesOpen} label="Pedidos abertos" color="amber" />}
+        {data.avgAudit&&<KPI num={`${data.avgAudit}%`} label="Score Auditoria" color={data.avgAudit>=80?'green':data.avgAudit>=60?'amber':'red'} />}
       </div>
 
       {/* MTBF/MTTR/Availability row */}

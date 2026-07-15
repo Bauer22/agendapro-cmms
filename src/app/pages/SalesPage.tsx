@@ -17,6 +17,7 @@ const STATUS_C: Record<string,string> = { active:'green', cancelled:'red' }
 export default function SalesPage({ profile, can }: Props) {
   const [orders, setOrders]     = useState<any[]>([])
   const [clients, setClients]   = useState<any[]>([])
+  const [motoristas, setMotoristas] = useState<any[]>([])
   const [products, setProducts] = useState<any[]>([])
   const [modal, setModal]       = useState(false)
   const [clientModal, setClientModal] = useState(false)
@@ -42,12 +43,14 @@ export default function SalesPage({ profile, can }: Props) {
   }
 
   async function loadMeta() {
-    const [c, p] = await Promise.all([
-      supabase.from('clients').select('id,name').eq('active', true).order('name'),
+    const [cli, prd, mot] = await Promise.all([
+      supabase.from('cadastros').select('id,nome_razao').eq('is_cliente', true).eq('status', true).order('nome_razao'),
       supabase.from('products').select('id,name,unit').eq('active', true).order('name'),
+      supabase.from('cadastros').select('id,nome_razao').eq('is_motorista', true).eq('status', true).order('nome_razao'),
     ])
-    setClients(c.data || [])
-    setProducts(p.data || [])
+    setClients((cli.data||[]).map((x:any)=>({id:x.id,name:x.nome_razao})))
+    setProducts(prd.data || [])
+    setMotoristas((mot.data||[]).map((x:any)=>({id:x.id,name:x.nome_razao})))
   }
 
   function openNew() {
@@ -116,7 +119,13 @@ export default function SalesPage({ profile, can }: Props) {
 
   async function saveClient() {
     if (!newClient.name) { toast.error('Informe o nome do cliente'); return }
-    const { error } = await supabase.from('clients').insert({ ...newClient, active: true })
+    const { error } = await supabase.from('cadastros').insert({
+      nome_razao: newClient.name, documento: newClient.document||null,
+      telefone: newClient.phone||null, email: newClient.email||null,
+      endereco: newClient.address||null, is_cliente: true,
+      status: true, company_id: profile?.company_id||null,
+      created_by: profile?.display_name||''
+    })
     if (error) { toast.error(error.message); return }
     toast.success('Cliente cadastrado ✅')
     setClientModal(false); setNewClient({})
@@ -268,7 +277,14 @@ export default function SalesPage({ profile, can }: Props) {
           <Input label="Metros (m³/ster)" value={editing.volume_m3} onChange={(v:string) => setEditing((e:any) => ({...e, volume_m3:v}))} type="number" placeholder="0.00" />
         </div>
 
-        <Input label="Motorista *" value={editing.driver} onChange={(v:string) => setEditing((e:any) => ({...e, driver:v}))} placeholder="Nome completo" />
+        {motoristas.length > 0 ? (
+          <Select label="Motorista *" value={editing.driver_id||''} onChange={(v:string) => {
+            const m = motoristas.find(x=>x.id===v)
+            setEditing((e:any)=>({...e, driver_id:v, driver: m?.name||''}))
+          }} options={[{value:'',label:'Selecione o motorista...'}, ...motoristas.map(m=>({value:m.id,label:m.name}))]} />
+        ) : (
+          <Input label="Motorista *" value={editing.driver} onChange={(v:string) => setEditing((e:any) => ({...e, driver:v}))} placeholder="Nome completo do motorista" />
+        )}
         <Input label="Placa *" value={editing.plate} onChange={(v:string) => setEditing((e:any) => ({...e, plate:maskPlate(v)}))} placeholder="AAA0A00 ou AAA0000" />
         <Textarea label="Observações" value={editing.notes} onChange={(v:string) => setEditing((e:any) => ({...e, notes:v}))} rows={2} placeholder="Opcional..." />
       </Modal>
