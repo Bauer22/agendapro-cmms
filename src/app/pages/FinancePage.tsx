@@ -20,6 +20,9 @@ export default function FinancePage({ profile, can }: Props) {
   const [modal, setModal]       = useState(false)
   const [editing, setEdit]      = useState<any>({})
   const [tab, setTab]           = useState('bills')
+  const [fixed, setFixed]       = useState<any[]>([])
+  const [fixModal, setFixModal] = useState(false)
+  const [editFix, setEditFix]   = useState<any>({})
   const [fStatus, setFStatus]   = useState('')
   const [search, setSearch]     = useState('')
   const { confirm, dialog }     = useConfirm()
@@ -34,11 +37,63 @@ export default function FinancePage({ profile, can }: Props) {
         supabase.from('cadastros').select('id,nome_razao,nome_fantasia').eq('is_fornecedor',true).eq('status',true),
       ])
       setBills(b.data||[]); setCenters(c.data||[]); setSuppliers(s.data||[])
+    } else if (tab === 'fixed') {
+      const [f, c2] = await Promise.all([
+        supabase.from('fixed_expenses').select('*').order('description'),
+        supabase.from('cost_centers').select('*').eq('active', true),
+      ])
+      setFixed(f.data||[]); setCenters(c2.data||[])
     } else {
       const { data } = await supabase.from('cost_centers').select('*').order('codigo')
       setCenters(data||[])
     }
     setLoad(false)
+  }
+
+  async function saveFixed() {
+    if (!editFix.description?.trim()) { toast.error('Informe a descrição'); return }
+    if (!editFix.value) { toast.error('Informe o valor'); return }
+    const obj = {
+      description: editFix.description.trim(),
+      value: parseFloat(editFix.value),
+      centro_custo_id: editFix.centro_custo_id||null,
+      due_day: parseInt(editFix.due_day)||5,
+      active: editFix.active !== false,
+      notes: editFix.notes||null,
+    }
+    const { error } = editFix.id
+      ? await supabase.from('fixed_expenses').update(obj).eq('id', editFix.id)
+      : await supabase.from('fixed_expenses').insert({...obj, company_id: profile?.company_id||null})
+    if (error) { toast.error('Erro: '+error.message); return }
+    toast.success(editFix.id?'Atualizado ✅':'Despesa fixa criada ✅')
+    setFixModal(false); setEditFix({}); load()
+  }
+
+  async function gerarMes() {
+    const now = new Date()
+    const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`
+    const ativas = fixed.filter(f => f.active !== false)
+    if (ativas.length === 0) { toast.error('Nenhuma despesa fixa ativa'); return }
+    const jaGeradas = ativas.filter(f => (f.last_generated||'').startsWith(ym))
+    if (jaGeradas.length === ativas.length) { toast.error('Despesas deste mês já foram geradas'); return }
+    if (!await confirm(`Gerar ${ativas.length - jaGeradas.length} lançamento(s) de ${ym} em Contas a Pagar?`)) return
+
+    const pend = ativas.filter(f => !(f.last_generated||'').startsWith(ym))
+    const rows = pend.map(f => ({
+      descricao: f.description,
+      valor: parseFloat(f.value),
+      centro_custo_id: f.centro_custo_id,
+      due_date: `${ym}-${String(f.due_day||5).padStart(2,'0')}`,
+      status: 'pending',
+      company_id: profile?.company_id||null,
+      created_by: profile?.display_name||'',
+      created_at: new Date().toISOString(),
+    }))
+    const { error } = await supabase.from('accounts_payable').insert(rows)
+    if (error) { toast.error('Erro: '+error.message); return }
+    await supabase.from('fixed_expenses').update({ last_generated: `${ym}-01` }).in('id', pend.map(f=>f.id))
+    toast.success(`${rows.length} lançamento(s) gerado(s) ✅`)
+    load()
   }
 
   async function saveBill() {
@@ -103,13 +158,79 @@ export default function FinancePage({ profile, can }: Props) {
       {dialog}
       {/* Tabs */}
       <div className="flex gap-1.5 mb-3">
-        {[{k:'bills',l:'💰 Contas a Pagar'},{k:'centers',l:'📊 Centros de Custo'}].map(t=>(
+        {[{k:'bills',l:'💰 Contas'},{k:'fixed',l:'🔁 Fixas'},{k:'centers',l:'📊 Centros'}].map(t=>(
           <button key={t.k} onClick={()=>setTab(t.k)} className="px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer border"
             style={{background:tab===t.k?'var(--cy)':'transparent',color:tab===t.k?'#000':'var(--t2)',borderColor:tab===t.k?'var(--cy)':'var(--bd)',fontFamily:'Sora,system-ui,sans-serif'}}>
             {t.l}
           </button>
         ))}
       </div>
+
+      {tab==='fixed' && (
+        <>
+          <div className="flex gap-2 mb-3">
+            <Btn onClick={()=>{setEditFix({active:true,due_day:5});setFixModal(true)}} variant="secondary" size="sm">+ Nova Fixa</Btn>
+            <Btn onClick={gerarMes} variant="primary" size="sm">🔁 Gerar mês atual</Btn>
+          </div>
+          <div style={{fontSize:'10px',color:'var(--t3)',marginBottom:'8px'}}>
+            Despesas recorrentes. Clique em "Gerar mês atual" para lançá-las em Contas a Pagar.
+          </div>
+          {fixed.length===0 ? <Empty icon="🔁" text="Nenhuma despesa fixa cadastrada." /> : (
+            <div className="flex flex-col gap-2">
+              {fixed.map(f => {
+                const cc = centers.find(x=>x.id===f.centro_custo_id)
+                const now = new Date()
+                const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`
+                const done = (f.last_generated||'').startsWith(ym)
+                return (
+                  <div key={f.id} className="rounded-xl p-3" style={{background:'var(--s1)',border:'1px solid var(--bd)',opacity:f.active===false?0.55:1}}>
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-sm">{f.description}</span>
+                          {done && <Badge color="green">✓ mês gerado</Badge>}
+                          {f.active===false && <Badge color="gray">Inativa</Badge>}
+                        </div>
+                        <div className="text-xs font-bold" style={{color:'var(--cy)'}}>
+                          R$ {(parseFloat(f.value)||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}
+                        </div>
+                        <div className="text-xs mt-0.5" style={{color:'var(--t3)'}}>
+                          📅 Vence dia {f.due_day||5}{cc?' · 📊 '+cc.descricao:''}
+                        </div>
+                      </div>
+                      <div className="flex gap-1 ml-2">
+                        <Btn onClick={()=>{setEditFix(f);setFixModal(true)}} size="sm">✏️</Btn>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+              <div className="rounded-xl p-3 mt-1" style={{background:'rgba(249,115,22,.08)',border:'1px solid rgba(249,115,22,.3)'}}>
+                <div className="flex justify-between" style={{fontSize:'13px',fontWeight:700}}>
+                  <span>Total mensal fixo</span>
+                  <span style={{color:'#f97316'}}>
+                    R$ {fixed.filter(f=>f.active!==false).reduce((s,f)=>s+(parseFloat(f.value)||0),0).toLocaleString('pt-BR',{minimumFractionDigits:2})}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <Modal open={fixModal} onClose={()=>setFixModal(false)}
+            title={editFix.id?'Editar Despesa Fixa':'Nova Despesa Fixa'}
+            footer={<><Btn onClick={()=>setFixModal(false)}>Cancelar</Btn><Btn onClick={saveFixed} variant="primary" size="md">Salvar</Btn></>}>
+            <Input label="Descrição *" value={editFix.description} onChange={(v:string)=>setEditFix((e:any)=>({...e,description:v}))} placeholder="Ex: Aluguel" />
+            <div className="grid grid-cols-2 gap-x-3">
+              <Input label="Valor R$ *" value={editFix.value} onChange={(v:string)=>setEditFix((e:any)=>({...e,value:v}))} type="number" placeholder="0.00" />
+              <Input label="Dia vencimento" value={editFix.due_day} onChange={(v:string)=>setEditFix((e:any)=>({...e,due_day:v}))} type="number" placeholder="5" />
+            </div>
+            <Select label="Centro de Custo" value={editFix.centro_custo_id||''} onChange={(v:string)=>setEditFix((e:any)=>({...e,centro_custo_id:v}))}
+              options={[{value:'',label:'Nenhum'},...centers.map(c2=>({value:c2.id,label:`${c2.codigo} - ${c2.descricao}`}))]} />
+            <Select label="Status" value={editFix.active===false?'0':'1'} onChange={(v:string)=>setEditFix((e:any)=>({...e,active:v==='1'}))}
+              options={[{value:'1',label:'✅ Ativa'},{value:'0',label:'⛔ Inativa'}]} />
+          </Modal>
+        </>
+      )}
 
       {tab==='bills' && (
         <>

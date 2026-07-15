@@ -62,9 +62,11 @@ import AuditPage       from '@/app/pages/AuditPage'
 import EnergyPage      from '@/app/pages/EnergyPage'
 import WoodPage        from '@/app/pages/WoodPage'
 import CadastrosPage   from '@/app/pages/CadastrosPage'
+import FuelPage        from '@/app/pages/FuelPage'
+import ProductionPage  from '@/app/pages/ProductionPage'
 import SalesPage       from '@/app/pages/SalesPage'
 
-type Page = 'dashboard'|'os'|'machines'|'pm'|'tasks'|'parts'|'suppliers'|'cadastros'|'reports'|'users'|'settings'|'finance'|'qr'|'downtime'|'superadmin'|'chat'|'scheduling'|'documents'|'epi'|'oee'|'training'|'audit'|'energy'|'wood'|'sales'
+type Page = 'dashboard'|'os'|'machines'|'pm'|'tasks'|'parts'|'suppliers'|'cadastros'|'fuel'|'production'|'reports'|'users'|'settings'|'finance'|'qr'|'downtime'|'superadmin'|'chat'|'scheduling'|'documents'|'epi'|'oee'|'training'|'audit'|'energy'|'wood'|'sales'
 
 
 export default function App() {
@@ -205,6 +207,8 @@ export default function App() {
     {id:'audit' as Page,      label:'Auditorias',  icon:<span>🔍</span>},
     {id:'energy' as Page,     label:'Energia',     icon:<span>⚡</span>},
     {id:'wood' as Page,       label:'Madeira',     icon:<span>🪵</span>},
+    {id:'production' as Page, label:'Produção',    icon:<span>🏭</span>},
+    {id:'fuel' as Page,       label:'Combustível', icon:<span>⛽</span>},
     {id:'sales' as Page,      label:'Vendas',      icon:<span>🛒</span>},
     {id:'users' as Page,      label:'Usuários',    icon:IC.users},
     {id:'superadmin' as Page, label:'Super Admin', icon:IC.sadm},
@@ -241,6 +245,8 @@ export default function App() {
     energy:      <EnergyPage      profile={profile} can={can} />,
     wood:        <WoodPage        profile={profile} can={can} />,
     cadastros:   <CadastrosPage   profile={profile} can={can} />,
+    fuel:        <FuelPage        profile={profile} can={can} />,
+    production:  <ProductionPage  profile={profile} can={can} />,
     sales:       <SalesPage       profile={profile} can={can} />,
     superadmin:  <SuperAdminPage profile={profile} />,
   }

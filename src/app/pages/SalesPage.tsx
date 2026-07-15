@@ -27,12 +27,15 @@ export default function SalesPage({ profile, can }: Props) {
   const [editing, setEditing]   = useState<any>({})
   const [newClient, setNewClient] = useState<any>({})
   const [newProduct, setNewProduct] = useState<any>({})
-  const [tab, setTab]           = useState<'open'|'all'>('open')
+  const [tab, setTab]           = useState<'open'|'all'|'relatorio'>('open')
+  const [rFrom, setRFrom] = useState(''); const [rTo, setRTo] = useState('')
+  const [rCli, setRCli] = useState(''); const [rProd, setRProd] = useState('')
   const [loading, setLoading]   = useState(true)
   const [saving, setSaving]     = useState(false)
   const { confirm, dialog }     = useConfirm()
 
-  useEffect(() => { load(); loadMeta() }, [tab])
+  useEffect(() => { loadMeta() }, [])
+  useEffect(() => { if (tab !== 'relatorio') load() }, [tab])
 
   async function load() {
     let q = supabase.from('sales_orders').select('*').order('created_at', { ascending: false })
@@ -151,6 +154,74 @@ export default function SalesPage({ profile, can }: Props) {
     toast.success('Romaneio cancelado'); load()
   }
 
+  // ── Relatório ──
+  const money = (v:number) => `R$ ${(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}`
+  const rep = orders.filter(o =>
+    (!rFrom || (o.sale_date||'') >= rFrom) && (!rTo || (o.sale_date||'') <= rTo) &&
+    (!rCli || o.client_id === rCli) && (!rProd || o.product_id === rProd) && o.status === 'active')
+  const repTons = rep.reduce((s,o)=>s+(parseFloat(o.weight_tons)||0),0)
+  const repM3   = rep.reduce((s,o)=>s+(parseFloat(o.volume_m3)||0),0)
+
+  const byProd: Record<string,{nome:string;tons:number;m3:number;qtd:number}> = {}
+  rep.forEach(o => {
+    const k = o.product_name || '—'
+    if (!byProd[k]) byProd[k] = {nome:k, tons:0, m3:0, qtd:0}
+    byProd[k].tons += parseFloat(o.weight_tons)||0
+    byProd[k].m3   += parseFloat(o.volume_m3)||0
+    byProd[k].qtd  += 1
+  })
+  const prodRows = Object.values(byProd).sort((a,b)=>b.tons-a.tons)
+
+  const byCli: Record<string,{nome:string;tons:number;m3:number;qtd:number}> = {}
+  rep.forEach(o => {
+    const k = o.client_name || '—'
+    if (!byCli[k]) byCli[k] = {nome:k, tons:0, m3:0, qtd:0}
+    byCli[k].tons += parseFloat(o.weight_tons)||0
+    byCli[k].m3   += parseFloat(o.volume_m3)||0
+    byCli[k].qtd  += 1
+  })
+  const cliRows = Object.values(byCli).sort((a,b)=>b.tons-a.tons)
+
+  async function exportPDF() {
+    try {
+      const { default: jsPDF } = await import('jspdf')
+      const { default: autoTable } = await import('jspdf-autotable')
+      const doc = new jsPDF()
+      doc.setFillColor(6,13,26); doc.rect(0,0,210,25,'F')
+      doc.setTextColor(249,115,22); doc.setFontSize(14); doc.setFont('helvetica','bold')
+      doc.text('Industrial8 — Relatório de Vendas', 12, 11)
+      doc.setTextColor(148,163,184); doc.setFontSize(8); doc.setFont('helvetica','normal')
+      let fi = ''
+      if (rFrom||rTo) fi += `Período: ${rFrom?fmtD(rFrom):'início'} a ${rTo?fmtD(rTo):'hoje'} | `
+      if (rCli) fi += `Cliente: ${clients.find(x=>x.id===rCli)?.name||''} | `
+      if (rProd) fi += `Produto: ${products.find(x=>x.id===rProd)?.name||''}`
+      doc.text(fi || `Gerado em ${new Date().toLocaleDateString('pt-BR')}`, 12, 18)
+
+      autoTable(doc, {
+        startY: 30, head: [['Produto','Romaneios','Toneladas','Metros']],
+        body: prodRows.map(p=>[p.nome, String(p.qtd), p.tons.toFixed(3), p.m3.toFixed(2)]),
+        foot: [['TOTAL', String(rep.length), repTons.toFixed(3), repM3.toFixed(2)]],
+        theme:'grid', headStyles:{fillColor:[249,115,22]}, footStyles:{fillColor:[30,58,110]}, styles:{fontSize:8},
+      })
+      let y = (doc as any).lastAutoTable.finalY + 8
+      autoTable(doc, {
+        startY: y, head: [['Cliente','Romaneios','Toneladas','Metros']],
+        body: cliRows.map(x=>[x.nome, String(x.qtd), x.tons.toFixed(3), x.m3.toFixed(2)]),
+        theme:'grid', headStyles:{fillColor:[59,130,246]}, styles:{fontSize:8},
+      })
+      y = (doc as any).lastAutoTable.finalY + 8
+      autoTable(doc, {
+        startY: y, head: [['Romaneio','Data','Cliente','Produto','Ton','m³','Motorista','Placa']],
+        body: rep.map(o=>[String(o.romaneio_num||''), fmtD(o.sale_date), o.client_name||'—', o.product_name||'—',
+          o.weight_tons?parseFloat(o.weight_tons).toFixed(3):'—', o.volume_m3?parseFloat(o.volume_m3).toFixed(2):'—',
+          o.driver||'—', o.plate||'—']),
+        theme:'striped', headStyles:{fillColor:[30,58,110]}, styles:{fontSize:7},
+      })
+      doc.save(`vendas_${td()}.pdf`)
+      toast.success('PDF gerado ✅')
+    } catch(err:any) { toast.error('Erro ao gerar PDF: '+err.message) }
+  }
+
   const totalTons = orders.filter(o => o.status === 'active').reduce((s,o) => s + (parseFloat(o.weight_tons)||0), 0)
   const todayCount = orders.filter(o => o.sale_date === td() && o.status === 'active').length
 
@@ -172,18 +243,78 @@ export default function SalesPage({ profile, can }: Props) {
       </div>
 
       <div className="flex gap-2 mb-3">
-        {(['open','all'] as const).map(t => (
-          <div key={t} onClick={() => { setTab(t); setLoading(true) }}
+        {(['open','all','relatorio'] as const).map(t => (
+          <div key={t} onClick={() => { setTab(t); if(t!=='relatorio') setLoading(true) }}
             style={{ flex:1, textAlign:'center', padding:'7px', borderRadius:'10px', fontSize:'11px', fontWeight:700, cursor:'pointer',
               background: tab===t ? 'rgba(249,115,22,.12)' : 'var(--s1)',
               border: `1px solid ${tab===t ? 'rgba(249,115,22,.4)' : 'var(--bd)'}`,
               color: tab===t ? '#f97316' : 'var(--t2)' }}>
-            {t === 'open' ? '📋 Ativos' : '📦 Todos'}
+            {t === 'open' ? '📋 Ativos' : t === 'all' ? '📦 Todos' : '📊 Relatório'}
           </div>
         ))}
       </div>
 
-      {loading ? <Empty icon="⏳" text="Carregando..." /> :
+      {tab === 'relatorio' && (
+        <>
+          <div className="rounded-xl p-3 mb-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+            <div style={{fontSize:'9px',fontWeight:700,color:'rgba(249,115,22,.65)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'8px'}}>FILTROS</div>
+            <div className="grid grid-cols-2 gap-x-3">
+              <Input label="De" value={rFrom} onChange={setRFrom} type="date" />
+              <Input label="Até" value={rTo} onChange={setRTo} type="date" />
+            </div>
+            <Select label="Cliente" value={rCli} onChange={setRCli}
+              options={[{value:'',label:'Todos os clientes'}, ...clients.map(x=>({value:x.id,label:x.name}))]} />
+            <Select label="Produto" value={rProd} onChange={setRProd}
+              options={[{value:'',label:'Todos os produtos'}, ...products.map(x=>({value:x.id,label:x.name}))]} />
+            <div className="flex gap-2">
+              {(rFrom||rTo||rCli||rProd) && <Btn onClick={()=>{setRFrom('');setRTo('');setRCli('');setRProd('')}} size="sm" variant="secondary">✕ Limpar</Btn>}
+              <Btn onClick={exportPDF} size="sm" variant="primary">📄 Exportar PDF</Btn>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <KPI num={rep.length} label="Romaneios" color="blue" />
+            <KPI num={`${repTons.toFixed(1)}t`} label="Toneladas" color="orange" />
+            <KPI num={`${repM3.toFixed(1)}m³`} label="Metros" color="green" />
+          </div>
+
+          {prodRows.length === 0 ? <Empty icon="📊" text="Nenhuma venda no período." /> : (
+            <>
+              <div style={{fontSize:'10px',fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:'6px'}}>📦 Por Produto</div>
+              <div className="rounded-xl overflow-hidden mb-3" style={{border:'1px solid var(--bd)'}}>
+                <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 44px 68px 60px',background:'var(--s2)',fontSize:'9px',fontWeight:700,color:'var(--t3)',textTransform:'uppercase'}}>
+                  <span>Produto</span><span style={{textAlign:'right'}}>Qtd</span><span style={{textAlign:'right'}}>Ton</span><span style={{textAlign:'right'}}>m³</span>
+                </div>
+                {prodRows.map((x,i)=>(
+                  <div key={i} className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 44px 68px 60px',background:'var(--s1)',borderTop:'1px solid var(--bd)',fontSize:'11px'}}>
+                    <span style={{fontWeight:700}}>{x.nome}</span>
+                    <span style={{textAlign:'right',color:'var(--t2)'}}>{x.qtd}</span>
+                    <span style={{textAlign:'right',color:'var(--cy)'}}>{x.tons.toFixed(2)}</span>
+                    <span style={{textAlign:'right',color:'var(--gn)'}}>{x.m3.toFixed(1)}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{fontSize:'10px',fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:'6px'}}>🤝 Por Cliente</div>
+              <div className="rounded-xl overflow-hidden mb-3" style={{border:'1px solid var(--bd)'}}>
+                <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 44px 68px 60px',background:'var(--s2)',fontSize:'9px',fontWeight:700,color:'var(--t3)',textTransform:'uppercase'}}>
+                  <span>Cliente</span><span style={{textAlign:'right'}}>Qtd</span><span style={{textAlign:'right'}}>Ton</span><span style={{textAlign:'right'}}>m³</span>
+                </div>
+                {cliRows.map((x,i)=>(
+                  <div key={i} className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 44px 68px 60px',background:'var(--s1)',borderTop:'1px solid var(--bd)',fontSize:'11px'}}>
+                    <span style={{fontWeight:700}}>{x.nome}</span>
+                    <span style={{textAlign:'right',color:'var(--t2)'}}>{x.qtd}</span>
+                    <span style={{textAlign:'right',color:'var(--cy)'}}>{x.tons.toFixed(2)}</span>
+                    <span style={{textAlign:'right',color:'var(--gn)'}}>{x.m3.toFixed(1)}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {tab !== 'relatorio' && (loading ? <Empty icon="⏳" text="Carregando..." /> :
        orders.length === 0 ? <Empty icon="🛒" text="Nenhum romaneio encontrado." /> : (
         <div className="flex flex-col gap-2">
           {orders.map(o => (
@@ -220,7 +351,7 @@ export default function SalesPage({ profile, can }: Props) {
             </div>
           ))}
         </div>
-      )}
+      ))}
 
       {/* Detalhe */}
       <Modal open={!!view} onClose={() => setView(null)} title={`Romaneio Nº ${view?.romaneio_num || ''}`}>

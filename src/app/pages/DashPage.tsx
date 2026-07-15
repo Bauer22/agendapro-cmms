@@ -1,36 +1,51 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { KPI, SH, Empty } from '@/components/ui'
+import { KPI, SH, Empty, Input } from '@/components/ui'
 import { fmtD, STATUS_INFO, PRIO_COLOR, oilStatus, DPT, MPT, MFULL } from '@/lib/utils'
 import type { UserProfile } from '@/types'
 
 interface Props { profile: UserProfile|null; can:(p:string)=>boolean; onNavigate:(p:any)=>void }
 
+const money = (v:number) => `R$ ${(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}`
+
 export default function DashPage({ profile, can, onNavigate }: Props) {
   const [data, setData]     = useState<any>({})
+  const [period, setPeriod] = useState<'mes'|'30d'|'ano'|'custom'>('mes')
+  const [pFrom, setPFrom]   = useState('')
+  const [pTo, setPTo]       = useState('')
   const [loading, setLoad]  = useState(true)
   const [calMonth, setCalMonth] = useState(new Date())
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [period, pFrom, pTo])
 
   async function load() {
     try {
       const today = new Date().toISOString().split('T')[0]
-      const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
-      const [os, mach, maint, tasks, parts, downtime, oeeRecs, woodRecs, salesRecs, audits, trainings, epis] = await Promise.all([
+      const now2 = new Date()
+      let monthStart: string, rangeEnd: string = today
+      if (period === 'mes')      monthStart = new Date(now2.getFullYear(), now2.getMonth(), 1).toISOString().split('T')[0]
+      else if (period === '30d') monthStart = new Date(Date.now()-30*86400000).toISOString().split('T')[0]
+      else if (period === 'ano') monthStart = new Date(now2.getFullYear(), 0, 1).toISOString().split('T')[0]
+      else { monthStart = pFrom || new Date(now2.getFullYear(), now2.getMonth(), 1).toISOString().split('T')[0]; rangeEnd = pTo || today }
+      const [os, mach, maint, tasks, parts, downtime, oeeRecs, woodRecs, salesRecs, audits, trainings, epis, bills, ccs, fuelRecs, vehExps, prodRecs] = await Promise.all([
         supabase.from('work_orders').select('*'),
         supabase.from('machines').select('*'),
         supabase.from('maintenance').select('*').order('date',{ascending:false}).limit(5),
         supabase.from('tasks').select('*').eq('date', today),
         supabase.from('parts').select('stock,min_stock,name,unit,code'),
         supabase.from('downtime_records').select('*').eq('status','open'),
-        supabase.from('oee_records').select('planned_time,operating_time,total_pieces,defect_pieces,ideal_cycle_time').gte('record_date', monthStart),
-        supabase.from('wood_entries').select('volume_m3,total_value,data_entrada').gte('data_entrada', monthStart),
-        supabase.from('sales_orders').select('status,total_value,sale_date').in('status',['quote','confirmed','production','delivered','active']).gte('sale_date', monthStart),
+        supabase.from('oee_records').select('planned_time,operating_time,total_pieces,defect_pieces,ideal_cycle_time').gte('record_date', monthStart).lte('record_date', rangeEnd),
+        supabase.from('wood_entries').select('volume_m3,total_value,data_entrada').gte('data_entrada', monthStart).lte('data_entrada', rangeEnd),
+        supabase.from('sales_orders').select('status,total_value,sale_date').in('status',['quote','confirmed','production','delivered','active']).gte('sale_date', monthStart).lte('sale_date', rangeEnd),
         supabase.from('audits').select('score,status,created_at').gte('created_at', new Date(Date.now()-30*86400000).toISOString()),
         supabase.from('trainings').select('status,expiry_date').lte('expiry_date', today),
         supabase.from('epi_items').select('stock,min_stock'),
+        supabase.from('accounts_payable').select('valor,status,due_date,centro_custo_id').gte('due_date', monthStart).lte('due_date', rangeEnd),
+        supabase.from('cost_centers').select('id,codigo,descricao'),
+        supabase.from('fuel_records').select('liters,total_value,record_date').gte('record_date', monthStart).lte('record_date', rangeEnd),
+        supabase.from('vehicle_expenses').select('value,expense_date').gte('expense_date', monthStart).lte('expense_date', rangeEnd),
+        supabase.from('production_records').select('tank_m3,produced_m3,prod_date').gte('prod_date', monthStart).lte('prod_date', rangeEnd),
       ])
 
       const osList   = os.data||[]
@@ -105,6 +120,39 @@ export default function DashPage({ profile, can, onNavigate }: Props) {
       if (epiLow > 0) alerts.push({level:'am',icon:'🦺',title:`${epiLow} EPI(s) com estoque baixo`,sub:'Verifique o módulo EPI'})
       if (trainExp > 0) alerts.push({level:'am',icon:'🎓',title:`${trainExp} treinamento(s) vencido(s)`,sub:'Renovar certificações'})
 
+      // Financeiro
+      const billList = bills.data||[]
+      const ccList = ccs.data||[]
+      const totalDesp = billList.reduce((s:any,b:any)=>s+(parseFloat(b.valor)||0),0)
+      const paidDesp  = billList.filter((b:any)=>b.status==='paid').reduce((s:any,b:any)=>s+(parseFloat(b.valor)||0),0)
+      const pendDesp  = totalDesp - paidDesp
+      // por centro de custo
+      const ccMap: Record<string,{nome:string;valor:number}> = {}
+      billList.forEach((b:any) => {
+        const cc = ccList.find((x:any)=>x.id===b.centro_custo_id)
+        const k = cc ? `${cc.codigo} - ${cc.descricao}` : 'Sem centro'
+        if (!ccMap[k]) ccMap[k] = {nome:k, valor:0}
+        ccMap[k].valor += parseFloat(b.valor)||0
+      })
+      const ccRows = Object.values(ccMap).sort((a,b)=>b.valor-a.valor).slice(0,8)
+
+      // Combustível
+      const fuelList = fuelRecs.data||[]
+      const fuelLiters = fuelList.reduce((s:any,f:any)=>s+(parseFloat(f.liters)||0),0)
+      const fuelCost   = fuelList.reduce((s:any,f:any)=>s+(parseFloat(f.total_value)||0),0)
+      const vehCost    = (vehExps.data||[]).reduce((s:any,v:any)=>s+(parseFloat(v.value)||0),0)
+
+      // Produção
+      const prodList = prodRecs.data||[]
+      const prodTank = prodList.reduce((s:any,r:any)=>s+(parseFloat(r.tank_m3)||0),0)
+      const prodM3   = prodList.reduce((s:any,r:any)=>s+(parseFloat(r.produced_m3)||0),0)
+      const prodYield = prodM3 > 0 ? prodTank/prodM3 : 0
+
+      // Madeira e vendas do período
+      const woodTonsTotal = (woodRecs.data||[]).reduce((s:any,w:any)=>s+(parseFloat(w.weight_tons)||parseFloat(w.peso_liquido)||0),0)
+      const woodValTotal  = (woodRecs.data||[]).reduce((s:any,w:any)=>s+(parseFloat(w.total_value)||0),0)
+      const salesTons     = (salesRecs.data||[]).reduce((s:any,o:any)=>s+(parseFloat(o.weight_tons)||0),0)
+
       setData({
         osOpen:     osList.filter((o:any)=>o.status==='open').length,
         osProgress: osList.filter((o:any)=>o.status==='progress').length,
@@ -121,6 +169,10 @@ export default function DashPage({ profile, can, onNavigate }: Props) {
         pendingBills: 0,
         osAll: osList,
         avgOEE, woodM3, salesTotal, salesOpen, avgAudit, trainExp, epiLow,
+        totalDesp, paidDesp, pendDesp, ccRows,
+        fuelLiters, fuelCost, vehCost,
+        prodTank, prodM3, prodYield,
+        woodTonsTotal, woodValTotal, salesTons,
       })
     } catch(e) { console.error(e) }
     finally { setLoad(false) }
@@ -148,6 +200,24 @@ export default function DashPage({ profile, can, onNavigate }: Props) {
   return (
     <div>
       {/* KPIs */}
+      <div className="rounded-xl p-2.5 mb-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+        <div className="flex gap-1.5 mb-1 overflow-x-auto pb-0.5">
+          {([['mes','📅 Mês'],['30d','🕐 30 dias'],['ano','📆 Ano'],['custom','⚙️ Período']] as ['mes'|'30d'|'ano'|'custom',string][]).map(([k,l])=>(
+            <div key={k} onClick={()=>setPeriod(k)}
+              style={{flexShrink:0,padding:'5px 11px',borderRadius:'16px',fontSize:'10px',fontWeight:700,cursor:'pointer',
+                background:period===k?'rgba(249,115,22,.14)':'var(--s2)',
+                border:`1px solid ${period===k?'rgba(249,115,22,.4)':'var(--bd)'}`,
+                color:period===k?'#f97316':'var(--t3)',whiteSpace:'nowrap'}}>{l}</div>
+          ))}
+        </div>
+        {period==='custom' && (
+          <div className="grid grid-cols-2 gap-x-2 mt-2">
+            <Input label="De" value={pFrom} onChange={setPFrom} type="date" />
+            <Input label="Até" value={pTo} onChange={setPTo} type="date" />
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-4 gap-1.5 mb-3">
         <KPI num={data.osOpen||0}    label="OS Abertas"   color="blue"  />
         <KPI num={data.osProgress||0} label="Andamento"   color="amber" />
@@ -162,6 +232,77 @@ export default function DashPage({ profile, can, onNavigate }: Props) {
         {data.salesOpen>0&&<KPI num={data.salesOpen} label="Pedidos abertos" color="amber" />}
         {data.avgAudit&&<KPI num={`${data.avgAudit}%`} label="Score Auditoria" color={data.avgAudit>=80?'green':data.avgAudit>=60?'amber':'red'} />}
       </div>
+
+      {/* ═══ FINANCEIRO DO PERÍODO ═══ */}
+      {(data.totalDesp > 0 || data.woodValTotal > 0) && (
+        <div className="rounded-xl p-3 mb-3" style={{background:'var(--s1)',border:'1px solid rgba(249,115,22,.2)'}}>
+          <div style={{fontSize:'10px',fontWeight:700,color:'#f97316',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'8px'}}>
+            💰 FINANCEIRO DO PERÍODO
+          </div>
+          {[
+            ['Despesas totais', money(data.totalDesp), 'var(--t1)'],
+            ['Pagas', money(data.paidDesp), 'var(--gn)'],
+            ['Pendentes', money(data.pendDesp), data.pendDesp>0?'var(--rd)':'var(--t3)'],
+            ['—','',''],
+            ['Compra de madeira', money(data.woodValTotal), 'var(--t1)'],
+            ['Combustível', money(data.fuelCost), 'var(--am)'],
+            ['Despesas de veículos', money(data.vehCost), 'var(--pp)'],
+          ].map(([l,v,col],i) =>
+            l==='—' ? <div key={i} style={{height:'1px',background:'var(--bd)',margin:'6px 0'}} />
+            : (
+              <div key={i} className="flex justify-between py-1" style={{fontSize:'12px'}}>
+                <span style={{color:'var(--t3)'}}>{l}</span>
+                <span style={{fontWeight:700,color:col}}>{v}</span>
+              </div>
+            )
+          )}
+        </div>
+      )}
+
+      {/* ═══ DESPESAS POR CENTRO DE CUSTO ═══ */}
+      {data.ccRows?.length > 0 && (
+        <div className="rounded-xl p-3 mb-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+          <div style={{fontSize:'10px',fontWeight:700,color:'var(--t2)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'8px'}}>
+            📊 DESPESAS POR CENTRO DE CUSTO
+          </div>
+          {data.ccRows.map((cc:any,i:number) => {
+            const pct = data.totalDesp > 0 ? (cc.valor/data.totalDesp*100) : 0
+            return (
+              <div key={i} style={{marginBottom:'7px'}}>
+                <div className="flex justify-between" style={{fontSize:'11px',marginBottom:'3px'}}>
+                  <span style={{color:'var(--t2)'}}>{cc.nome}</span>
+                  <span style={{fontWeight:700,color:'var(--cy)'}}>{money(cc.valor)}</span>
+                </div>
+                <div style={{height:'5px',background:'rgba(255,255,255,.05)',borderRadius:'3px',overflow:'hidden'}}>
+                  <div style={{height:'100%',width:`${Math.min(pct,100)}%`,background:'linear-gradient(90deg,#f97316,#fb923c)',borderRadius:'3px'}} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ═══ OPERAÇÃO: MADEIRA / PRODUÇÃO / VENDAS ═══ */}
+      {(data.woodTonsTotal > 0 || data.prodM3 > 0 || data.salesTons > 0) && (
+        <div className="rounded-xl p-3 mb-3" style={{background:'var(--s1)',border:'1px solid rgba(34,197,94,.2)'}}>
+          <div style={{fontSize:'10px',fontWeight:700,color:'var(--gn)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'8px'}}>
+            🏭 OPERAÇÃO DO PERÍODO
+          </div>
+          {[
+            ['🪵 Entrada de madeira', `${(data.woodTonsTotal||0).toFixed(2)} t`],
+            ['🛢 Tanque processado', `${(data.prodTank||0).toFixed(2)} m³`],
+            ['🏭 Produzido', `${(data.prodM3||0).toFixed(2)} m³`],
+            ['📊 Renda média', (data.prodYield||0).toFixed(4)],
+            ['🛒 Vendas (saída)', `${(data.salesTons||0).toFixed(2)} t`],
+            ['⛽ Combustível', `${(data.fuelLiters||0).toFixed(0)} L`],
+          ].map(([l,v],i) => (
+            <div key={i} className="flex justify-between py-1" style={{fontSize:'12px'}}>
+              <span style={{color:'var(--t3)'}}>{l}</span>
+              <span style={{fontWeight:700}}>{v}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* MTBF/MTTR/Availability row */}
       <div className="grid grid-cols-3 gap-1.5 mb-3">

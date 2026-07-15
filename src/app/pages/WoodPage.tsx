@@ -26,6 +26,9 @@ export default function WoodPage({ profile, can }: Props) {
   const [editing, setEditing] = useState<any>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [tab, setTab] = useState<'lista'|'relatorio'>('lista')
+  const [rFrom, setRFrom] = useState(''); const [rTo, setRTo] = useState('')
+  const [rForn, setRForn] = useState('')
   const { confirm, dialog } = useConfirm()
 
   useEffect(() => { load(); loadSuppliers() }, [])
@@ -78,6 +81,8 @@ export default function WoodPage({ profile, can }: Props) {
     const obj = {
       data_entrada:  editing.data_entrada || td(),
       arrival_time:  editing.arrival_time,
+      unload_time:   editing.unload_time || null,
+      veiculo_id:    editing.veiculo_id || null,
       supplier_id:   editing.supplier_id,
       supplier_name: sup?.name || '',
       wood_class:    editing.wood_class,
@@ -119,6 +124,52 @@ export default function WoodPage({ profile, can }: Props) {
     load()
   }
 
+  // ── Relatório ──
+  const rep = entries.filter(e =>
+    (!rFrom || (e.data_entrada||'') >= rFrom) && (!rTo || (e.data_entrada||'') <= rTo) &&
+    (!rForn || e.supplier_id === rForn))
+  const repTons = rep.reduce((s,e)=>s+(parseFloat(e.weight_tons)||0),0)
+  const byForn: Record<string,{nome:string;tons:number;cargas:number}> = {}
+  rep.forEach(e => {
+    const k = e.supplier_name || '—'
+    if (!byForn[k]) byForn[k] = {nome:k, tons:0, cargas:0}
+    byForn[k].tons += parseFloat(e.weight_tons)||0
+    byForn[k].cargas += 1
+  })
+  const fornRows = Object.values(byForn).sort((a,b)=>b.tons-a.tons)
+
+  async function exportPDF() {
+    try {
+      const { default: jsPDF } = await import('jspdf')
+      const { default: autoTable } = await import('jspdf-autotable')
+      const doc = new jsPDF()
+      doc.setFillColor(6,13,26); doc.rect(0,0,210,25,'F')
+      doc.setTextColor(249,115,22); doc.setFontSize(14); doc.setFont('helvetica','bold')
+      doc.text('Industrial8 — Entrada de Madeira', 12, 11)
+      doc.setTextColor(148,163,184); doc.setFontSize(8); doc.setFont('helvetica','normal')
+      let fi = ''
+      if (rFrom||rTo) fi += `Período: ${rFrom?fmtD(rFrom):'início'} a ${rTo?fmtD(rTo):'hoje'} | `
+      if (rForn) fi += `Fornecedor: ${suppliers.find(s=>s.id===rForn)?.name||''}`
+      doc.text(fi || `Gerado em ${new Date().toLocaleDateString('pt-BR')}`, 12, 18)
+
+      autoTable(doc, {
+        startY: 30, head: [['Fornecedor','Cargas','Toneladas']],
+        body: fornRows.map(f=>[f.nome, String(f.cargas), f.tons.toFixed(3)+' t']),
+        foot: [['TOTAL', String(rep.length), repTons.toFixed(3)+' t']],
+        theme:'grid', headStyles:{fillColor:[249,115,22]}, footStyles:{fillColor:[30,58,110]}, styles:{fontSize:8},
+      })
+      const y = (doc as any).lastAutoTable.finalY + 8
+      autoTable(doc, {
+        startY: y, head: [['Data','Chegada','Descarga','Fornecedor','Classe','Motorista','Placa','Ton']],
+        body: rep.map(e=>[fmtD(e.data_entrada), e.arrival_time?.slice(0,5)||'—', e.unload_time?.slice(0,5)||'—',
+          e.supplier_name||'—', e.wood_class||'—', e.driver||'—', e.plate||'—', (parseFloat(e.weight_tons)||0).toFixed(3)]),
+        theme:'striped', headStyles:{fillColor:[30,58,110]}, styles:{fontSize:7},
+      })
+      doc.save(`madeira_${td()}.pdf`)
+      toast.success('PDF gerado ✅')
+    } catch(err:any) { toast.error('Erro ao gerar PDF: '+err.message) }
+  }
+
   const totalTons = entries.slice(0, 30).reduce((s, e) => s + (parseFloat(e.weight_tons) || 0), 0)
   const totalEntries = entries.filter(e => e.data_entrada === td()).length
 
@@ -126,15 +177,65 @@ export default function WoodPage({ profile, can }: Props) {
     <div className="page-enter p-3">
       {dialog}
       <SH label="🪵 Entrada de Madeira" action={
-        <Btn onClick={openNew} variant="primary" size="sm">+ Entrada</Btn>
+        tab==='lista' ? <Btn onClick={openNew} variant="primary" size="sm">+ Entrada</Btn>
+                      : <Btn onClick={exportPDF} variant="primary" size="sm">📄 PDF</Btn>
       } />
+
+      <div className="flex gap-2 mb-3">
+        {([['lista','📋 Lançamentos'],['relatorio','📊 Relatório']] as ['lista'|'relatorio',string][]).map(([t,l]) => (
+          <div key={t} onClick={()=>setTab(t)}
+            style={{ flex:1, textAlign:'center', padding:'8px', borderRadius:'10px', fontSize:'12px', fontWeight:700, cursor:'pointer',
+              background: tab===t?'rgba(249,115,22,.12)':'var(--s1)',
+              border:`1px solid ${tab===t?'rgba(249,115,22,.4)':'var(--bd)'}`,
+              color: tab===t?'#f97316':'var(--t2)' }}>{l}</div>
+        ))}
+      </div>
 
       <div className="grid grid-cols-2 gap-2 mb-3">
         <KPI num={`${totalTons.toFixed(1)} t`} label="Toneladas (30 últ.)" color="green" />
         <KPI num={totalEntries} label="Entradas hoje" color="orange" />
       </div>
 
-      {loading ? <Empty icon="⏳" text="Carregando..." /> :
+      {tab==='relatorio' && (
+        <>
+          <div className="rounded-xl p-3 mb-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+            <div style={{fontSize:'9px',fontWeight:700,color:'rgba(249,115,22,.65)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'8px'}}>FILTROS</div>
+            <div className="grid grid-cols-2 gap-x-3">
+              <Input label="De" value={rFrom} onChange={setRFrom} type="date" />
+              <Input label="Até" value={rTo} onChange={setRTo} type="date" />
+            </div>
+            <Select label="Fornecedor" value={rForn} onChange={setRForn}
+              options={[{value:'',label:'Todos os fornecedores'}, ...suppliers.map(s=>({value:s.id,label:s.name}))]} />
+            {(rFrom||rTo||rForn) && <Btn onClick={()=>{setRFrom('');setRTo('');setRForn('')}} size="sm" variant="secondary">✕ Limpar</Btn>}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <KPI num={`${repTons.toFixed(2)} t`} label="Total período" color="green" />
+            <KPI num={rep.length} label="Cargas" color="blue" />
+          </div>
+
+          {fornRows.length===0 ? <Empty icon="📊" text="Nenhum dado no período." /> : (
+            <div className="rounded-xl overflow-hidden mb-3" style={{border:'1px solid var(--bd)'}}>
+              <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 60px 80px',background:'var(--s2)',fontSize:'9px',fontWeight:700,color:'var(--t3)',textTransform:'uppercase'}}>
+                <span>Fornecedor</span><span style={{textAlign:'right'}}>Cargas</span><span style={{textAlign:'right'}}>Toneladas</span>
+              </div>
+              {fornRows.map((f,i)=>(
+                <div key={i} className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 60px 80px',background:'var(--s1)',borderTop:'1px solid var(--bd)',fontSize:'11px'}}>
+                  <span style={{fontWeight:700}}>{f.nome}</span>
+                  <span style={{textAlign:'right',color:'var(--t2)'}}>{f.cargas}</span>
+                  <span style={{textAlign:'right',color:'var(--cy)'}}>{f.tons.toFixed(3)}</span>
+                </div>
+              ))}
+              <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 60px 80px',background:'rgba(249,115,22,.1)',borderTop:'2px solid rgba(249,115,22,.3)',fontSize:'11px',fontWeight:700}}>
+                <span>TOTAL</span><span style={{textAlign:'right'}}>{rep.length}</span>
+                <span style={{textAlign:'right',color:'var(--cy)'}}>{repTons.toFixed(3)}</span>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {tab==='lista' && (loading ? <Empty icon="⏳" text="Carregando..." /> :
        entries.length === 0 ? <Empty icon="🪵" text="Nenhuma entrada registrada." /> : (
         <div className="flex flex-col gap-2">
           {entries.map(e => (
@@ -166,7 +267,7 @@ export default function WoodPage({ profile, can }: Props) {
             </div>
           ))}
         </div>
-      )}
+      ))}
 
       {/* Detalhe */}
       <Modal open={!!view} onClose={() => setView(null)} title="Detalhe da Entrada">
@@ -175,6 +276,7 @@ export default function WoodPage({ profile, can }: Props) {
             {[
               ['Data', fmtD(view.data_entrada)],
               ['Hora Chegada', view.arrival_time?.slice(0,5) || '—'],
+              ['Hora Descarga', view.unload_time?.slice(0,5) || '—'],
               ['Fornecedor', view.supplier_name || '—'],
               ['Classe Madeira', view.wood_class || '—'],
               ['Motorista', view.driver || '—'],
@@ -204,9 +306,10 @@ export default function WoodPage({ profile, can }: Props) {
           </>
         }>
 
+        <Input label="Data *" value={editing.data_entrada} onChange={(v:string) => setEditing((e:any) => ({...e, data_entrada: v}))} type="date" />
         <div className="grid grid-cols-2 gap-x-3">
-          <Input label="Data *" value={editing.data_entrada} onChange={(v:string) => setEditing((e:any) => ({...e, data_entrada: v}))} type="date" />
           <Input label="Hora Chegada *" value={editing.arrival_time} onChange={(v:string) => setEditing((e:any) => ({...e, arrival_time: v}))} type="time" />
+          <Input label="Hora Descarga" value={editing.unload_time} onChange={(v:string) => setEditing((e:any) => ({...e, unload_time: v}))} type="time" />
         </div>
 
         <Select label="Fornecedor *" value={editing.supplier_id || ''} onChange={(v:string) => setEditing((e:any) => ({...e, supplier_id: v}))}
