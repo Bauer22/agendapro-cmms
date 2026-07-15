@@ -32,7 +32,7 @@ export default function WoodPage({ profile, can }: Props) {
   async function load() {
     const { data, error } = await supabase
       .from('wood_entries').select('*')
-      .order('entry_date', { ascending: false })
+      .order('data_entrada', { ascending: false })
       .order('arrival_time', { ascending: false })
       .limit(200)
     if (error) toast.error('Erro ao carregar: ' + error.message)
@@ -54,7 +54,7 @@ export default function WoodPage({ profile, can }: Props) {
     const hh = String(now.getHours()).padStart(2,'0')
     const mm = String(now.getMinutes()).padStart(2,'0')
     setEditing({
-      entry_date: td(),
+      data_entrada: td(),
       arrival_time: `${hh}:${mm}`,
       wood_class: '18 a 24',
     })
@@ -73,7 +73,7 @@ export default function WoodPage({ profile, can }: Props) {
     const sup = suppliers.find(s => s.id === editing.supplier_id)
     const mot = editing.driver_id ? motoristas.find(m => m.id === editing.driver_id) : null
     const obj = {
-      entry_date:    editing.entry_date || td(),
+      data_entrada:  editing.data_entrada || td(),
       arrival_time:  editing.arrival_time,
       supplier_id:   editing.supplier_id,
       supplier_name: sup?.name || '',
@@ -117,7 +117,7 @@ export default function WoodPage({ profile, can }: Props) {
   }
 
   const totalTons = entries.slice(0, 30).reduce((s, e) => s + (parseFloat(e.weight_tons) || 0), 0)
-  const totalEntries = entries.filter(e => e.entry_date === td()).length
+  const totalEntries = entries.filter(e => e.data_entrada === td()).length
 
   return (
     <div className="page-enter p-3">
@@ -148,7 +148,7 @@ export default function WoodPage({ profile, can }: Props) {
                   </div>
                   <div className="font-bold text-sm">{e.supplier_name || '—'}</div>
                   <div className="text-xs mt-0.5" style={{ color: 'var(--t2)' }}>
-                    📅 {fmtD(e.entry_date)}{e.arrival_time ? ' às ' + e.arrival_time.slice(0,5) : ''}
+                    📅 {fmtD(e.data_entrada)}{e.arrival_time ? ' às ' + e.arrival_time.slice(0,5) : ''}
                     {e.driver ? ' · 🚗 ' + e.driver : ''}
                   </div>
                   <div className="text-xs" style={{ color: 'var(--t3)' }}>
@@ -170,7 +170,7 @@ export default function WoodPage({ profile, can }: Props) {
         {view && (
           <div className="flex flex-col gap-2">
             {[
-              ['Data', fmtD(view.entry_date)],
+              ['Data', fmtD(view.data_entrada)],
               ['Hora Chegada', view.arrival_time?.slice(0,5) || '—'],
               ['Fornecedor', view.supplier_name || '—'],
               ['Classe Madeira', view.wood_class || '—'],
@@ -202,7 +202,7 @@ export default function WoodPage({ profile, can }: Props) {
         }>
 
         <div className="grid grid-cols-2 gap-x-3">
-          <Input label="Data *" value={editing.entry_date} onChange={(v:string) => setEditing((e:any) => ({...e, entry_date: v}))} type="date" />
+          <Input label="Data *" value={editing.data_entrada} onChange={(v:string) => setEditing((e:any) => ({...e, data_entrada: v}))} type="date" />
           <Input label="Hora Chegada *" value={editing.arrival_time} onChange={(v:string) => setEditing((e:any) => ({...e, arrival_time: v}))} type="time" />
         </div>
 
