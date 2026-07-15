@@ -80,6 +80,7 @@ export default function ProductionPage({ profile, can }: Props) {
       wood_class: editing.wood_class||null,
       produced_m3: prod,
       yield_pct: prod > 0 ? tank/prod : null,
+      cavaco_m3: editing.cavaco_m3 ? parseFloat(editing.cavaco_m3) : null,
       notes: editing.notes||null,
       created_by: profile?.display_name||'',
     }
@@ -104,6 +105,7 @@ export default function ProductionPage({ profile, can }: Props) {
     (!rClass || r.wood_class === rClass))
   const repTank = rep.reduce((s,r)=>s+(parseFloat(r.tank_m3)||0),0)
   const repProd = rep.reduce((s,r)=>s+(parseFloat(r.produced_m3)||0),0)
+  const repCav  = rep.reduce((s,r)=>s+(parseFloat(r.cavaco_m3)||0),0)
   const repTons = repTank / CONV
   const repCost = repTons * avgTonPrice
   const repYield = repProd > 0 ? repTank/repProd : 0
@@ -138,6 +140,7 @@ export default function ProductionPage({ profile, can }: Props) {
           ['Total m³ tanque', `${repTank.toFixed(3)} m³`],
           ['Equivalente em toneladas (÷1,4)', `${repTons.toFixed(3)} t`],
           ['Total m³ produzidos', `${repProd.toFixed(3)} m³`],
+          ['Produção de cavaco', `${repCav.toFixed(2)} m³`],
           ['Média renda de produção', repYield.toFixed(4)],
           ['Custo total de produção', money(repCost)],
           ['Custo por m³ produzido', money(repCostM3)],
@@ -147,12 +150,13 @@ export default function ProductionPage({ profile, can }: Props) {
 
       const y = (doc as any).lastAutoTable.finalY + 8
       autoTable(doc, {
-        startY: y, head: [['Data','Turno','Classe','m³ Tanque','Toneladas','m³ Produzido','Renda','Custo/m³']],
+        startY: y, head: [['Data','Turno','Classe','m³ Tanque','Toneladas','m³ Produzido','Cavaco','Renda','Custo/m³']],
         body: rep.map(r => {
           const c = calc(r)
           return [fmtD(r.prod_date), r.shift||'—', r.wood_class||'—',
             (parseFloat(r.tank_m3)||0).toFixed(2), c.tons.toFixed(3),
-            (parseFloat(r.produced_m3)||0).toFixed(2), c.yieldPct.toFixed(4), money(c.costPerM3)]
+            (parseFloat(r.produced_m3)||0).toFixed(2), r.cavaco_m3?parseFloat(r.cavaco_m3).toFixed(1):'—',
+            c.yieldPct.toFixed(4), money(c.costPerM3)]
         }),
         theme:'striped', headStyles:{fillColor:[30,58,110]}, styles:{fontSize:7},
       })
@@ -207,6 +211,7 @@ export default function ProductionPage({ profile, can }: Props) {
                       <div className="text-xs mt-0.5 flex gap-3" style={{color:'var(--t3)'}}>
                         <span>📊 Renda: {c.yieldPct.toFixed(4)}</span>
                         <span style={{color:'var(--cy)'}}>💰 {money(c.costPerM3)}/m³</span>
+                        {r.cavaco_m3 > 0 && <span style={{color:'var(--am)'}}>🪵 {parseFloat(r.cavaco_m3).toFixed(1)} m³ cavaco</span>}
                       </div>
                     </div>
                     <div className="flex gap-1 ml-2">
@@ -247,6 +252,7 @@ export default function ProductionPage({ profile, can }: Props) {
                 ['Total m³ tanque', `${repTank.toFixed(3)} m³`, 'var(--t1)'],
                 ['Equivalente em toneladas (÷1,4)', `${repTons.toFixed(3)} t`, 'var(--t1)'],
                 ['Total m³ produzidos', `${repProd.toFixed(3)} m³`, 'var(--gn)'],
+            ['Produção de cavaco', `${repCav.toFixed(2)} m³`, 'var(--am)'],
                 ['—', '', ''],
                 ['Média renda produção', repYield.toFixed(4), 'var(--pp)'],
                 ['Custo total produção', money(repCost), 'var(--t1)'],
@@ -312,6 +318,9 @@ export default function ProductionPage({ profile, can }: Props) {
 
         <Input label="Metros cúbicos PRODUZIDOS *" value={editing.produced_m3}
           onChange={(v:string)=>setEditing((e:any)=>({...e,produced_m3:v}))} type="number" placeholder="0.000" />
+
+        <Input label="Produção de cavaco (m³)" value={editing.cavaco_m3}
+          onChange={(v:string)=>setEditing((e:any)=>({...e,cavaco_m3:v}))} type="number" placeholder="0.00" />
 
         {editing.tank_m3 && editing.produced_m3 && parseFloat(editing.produced_m3) > 0 && (
           <div className="rounded-lg p-2 mb-2" style={{background:'var(--s2)',border:'1px solid var(--bd)'}}>
