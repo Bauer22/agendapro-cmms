@@ -89,6 +89,7 @@ export default function WoodPage({ profile, can }: Props) {
       driver:        editing.driver.trim(),
       plate:         editing.plate.trim().toUpperCase(),
       weight_tons:   parseFloat(editing.weight_tons),
+      volume_m3:     editing.volume_m3 ? parseFloat(editing.volume_m3) : null,
       observation:   editing.observation || null,
       created_by:    profile?.display_name || profile?.email || '',
       created_by_id: profile?.id || null,
@@ -129,11 +130,13 @@ export default function WoodPage({ profile, can }: Props) {
     (!rFrom || (e.data_entrada||'') >= rFrom) && (!rTo || (e.data_entrada||'') <= rTo) &&
     (!rForn || e.supplier_id === rForn))
   const repTons = rep.reduce((s,e)=>s+(parseFloat(e.weight_tons)||0),0)
-  const byForn: Record<string,{nome:string;tons:number;cargas:number}> = {}
+  const repM3   = rep.reduce((s,e)=>s+(parseFloat(e.volume_m3)||0),0)
+  const byForn: Record<string,{nome:string;tons:number;m3:number;cargas:number}> = {}
   rep.forEach(e => {
     const k = e.supplier_name || '—'
-    if (!byForn[k]) byForn[k] = {nome:k, tons:0, cargas:0}
+    if (!byForn[k]) byForn[k] = {nome:k, tons:0, m3:0, cargas:0}
     byForn[k].tons += parseFloat(e.weight_tons)||0
+    byForn[k].m3   += parseFloat(e.volume_m3)||0
     byForn[k].cargas += 1
   })
   const fornRows = Object.values(byForn).sort((a,b)=>b.tons-a.tons)
@@ -153,16 +156,17 @@ export default function WoodPage({ profile, can }: Props) {
       doc.text(fi || `Gerado em ${new Date().toLocaleDateString('pt-BR')}`, 12, 18)
 
       autoTable(doc, {
-        startY: 30, head: [['Fornecedor','Cargas','Toneladas']],
-        body: fornRows.map(f=>[f.nome, String(f.cargas), f.tons.toFixed(3)+' t']),
-        foot: [['TOTAL', String(rep.length), repTons.toFixed(3)+' t']],
+        startY: 30, head: [['Fornecedor','Cargas','Toneladas','Metros cúbicos']],
+        body: fornRows.map(f=>[f.nome, String(f.cargas), f.tons.toFixed(3)+' t', f.m3.toFixed(2)+' m³']),
+        foot: [['TOTAL', String(rep.length), repTons.toFixed(3)+' t', repM3.toFixed(2)+' m³']],
         theme:'grid', headStyles:{fillColor:[249,115,22]}, footStyles:{fillColor:[30,58,110]}, styles:{fontSize:8},
       })
       const y = (doc as any).lastAutoTable.finalY + 8
       autoTable(doc, {
-        startY: y, head: [['Data','Chegada','Descarga','Fornecedor','Classe','Motorista','Placa','Ton']],
-        body: rep.map(e=>[fmtD(e.data_entrada), e.arrival_time?.slice(0,5)||'—', e.unload_time?.slice(0,5)||'—',
-          e.supplier_name||'—', e.wood_class||'—', e.driver||'—', e.plate||'—', (parseFloat(e.weight_tons)||0).toFixed(3)]),
+        startY: y, head: [['Data','Descarga','Fornecedor','Classe','Motorista','Placa','Ton','m³']],
+        body: rep.map(e=>[fmtD(e.data_entrada), e.unload_time?.slice(0,5)||e.arrival_time?.slice(0,5)||'—',
+          e.supplier_name||'—', e.wood_class||'—', e.driver||'—', e.plate||'—',
+          (parseFloat(e.weight_tons)||0).toFixed(2), e.volume_m3?parseFloat(e.volume_m3).toFixed(2):'—']),
         theme:'striped', headStyles:{fillColor:[30,58,110]}, styles:{fontSize:7},
       })
       doc.save(`madeira_${td()}.pdf`)
@@ -209,26 +213,29 @@ export default function WoodPage({ profile, can }: Props) {
             {(rFrom||rTo||rForn) && <Btn onClick={()=>{setRFrom('');setRTo('');setRForn('')}} size="sm" variant="secondary">✕ Limpar</Btn>}
           </div>
 
-          <div className="grid grid-cols-2 gap-2 mb-3">
-            <KPI num={`${repTons.toFixed(2)} t`} label="Total período" color="green" />
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <KPI num={`${repTons.toFixed(1)}t`} label="Toneladas" color="green" />
+            <KPI num={`${repM3.toFixed(1)}m³`} label="Metros cúbicos" color="orange" />
             <KPI num={rep.length} label="Cargas" color="blue" />
           </div>
 
           {fornRows.length===0 ? <Empty icon="📊" text="Nenhum dado no período." /> : (
             <div className="rounded-xl overflow-hidden mb-3" style={{border:'1px solid var(--bd)'}}>
-              <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 60px 80px',background:'var(--s2)',fontSize:'9px',fontWeight:700,color:'var(--t3)',textTransform:'uppercase'}}>
-                <span>Fornecedor</span><span style={{textAlign:'right'}}>Cargas</span><span style={{textAlign:'right'}}>Toneladas</span>
+              <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 48px 68px 68px',background:'var(--s2)',fontSize:'9px',fontWeight:700,color:'var(--t3)',textTransform:'uppercase'}}>
+                <span>Fornecedor</span><span style={{textAlign:'right'}}>Cargas</span><span style={{textAlign:'right'}}>Ton</span><span style={{textAlign:'right'}}>m³</span>
               </div>
               {fornRows.map((f,i)=>(
-                <div key={i} className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 60px 80px',background:'var(--s1)',borderTop:'1px solid var(--bd)',fontSize:'11px'}}>
+                <div key={i} className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 48px 68px 68px',background:'var(--s1)',borderTop:'1px solid var(--bd)',fontSize:'11px'}}>
                   <span style={{fontWeight:700}}>{f.nome}</span>
                   <span style={{textAlign:'right',color:'var(--t2)'}}>{f.cargas}</span>
-                  <span style={{textAlign:'right',color:'var(--cy)'}}>{f.tons.toFixed(3)}</span>
+                  <span style={{textAlign:'right',color:'var(--cy)'}}>{f.tons.toFixed(2)}</span>
+                  <span style={{textAlign:'right',color:'var(--am)'}}>{f.m3.toFixed(1)}</span>
                 </div>
               ))}
-              <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 60px 80px',background:'rgba(249,115,22,.1)',borderTop:'2px solid rgba(249,115,22,.3)',fontSize:'11px',fontWeight:700}}>
+              <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 48px 68px 68px',background:'rgba(249,115,22,.1)',borderTop:'2px solid rgba(249,115,22,.3)',fontSize:'11px',fontWeight:700}}>
                 <span>TOTAL</span><span style={{textAlign:'right'}}>{rep.length}</span>
-                <span style={{textAlign:'right',color:'var(--cy)'}}>{repTons.toFixed(3)}</span>
+                <span style={{textAlign:'right',color:'var(--cy)'}}>{repTons.toFixed(2)}</span>
+                <span style={{textAlign:'right',color:'var(--am)'}}>{repM3.toFixed(1)}</span>
               </div>
             </div>
           )}
@@ -249,6 +256,7 @@ export default function WoodPage({ profile, can }: Props) {
                     <span className="text-xs font-bold" style={{ color: 'var(--cy)' }}>
                       {parseFloat(e.weight_tons || 0).toFixed(3)} t
                     </span>
+                    {e.volume_m3 > 0 && <span className="text-xs" style={{ color: 'var(--t3)' }}>{parseFloat(e.volume_m3).toFixed(2)} m³</span>}
                   </div>
                   <div className="font-bold text-sm">{e.supplier_name || '—'}</div>
                   <div className="text-xs mt-0.5" style={{ color: 'var(--t2)' }}>
@@ -282,6 +290,7 @@ export default function WoodPage({ profile, can }: Props) {
               ['Motorista', view.driver || '—'],
               ['Placa', view.plate || '—'],
               ['Toneladas', `${parseFloat(view.weight_tons||0).toFixed(3)} t`],
+              ['Metros cúbicos', view.volume_m3 ? `${parseFloat(view.volume_m3).toFixed(2)} m³` : '—'],
               ['Observação', view.observation || '—'],
               ['Registrado por', view.created_by || '—'],
             ].map(([l,v],i) => (
@@ -336,7 +345,10 @@ export default function WoodPage({ profile, can }: Props) {
           <Input label="Placa *" value={editing.plate} onChange={(v:string) => setEditing((e:any) => ({...e, plate: maskPlate(v)}))} placeholder="AAA0A00 ou AAA0000" />
         )}
 
-        <Input label="Toneladas *" value={editing.weight_tons} onChange={(v:string) => setEditing((e:any) => ({...e, weight_tons: v}))} type="number" placeholder="0.000" />
+        <div className="grid grid-cols-2 gap-x-3">
+          <Input label="Toneladas *" value={editing.weight_tons} onChange={(v:string) => setEditing((e:any) => ({...e, weight_tons: v}))} type="number" placeholder="0.000" />
+          <Input label="Metros cúbicos" value={editing.volume_m3} onChange={(v:string) => setEditing((e:any) => ({...e, volume_m3: v}))} type="number" placeholder="0.00" />
+        </div>
 
         <Textarea label="Observação (ticket de peso, anotações)" value={editing.observation} onChange={(v:string) => setEditing((e:any) => ({...e, observation: v}))} rows={2} placeholder="Opcional..." />
       </Modal>
