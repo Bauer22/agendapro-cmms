@@ -178,41 +178,68 @@ export default function FuelPage({ profile, can }: Props) {
   const veicRows = Object.values(byVeic).sort((a,b)=>(b.fuel+b.exp)-(a.fuel+a.exp))
 
   // ── Consolidado por placa/máquina (todo o histórico) ──
+  // Km/horas rodados = SOMA DOS DELTAS consecutivos (não MAX-MIN),
+  // descartando saltos implausíveis causados por erro de digitação no hodômetro.
+  const KM_DELTA_MAX = 5000   // salto máximo aceitável entre 2 abastecimentos (km)
+  const HM_DELTA_MAX = 400    // idem para horímetro (horas)
+
   const placaStats = (() => {
-    const m: Record<string, {
-      unidade:string; isVeic:boolean; abast:number; litros:number;
-      custo:number; desp:number; kmMin:number; kmMax:number; hmMin:number; hmMax:number;
-    }> = {}
+    type Row = { date:string; km:number|null; hm:number|null; liters:number; valor:number }
+    const m: Record<string, { unidade:string; isVeic:boolean; rows:Row[]; desp:number }> = {}
+
     records.forEach(r => {
       const k = r.veiculo_placa || r.machine_name || r.driver_name || '—'
-      if (!m[k]) m[k] = { unidade:k, isVeic: !!r.veiculo_placa, abast:0, litros:0, custo:0, desp:0,
-                          kmMin:Infinity, kmMax:0, hmMin:Infinity, hmMax:0 }
-      const e = m[k]
-      const lt = parseFloat(r.liters)||0
-      e.abast += 1
-      e.litros += lt
-      e.custo += (parseFloat(r.total_value) || (lt * (parseFloat(r.unit_price)||0)) || 0)
+      if (!m[k]) m[k] = { unidade:k, isVeic: !!r.veiculo_placa, rows:[], desp:0 }
+      const lt = parseFloat(r.liters) || 0
       const km = parseFloat(r.km)
-      if (km > 0) { e.kmMin = Math.min(e.kmMin, km); e.kmMax = Math.max(e.kmMax, km) }
       const hm = parseFloat(r.hour_meter)
-      if (hm > 0) { e.hmMin = Math.min(e.hmMin, hm); e.hmMax = Math.max(e.hmMax, hm) }
+      m[k].rows.push({
+        date: r.record_date || '',
+        km: km > 0 ? km : null,
+        hm: hm > 0 ? hm : null,
+        liters: lt,
+        valor: (parseFloat(r.total_value) || (lt * (parseFloat(r.unit_price)||0)) || 0),
+      })
     })
+
     expenses.forEach(x => {
       const k = x.veiculo_placa || '—'
-      if (!m[k]) m[k] = { unidade:k, isVeic:true, abast:0, litros:0, custo:0, desp:0,
-                          kmMin:Infinity, kmMax:0, hmMin:Infinity, hmMax:0 }
-      m[k].desp += parseFloat(x.value)||0
+      if (!m[k]) m[k] = { unidade:k, isVeic:true, rows:[], desp:0 }
+      m[k].desp += parseFloat(x.value) || 0
     })
+
+    // Soma deltas consecutivos ignorando outliers e leituras zeradas/negativas
+    function sumDeltas(vals:(number|null)[], maxDelta:number) {
+      const clean = vals.filter((v):v is number => v !== null && v > 0)
+      let total = 0, used = 0, ignored = 0
+      for (let i = 1; i < clean.length; i++) {
+        const d = clean[i] - clean[i-1]
+        if (d > 0 && d < maxDelta) { total += d; used++ }
+        else if (d !== 0) ignored++
+      }
+      return { total, used, ignored, readings: clean.length }
+    }
+
     return Object.values(m).map(e => {
-      const kmRod = (e.kmMax > 0 && e.kmMin < Infinity && e.kmMax > e.kmMin) ? e.kmMax - e.kmMin : 0
-      const hmRod = (e.hmMax > 0 && e.hmMin < Infinity && e.hmMax > e.hmMin) ? e.hmMax - e.hmMin : 0
-      const total = e.custo + e.desp
+      const rows = [...e.rows].sort((a,b) => (a.date||'').localeCompare(b.date||''))
+      const abast  = e.rows.length
+      const litros = e.rows.reduce((s,r) => s + r.liters, 0)
+      const custo  = e.rows.reduce((s,r) => s + r.valor, 0)
+      const total  = custo + e.desp
+
+      const kmD = sumDeltas(rows.map(r => r.km), KM_DELTA_MAX)
+      const hmD = sumDeltas(rows.map(r => r.hm), HM_DELTA_MAX)
+      const kmRod = kmD.total
+      const hmRod = hmD.total
+
       return {
-        ...e, kmRod, hmRod, total,
-        precoMedio: e.litros > 0 ? e.custo/e.litros : 0,
-        kmPorL:  kmRod > 0 && e.litros > 0 ? kmRod/e.litros : 0,
+        unidade: e.unidade, isVeic: e.isVeic, abast, litros, custo, desp: e.desp, total,
+        kmRod, hmRod,
+        kmIgnored: kmD.ignored, hmIgnored: hmD.ignored,
+        precoMedio: litros > 0 ? custo/litros : 0,
+        kmPorL:  kmRod > 0 && litros > 0 ? kmRod/litros : 0,
         custoKm: kmRod > 0 ? total/kmRod : 0,
-        lPorH:   hmRod > 0 && e.litros > 0 ? e.litros/hmRod : 0,
+        lPorH:   hmRod > 0 && litros > 0 ? litros/hmRod : 0,
         custoH:  hmRod > 0 ? total/hmRod : 0,
       }
     }).sort((a,b) => b.total - a.total)
@@ -233,6 +260,8 @@ export default function FuelPage({ profile, can }: Props) {
       doc.text('Industrial8 — Custo por Placa / Máquina', 12, 11)
       doc.setTextColor(148,163,184); doc.setFontSize(8); doc.setFont('helvetica','normal')
       doc.text(`Histórico completo · Gerado em ${new Date().toLocaleDateString('pt-BR')}`, 12, 18)
+      doc.setFontSize(6)
+      doc.text(`Km rodados = soma dos deltas consecutivos do hodômetro (saltos > ${KM_DELTA_MAX} km descartados)`, 12, 22)
       autoTable(doc, {
         startY: 30,
         head: [['Placa/Máquina','Abast.','Litros','Custo Combustível','Outras Despesas','Custo Total','R$/L','Km rodados','Km/L','R$/km']],
@@ -416,10 +445,16 @@ export default function FuelPage({ profile, can }: Props) {
         {/* ═══ POR PLACA ═══ */}
         {tab==='placas' && (placaStats.length===0 ? <Empty icon="🚛" text="Nenhum abastecimento registrado." /> : (
           <>
-            <div className="grid grid-cols-3 gap-2 mb-3">
+            <div className="grid grid-cols-3 gap-2 mb-2">
               <KPI num={`${placaTotals.litros.toFixed(0)}L`} label="Litros totais" color="blue" />
               <KPI num={money(placaTotals.custo).replace('R$ ','R$')} label="Combustível" color="orange" />
               <KPI num={money(placaTotals.total).replace('R$ ','R$')} label="Custo total" color="purple" />
+            </div>
+
+            <div className="rounded-lg px-3 py-2 mb-3" style={{background:'var(--s2)',border:'1px solid var(--bd)',fontSize:'9px',color:'var(--t3)',lineHeight:1.5}}>
+              📐 <b style={{color:'var(--t2)'}}>Como é calculado:</b> Km rodados = soma das diferenças entre leituras
+              consecutivas do hodômetro (saltos acima de {KM_DELTA_MAX.toLocaleString('pt-BR')} km são descartados como erro de digitação).
+              Custo total = combustível + outras despesas do veículo.
             </div>
 
             <div className="flex flex-col gap-2">
@@ -486,6 +521,11 @@ export default function FuelPage({ profile, can }: Props) {
                         </div>
                       </>}
                     </div>
+                    {(p.kmIgnored > 0 || p.hmIgnored > 0) && (
+                      <div style={{fontSize:'9px',color:'var(--am)',marginTop:'6px',display:'flex',alignItems:'center',gap:'4px'}}>
+                        ⚠️ {p.kmIgnored + p.hmIgnored} leitura(s) de {p.isVeic?'hodômetro':'horímetro'} descartada(s) por inconsistência
+                      </div>
+                    )}
                   </div>
                 )
               })}
