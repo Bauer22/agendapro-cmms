@@ -77,6 +77,7 @@ export default function App() {
   const [page, setPage]    = useState<Page>('dashboard')
   const [splashDone, setSplashDone] = useState(false)
   const [userModules, setUserModules] = useState<string[]>([])
+  const [userPerms, setUserPerms] = useState<Record<string,{edit:boolean;del:boolean}>>({})
 
   // Auth init
   useEffect(() => {
@@ -103,9 +104,14 @@ export default function App() {
   }, [])
 
   async function loadUserModules(uid: string) {
-    const { data } = await supabase.from('user_permissions').select('module_id').eq('user_id', uid).eq('enabled', true)
+    const { data } = await supabase.from('user_permissions')
+      .select('module_id,can_view,can_edit,can_delete')
+      .eq('user_id', uid).eq('enabled', true)
     if (data && data.length > 0) {
-      setUserModules(data.map((d:any) => d.module_id))
+      setUserModules(data.filter((d:any) => d.can_view !== false).map((d:any) => d.module_id))
+      const map: Record<string,{edit:boolean;del:boolean}> = {}
+      data.forEach((d:any) => { map[d.module_id] = { edit: d.can_edit !== false, del: !!d.can_delete } })
+      setUserPerms(map)
     }
   }
 
@@ -135,12 +141,30 @@ export default function App() {
     setUser(null); setProfile(null); setPage('dashboard')
   }, [])
 
+  // can('os')        -> pode editar o módulo os?
+  // can('os:view')   -> pode ver?
+  // can('os:delete') -> pode excluir?
   const can = useCallback((perm: string) => {
     if (!profile) return false
     if (profile.role === 'superadmin' || profile.role === 'admin') return true
+
+    const [mod, action = 'edit'] = perm.split(':')
+
+    // Permissão granular por usuário (tem prioridade)
+    if (Object.keys(userPerms).length > 0) {
+      const p = userPerms[mod]
+      if (p) {
+        if (action === 'view')   return true          // está na lista = pode ver
+        if (action === 'delete') return p.del
+        return p.edit                                  // edit é o padrão
+      }
+      // módulo fora da lista: sem acesso (a menos que role antiga permita)
+    }
+
+    // Fallback: permissões por perfil (compatibilidade)
     const perms = ROLES[profile.role]?.perms || []
-    return perms.includes(perm) || perms.includes('all')
-  }, [profile])
+    return perms.includes(mod) || perms.includes('all')
+  }, [profile, userPerms])
 
   // ─── Splash ────────────────────────────────────────────────────────────────
   if (!splashDone) return (

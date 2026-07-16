@@ -33,7 +33,8 @@ export default function UsersPage({ profile, can }: Props) {
   const [modModal, setModModal] = useState(false)
   const [modUser, setModUser] = useState<any>(null)
   const [allModules, setAllModules] = useState<any[]>([])
-  const [userMods, setUserMods] = useState<string[]>([])
+  const [userMods, setUserMods] = useState<Record<string,{view:boolean;edit:boolean;del:boolean}>>({})
+  const [presets, setPresets] = useState<any[]>([])
   const { confirm, dialog } = useConfirm()
 
   useEffect(() => { load() }, [])
@@ -46,30 +47,71 @@ export default function UsersPage({ profile, can }: Props) {
   function openNew() { setEdit({ role:'operator', shift:'A' }); setIsNew(true); setModal(true) }
   async function openModules(u: any) {
     setModUser(u)
-    const [mods, perms] = await Promise.all([
+    const [mods, perms, pre] = await Promise.all([
       supabase.from('modules').select('*').order('sort_order'),
-      supabase.from('user_permissions').select('module_id').eq('user_id', u.id).eq('enabled', true)
+      supabase.from('user_permissions').select('module_id,can_view,can_edit,can_delete').eq('user_id', u.id).eq('enabled', true),
+      supabase.from('permission_presets').select('*').eq('active', true).order('name'),
     ])
     setAllModules(mods.data || [])
-    setUserMods((perms.data || []).map((p:any) => p.module_id))
+    const map: Record<string,{view:boolean;edit:boolean;del:boolean}> = {}
+    ;(perms.data || []).forEach((p:any) => {
+      map[p.module_id] = { view: p.can_view !== false, edit: p.can_edit !== false, del: !!p.can_delete }
+    })
+    setUserMods(map)
+    setPresets(pre.data || [])
     setModModal(true)
+  }
+
+  function aplicarPreset(pre: any) {
+    const map: Record<string,{view:boolean;edit:boolean;del:boolean}> = {}
+    ;(pre.modules || []).forEach((m:any) => {
+      map[m.module_id] = { view: m.can_view !== false, edit: !!m.can_edit, del: !!m.can_delete }
+    })
+    setUserMods(map)
+    toast.success(`Perfil "${pre.name}" aplicado — revise e salve`)
   }
 
   async function saveModules() {
     if (!modUser) return
     await supabase.from('user_permissions').delete().eq('user_id', modUser.id)
-    if (userMods.length > 0) {
-      const { error } = await supabase.from('user_permissions').insert(
-        userMods.map(m => ({ user_id: modUser.id, module_id: m, enabled: true, company_id: profile?.company_id, granted_by: profile?.id }))
-      )
+    const rows = Object.entries(userMods)
+      .filter(([_, p]) => p.view)
+      .map(([mid, p]) => ({
+        user_id: modUser.id, module_id: mid, enabled: true,
+        can_view: true, can_edit: p.edit, can_delete: p.del,
+        company_id: profile?.company_id, granted_by: profile?.id,
+      }))
+    if (rows.length > 0) {
+      const { error } = await supabase.from('user_permissions').insert(rows)
       if (error) { toast.error('Erro ao salvar módulos: '+error.message); return }
     }
-    toast.success(`Módulos de ${modUser.display_name} atualizados ✅`)
+    toast.success(`${rows.length} módulo(s) liberado(s) para ${modUser.display_name} ✅`)
     setModModal(false)
   }
 
   function toggleMod(id: string) {
-    setUserMods(prev => prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id])
+    setUserMods(prev => {
+      const cur = prev[id]
+      if (cur?.view) { const { [id]:_, ...rest } = prev; return rest }   // desmarca tudo
+      return { ...prev, [id]: { view:true, edit:true, del:false } }       // marca ver+editar
+    })
+  }
+
+  function setNivel(id: string, nivel: 'edit'|'del', val: boolean) {
+    setUserMods(prev => {
+      const cur = prev[id] || { view:true, edit:false, del:false }
+      const next = { ...cur, [nivel === 'edit' ? 'edit' : 'del']: val }
+      if (nivel === 'edit' && !val) next.del = false     // sem editar, não exclui
+      if (nivel === 'del' && val)   next.edit = true     // excluir exige editar
+      return { ...prev, [id]: next }
+    })
+  }
+
+  function marcarTodos(v: boolean) {
+    if (!v) { setUserMods({}); return }
+    const map: Record<string,{view:boolean;edit:boolean;del:boolean}> = {}
+    allModules.forEach((m:any) => { map[m.id] = { view:true, edit:true, del:false } })
+    setUserMods(map)
   }
 
   function openEdit(u: UserProfile) { setEdit({...u}); setIsNew(false); setModal(true) }
@@ -135,20 +177,80 @@ export default function UsersPage({ profile, can }: Props) {
   return (
     <div>
       {dialog}
-      <Modal open={modModal} onClose={()=>setModModal(false)} title={`Módulos — ${modUser?.display_name||''}`}
+      <Modal open={modModal} onClose={()=>setModModal(false)} title={`Permissões — ${modUser?.display_name||''}`}
         footer={<><Btn onClick={()=>setModModal(false)}>Cancelar</Btn><Btn onClick={saveModules} variant="primary" size="md">Salvar</Btn></>}>
-        <div style={{fontSize:'10px',color:'var(--t3)',marginBottom:'10px'}}>Selecione os módulos que este usuário pode acessar:</div>
-        {Object.entries(allModules.reduce((acc:any, m:any)=>{ (acc[m.category]=acc[m.category]||[]).push(m); return acc }, {})).map(([cat,mods]:any) => (
-          <div key={cat} style={{marginBottom:'12px'}}>
-            <div style={{fontSize:'9px',fontWeight:700,color:'rgba(249,115,22,.6)',textTransform:'uppercase',letterSpacing:'.7px',marginBottom:'6px'}}>{cat}</div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
-              {mods.map((m:any) => (
-                <div key={m.id} onClick={()=>toggleMod(m.id)} style={{display:'flex',alignItems:'center',gap:'6px',padding:'8px 10px',borderRadius:'10px',cursor:'pointer',background:userMods.includes(m.id)?'rgba(249,115,22,.1)':'var(--s2)',border:`1px solid ${userMods.includes(m.id)?'rgba(249,115,22,.35)':'var(--bd)'}`}}>
-                  <span style={{fontSize:'14px'}}>{m.icon}</span>
-                  <span style={{fontSize:'10px',fontWeight:700,color:userMods.includes(m.id)?'#f97316':'var(--t1)',flex:1}}>{m.label}</span>
-                  <span style={{fontSize:'11px'}}>{userMods.includes(m.id)?'✅':'⬜'}</span>
+
+        {/* Perfis prontos */}
+        {presets.length > 0 && (
+          <>
+            <div style={{fontSize:'9px',fontWeight:700,color:'rgba(249,115,22,.65)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'6px'}}>
+              ⚡ Aplicar perfil pronto
+            </div>
+            <div className="flex gap-1.5 mb-3 overflow-x-auto pb-1">
+              {presets.map((pre:any)=>(
+                <div key={pre.id} onClick={()=>aplicarPreset(pre)} title={pre.description}
+                  style={{flexShrink:0,padding:'7px 12px',borderRadius:'10px',fontSize:'11px',fontWeight:700,cursor:'pointer',
+                    background:'var(--s2)',border:'1px solid var(--bd)',color:'var(--t2)',whiteSpace:'nowrap'}}>
+                  {pre.icon} {pre.name}
                 </div>
               ))}
+            </div>
+          </>
+        )}
+
+        {/* Ações rápidas + legenda */}
+        <div className="flex justify-between items-center mb-2">
+          <div className="flex gap-1.5">
+            <Btn onClick={()=>marcarTodos(true)} size="sm" variant="secondary">✅ Todos</Btn>
+            <Btn onClick={()=>marcarTodos(false)} size="sm" variant="secondary">⬜ Nenhum</Btn>
+          </div>
+          <span style={{fontSize:'10px',color:'var(--t3)',fontWeight:700}}>
+            {Object.values(userMods).filter((p:any)=>p.view).length} de {allModules.length}
+          </span>
+        </div>
+
+        <div className="rounded-lg px-2.5 py-1.5 mb-2" style={{background:'var(--s2)',border:'1px solid var(--bd)',fontSize:'9px',color:'var(--t3)'}}>
+          👁 ver · ✏️ editar · 🗑 excluir — clique no módulo para liberar/bloquear
+        </div>
+
+        {/* Módulos por categoria */}
+        {Object.entries(allModules.reduce((acc:any, m:any)=>{ (acc[m.category]=acc[m.category]||[]).push(m); return acc }, {})).map(([cat,mods]:any)=>(
+          <div key={cat} style={{marginBottom:'12px'}}>
+            <div style={{fontSize:'9px',fontWeight:700,color:'rgba(249,115,22,.6)',textTransform:'uppercase',letterSpacing:'.7px',marginBottom:'5px'}}>
+              {cat} · {mods.filter((m:any)=>userMods[m.id]?.view).length}/{mods.length}
+            </div>
+            <div className="flex flex-col gap-1">
+              {mods.map((m:any)=>{
+                const p = userMods[m.id]
+                const on = !!p?.view
+                return (
+                  <div key={m.id}
+                    style={{display:'flex',alignItems:'center',gap:'8px',padding:'7px 9px',borderRadius:'9px',
+                      background:on?'rgba(249,115,22,.08)':'var(--s2)',
+                      border:`1px solid ${on?'rgba(249,115,22,.3)':'var(--bd)'}`}}>
+
+                    <div onClick={()=>toggleMod(m.id)} style={{display:'flex',alignItems:'center',gap:'7px',flex:1,cursor:'pointer',minWidth:0}}>
+                      <span style={{fontSize:'13px'}}>{m.icon}</span>
+                      <span style={{fontSize:'11px',fontWeight:on?700:400,color:on?'#f97316':'var(--t2)',
+                        overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.label}</span>
+                    </div>
+
+                    {on ? (
+                      <div className="flex gap-1" style={{flexShrink:0}}>
+                        <span title="Pode ver" style={{fontSize:'12px',opacity:.9}}>👁</span>
+                        <button onClick={()=>setNivel(m.id,'edit',!p.edit)} title="Pode editar"
+                          style={{background:p.edit?'rgba(59,130,246,.2)':'transparent',border:`1px solid ${p.edit?'rgba(59,130,246,.5)':'var(--bd)'}`,
+                            borderRadius:'5px',padding:'2px 5px',cursor:'pointer',fontSize:'11px',opacity:p.edit?1:.35}}>✏️</button>
+                        <button onClick={()=>setNivel(m.id,'del',!p.del)} title="Pode excluir"
+                          style={{background:p.del?'rgba(239,68,68,.2)':'transparent',border:`1px solid ${p.del?'rgba(239,68,68,.5)':'var(--bd)'}`,
+                            borderRadius:'5px',padding:'2px 5px',cursor:'pointer',fontSize:'11px',opacity:p.del?1:.35}}>🗑</button>
+                      </div>
+                    ) : (
+                      <span onClick={()=>toggleMod(m.id)} style={{fontSize:'12px',cursor:'pointer',opacity:.4,flexShrink:0}}>⬜</span>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
         ))}
