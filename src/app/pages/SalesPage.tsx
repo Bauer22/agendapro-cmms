@@ -27,14 +27,47 @@ export default function SalesPage({ profile, can }: Props) {
   const [editing, setEditing]   = useState<any>({})
   const [newClient, setNewClient] = useState<any>({})
   const [newProduct, setNewProduct] = useState<any>({})
-  const [tab, setTab]           = useState<'open'|'all'|'relatorio'>('open')
+  const [tab, setTab]           = useState<'open'|'all'|'relatorio'|'extrato'>('open')
+  const [saldos, setSaldos]     = useState<any[]>([])
+  const [extrato, setExtrato]   = useState<any[]>([])
+  const [payModal, setPayModal] = useState(false)
+  const [newPay, setNewPay]     = useState<any>({})
   const [rFrom, setRFrom] = useState(''); const [rTo, setRTo] = useState('')
   const [rCli, setRCli] = useState(''); const [rProd, setRProd] = useState('')
   const [loading, setLoading]   = useState(true)
   const [saving, setSaving]     = useState(false)
   const { confirm, dialog }     = useConfirm()
 
-  useEffect(() => { loadMeta() }, [])
+  useEffect(() => { loadMeta(); loadExtrato() }, [])
+
+  async function loadExtrato() {
+    const [s, e] = await Promise.all([
+      supabase.from('v_cliente_saldo').select('*'),
+      supabase.from('v_cliente_extrato').select('*'),
+    ])
+    setSaldos(s.data || [])
+    setExtrato(e.data || [])
+  }
+
+  async function savePayment() {
+    if (!newPay.client_name) { toast.error('Selecione o cliente'); return }
+    if (!newPay.value || parseFloat(newPay.value) <= 0) { toast.error('Informe o valor'); return }
+    const cli = clients.find(c => c.name === newPay.client_name)
+    const { error } = await supabase.from('client_payments').insert({
+      client_id: cli?.id || null,
+      client_name: newPay.client_name,
+      payment_date: newPay.payment_date || td(),
+      value: parseFloat(newPay.value),
+      method: newPay.method || null,
+      invoice_ref: newPay.invoice_ref || null,
+      notes: newPay.notes || null,
+      created_by: profile?.display_name || '',
+      company_id: profile?.company_id || null,
+    })
+    if (error) { toast.error('Erro: ' + error.message); return }
+    toast.success('Pagamento registrado ✅')
+    setPayModal(false); setNewPay({}); loadExtrato()
+  }
   useEffect(() => { if (tab !== 'relatorio') load() }, [tab])
 
   async function load() {
@@ -250,16 +283,97 @@ export default function SalesPage({ profile, can }: Props) {
       </div>
 
       <div className="flex gap-2 mb-3">
-        {(['open','all','relatorio'] as const).map(t => (
-          <div key={t} onClick={() => { setTab(t); if(t!=='relatorio') setLoading(true) }}
+        {(['open','all','relatorio','extrato'] as const).map(t => (
+          <div key={t} onClick={() => { setTab(t); if(t!=='relatorio' && t!=='extrato') setLoading(true) }}
             style={{ flex:1, textAlign:'center', padding:'7px', borderRadius:'10px', fontSize:'11px', fontWeight:700, cursor:'pointer',
               background: tab===t ? 'rgba(249,115,22,.12)' : 'var(--s1)',
               border: `1px solid ${tab===t ? 'rgba(249,115,22,.4)' : 'var(--bd)'}`,
               color: tab===t ? '#f97316' : 'var(--t2)' }}>
-            {t === 'open' ? '📋 Ativos' : t === 'all' ? '📦 Todos' : '📊 Relatório'}
+            {t === 'open' ? '📋 Ativos' : t === 'all' ? '📦 Todos' : t === 'relatorio' ? '📊 Relatório' : '🤝 Extrato'}
           </div>
         ))}
       </div>
+
+      {tab === 'extrato' && (
+        <>
+          <div className="flex justify-between items-center mb-3">
+            <span style={{fontSize:'9px',color:'var(--t3)'}}>Vendas − pagamentos = saldo do cliente</span>
+            <Btn onClick={()=>{setNewPay({payment_date:td()});setPayModal(true)}} variant="primary" size="sm">+ Pagamento</Btn>
+          </div>
+
+          {saldos.length === 0 ? <Empty icon="🤝" text="Nenhum saldo. Execute o SQL das views." /> : (
+            <div className="flex flex-col gap-2 mb-4">
+              {saldos.map((s:any,i:number)=>{
+                const sa = +s.saldo_atual || 0
+                return (
+                  <div key={i} className="rounded-xl p-3"
+                    style={{background:'var(--s1)',border:`1px solid ${sa>0?'rgba(249,115,22,.3)':sa<0?'rgba(59,130,246,.3)':'rgba(34,197,94,.3)'}`}}>
+                    <div className="flex justify-between items-start mb-2">
+                      <span style={{fontSize:'13px',fontWeight:800}}>{s.cliente}</span>
+                      <Badge color={sa>0?'amber':sa<0?'blue':'green'}>{s.situacao}</Badge>
+                    </div>
+                    {+s.saldo_anterior !== 0 && (
+                      <div className="flex justify-between py-1" style={{fontSize:'12px'}}>
+                        <span style={{color:'var(--t3)'}}>📋 Saldo anterior</span>
+                        <span style={{fontWeight:700}}>{money(+s.saldo_anterior)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between py-1" style={{fontSize:'12px'}}>
+                      <span style={{color:'var(--t3)'}}>🛒 Vendas</span>
+                      <span style={{fontWeight:700,color:'var(--cy)'}}>{money(+s.total_vendas)}</span>
+                    </div>
+                    <div className="flex justify-between py-1" style={{fontSize:'12px'}}>
+                      <span style={{color:'var(--t3)'}}>💵 Pagamentos</span>
+                      <span style={{fontWeight:700,color:'var(--gn)'}}>− {money(+s.total_pago)}</span>
+                    </div>
+                    <div style={{height:'1px',background:'var(--bd)',margin:'5px 0'}} />
+                    <div className="flex justify-between" style={{fontSize:'14px'}}>
+                      <span style={{fontWeight:700}}>SALDO ATUAL</span>
+                      <span style={{fontWeight:800,color:sa>0?'#f97316':sa<0?'var(--bl)':'var(--gn)'}}>{money(sa)}</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {extrato.length > 0 && (
+            <>
+              <div style={{fontSize:'10px',fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:'6px'}}>
+                📆 Movimento mês a mês
+              </div>
+              <div className="rounded-xl overflow-hidden" style={{border:'1px solid var(--bd)'}}>
+                <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 56px 76px 76px 76px',background:'var(--s2)',fontSize:'9px',fontWeight:700,color:'var(--t3)',textTransform:'uppercase'}}>
+                  <span>Cliente</span><span>Mês</span><span style={{textAlign:'right'}}>Vendas</span><span style={{textAlign:'right'}}>Pagou</span><span style={{textAlign:'right'}}>Saldo</span>
+                </div>
+                {extrato.map((e:any,i:number)=>(
+                  <div key={i} className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 56px 76px 76px 76px',background:'var(--s1)',borderTop:'1px solid var(--bd)',fontSize:'10px'}}>
+                    <span style={{fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.cliente}</span>
+                    <span style={{color:'var(--t2)'}}>{e.mes?.slice(5)}/{e.mes?.slice(2,4)}</span>
+                    <span style={{textAlign:'right',color:'var(--cy)'}}>{(+e.vendas).toLocaleString('pt-BR',{maximumFractionDigits:0})}</span>
+                    <span style={{textAlign:'right',color:'var(--gn)'}}>{(+e.pagamentos).toLocaleString('pt-BR',{maximumFractionDigits:0})}</span>
+                    <span style={{textAlign:'right',color:+e.saldo_mes>0?'#f97316':'var(--t3)',fontWeight:700}}>{(+e.saldo_mes).toLocaleString('pt-BR',{maximumFractionDigits:0})}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          <Modal open={payModal} onClose={()=>setPayModal(false)} title="💵 Registrar Pagamento"
+            footer={<><Btn onClick={()=>setPayModal(false)}>Cancelar</Btn><Btn onClick={savePayment} variant="primary" size="md">Salvar</Btn></>}>
+            <Select label="Cliente *" value={newPay.client_name||''} onChange={(v:string)=>setNewPay((e:any)=>({...e,client_name:v}))}
+              options={[{value:'',label:'Selecione...'}, ...clients.map(c2=>({value:c2.name,label:c2.name}))]} />
+            <div className="grid grid-cols-2 gap-x-3">
+              <Input label="Data *" value={newPay.payment_date} onChange={(v:string)=>setNewPay((e:any)=>({...e,payment_date:v}))} type="date" />
+              <Input label="Valor R$ *" value={newPay.value} onChange={(v:string)=>setNewPay((e:any)=>({...e,value:v}))} type="number" placeholder="0.00" />
+            </div>
+            <Select label="Forma" value={newPay.method||''} onChange={(v:string)=>setNewPay((e:any)=>({...e,method:v}))}
+              options={[{value:'',label:'—'},{value:'PIX',label:'PIX'},{value:'Transferência',label:'Transferência'},{value:'Boleto',label:'Boleto'},{value:'Dinheiro',label:'Dinheiro'},{value:'Cheque',label:'Cheque'}]} />
+            <Input label="NF de referência" value={newPay.invoice_ref} onChange={(v:string)=>setNewPay((e:any)=>({...e,invoice_ref:v}))} placeholder="Opcional" />
+            <Textarea label="Observações" value={newPay.notes} onChange={(v:string)=>setNewPay((e:any)=>({...e,notes:v}))} rows={2} placeholder="Opcional..." />
+          </Modal>
+        </>
+      )}
 
       {tab === 'relatorio' && (
         <>
@@ -324,7 +438,7 @@ export default function SalesPage({ profile, can }: Props) {
         </>
       )}
 
-      {tab !== 'relatorio' && (loading ? <Empty icon="⏳" text="Carregando..." /> :
+      {tab !== 'relatorio' && tab !== 'extrato' && (loading ? <Empty icon="⏳" text="Carregando..." /> :
        orders.length === 0 ? <Empty icon="🛒" text="Nenhum romaneio encontrado." /> : (
         <div className="flex flex-col gap-2">
           {orders.map(o => (
