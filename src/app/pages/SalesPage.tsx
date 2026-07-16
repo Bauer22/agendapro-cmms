@@ -30,8 +30,11 @@ export default function SalesPage({ profile, can }: Props) {
   const [tab, setTab]           = useState<'open'|'all'|'relatorio'|'extrato'>('open')
   const [saldos, setSaldos]     = useState<any[]>([])
   const [extrato, setExtrato]   = useState<any[]>([])
+  const [lancs, setLancs]       = useState<any[]>([])
   const [payModal, setPayModal] = useState(false)
   const [newPay, setNewPay]     = useState<any>({})
+  const [payTipo, setPayTipo]   = useState<'receber'|'pagar'>('receber')
+  const [verExtrato, setVerExtrato] = useState<string|null>(null)
   const [rFrom, setRFrom] = useState(''); const [rTo, setRTo] = useState('')
   const [rCli, setRCli] = useState(''); const [rProd, setRProd] = useState('')
   const [loading, setLoading]   = useState(true)
@@ -41,21 +44,22 @@ export default function SalesPage({ profile, can }: Props) {
   useEffect(() => { loadMeta(); loadExtrato() }, [])
 
   async function loadExtrato() {
-    const [s, e] = await Promise.all([
-      supabase.from('v_cliente_saldo').select('*'),
-      supabase.from('v_cliente_extrato').select('*'),
+    const [s, e, l] = await Promise.all([
+      supabase.from('v_saldo_conta_corrente').select('*'),
+      supabase.from('v_extrato_parceiro').select('*'),
+      supabase.from('v_extrato_lancamentos').select('*'),
     ])
+    if (s.error) { toast.error('Execute o SQL da conta corrente unificada'); return }
     setSaldos(s.data || [])
     setExtrato(e.data || [])
+    setLancs(l.data || [])
   }
 
   async function savePayment() {
-    if (!newPay.client_name) { toast.error('Selecione o cliente'); return }
+    if (!newPay.parceiro) { toast.error('Selecione o parceiro'); return }
     if (!newPay.value || parseFloat(newPay.value) <= 0) { toast.error('Informe o valor'); return }
-    const cli = clients.find(c => c.name === newPay.client_name)
-    const { error } = await supabase.from('client_payments').insert({
-      client_id: cli?.id || null,
-      client_name: newPay.client_name,
+
+    const base = {
       payment_date: newPay.payment_date || td(),
       value: parseFloat(newPay.value),
       method: newPay.method || null,
@@ -63,11 +67,25 @@ export default function SalesPage({ profile, can }: Props) {
       notes: newPay.notes || null,
       created_by: profile?.display_name || '',
       company_id: profile?.company_id || null,
-    })
+    }
+    const tabela = payTipo === 'receber' ? 'client_payments' : 'supplier_payments'
+    const campos = payTipo === 'receber'
+      ? { client_name: newPay.parceiro, client_id: newPay.parceiro_id || null }
+      : { supplier_name: newPay.parceiro, supplier_id: newPay.parceiro_id || null }
+
+    const { error } = await supabase.from(tabela).insert({ ...base, ...campos })
     if (error) { toast.error('Erro: ' + error.message); return }
-    toast.success('Pagamento registrado ✅')
+    toast.success(payTipo === 'receber' ? 'Recebimento registrado ✅' : 'Pagamento registrado ✅')
     setPayModal(false); setNewPay({}); loadExtrato()
   }
+
+  // Lista de parceiros para o modal (clientes + fornecedores)
+  const [parceiros, setParceiros] = useState<any[]>([])
+  useEffect(() => {
+    supabase.from('cadastros').select('id,nome_razao,is_cliente,is_fornecedor')
+      .eq('status', true).or('is_cliente.eq.true,is_fornecedor.eq.true').order('nome_razao')
+      .then(({data}) => setParceiros(data || []))
+  }, [])
   useEffect(() => { if (tab !== 'relatorio') load() }, [tab])
 
   async function load() {
@@ -297,79 +315,196 @@ export default function SalesPage({ profile, can }: Props) {
       {tab === 'extrato' && (
         <>
           <div className="flex justify-between items-center mb-3">
-            <span style={{fontSize:'9px',color:'var(--t3)'}}>Vendas − pagamentos = saldo do cliente</span>
-            <Btn onClick={()=>{setNewPay({payment_date:td()});setPayModal(true)}} variant="primary" size="sm">+ Pagamento</Btn>
+            <span style={{fontSize:'9px',color:'var(--t3)'}}>Vendas − recebido − compras + pago = saldo</span>
+            <Btn onClick={()=>{setNewPay({payment_date:td()});setPayTipo('receber');setPayModal(true)}} variant="primary" size="sm">+ Lançar</Btn>
           </div>
 
-          {saldos.length === 0 ? <Empty icon="🤝" text="Nenhum saldo. Execute o SQL das views." /> : (
+          {saldos.length === 0 ? <Empty icon="🤝" text="Sem movimentação. Execute o SQL da conta corrente." /> : (
             <div className="flex flex-col gap-2 mb-4">
               {saldos.map((s:any,i:number)=>{
-                const sa = +s.saldo_atual || 0
+                const sf = +s.saldo_final || 0
+                const bi = s.tipo_relacao === 'CLIENTE E FORNECEDOR'
                 return (
                   <div key={i} className="rounded-xl p-3"
-                    style={{background:'var(--s1)',border:`1px solid ${sa>0?'rgba(249,115,22,.3)':sa<0?'rgba(59,130,246,.3)':'rgba(34,197,94,.3)'}`}}>
+                    style={{background:'var(--s1)',border:`1px solid ${sf>0?'rgba(34,197,94,.3)':sf<0?'rgba(239,68,68,.3)':'var(--bd)'}`}}>
+
                     <div className="flex justify-between items-start mb-2">
-                      <span style={{fontSize:'13px',fontWeight:800}}>{s.cliente}</span>
-                      <Badge color={sa>0?'amber':sa<0?'blue':'green'}>{s.situacao}</Badge>
+                      <div>
+                        <span style={{fontSize:'13px',fontWeight:800}}>{s.parceiro}</span>
+                        {bi && <div style={{fontSize:'8px',color:'var(--pp)',fontWeight:700,marginTop:'1px'}}>🔄 CLIENTE E FORNECEDOR</div>}
+                      </div>
+                      <Badge color={sf>0?'green':sf<0?'red':'gray'}>{s.situacao}</Badge>
                     </div>
-                    {+s.saldo_anterior !== 0 && (
-                      <div className="flex justify-between py-1" style={{fontSize:'12px'}}>
-                        <span style={{color:'var(--t3)'}}>📋 Saldo anterior</span>
-                        <span style={{fontWeight:700}}>{money(+s.saldo_anterior)}</span>
+
+                    {/* Coluna a receber */}
+                    {+s.total_vendas > 0 && (
+                      <>
+                        <div style={{fontSize:'8px',fontWeight:700,color:'var(--gn)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:'2px'}}>
+                          ▲ Eles nos devem
+                        </div>
+                        {+s.saldo_anterior !== 0 && (
+                          <div className="flex justify-between py-0.5" style={{fontSize:'11px'}}>
+                            <span style={{color:'var(--t3)'}}>Saldo anterior</span>
+                            <span style={{fontWeight:600}}>{money(+s.saldo_anterior)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between py-0.5" style={{fontSize:'11px'}}>
+                          <span style={{color:'var(--t3)'}}>🛒 Vendas ({s.qtd_vendas}) · {(+s.ton_vendidas).toFixed(1)}t</span>
+                          <span style={{fontWeight:600,color:'var(--cy)'}}>{money(+s.total_vendas)}</span>
+                        </div>
+                        <div className="flex justify-between py-0.5" style={{fontSize:'11px'}}>
+                          <span style={{color:'var(--t3)'}}>💵 Recebido</span>
+                          <span style={{fontWeight:600,color:'var(--gn)'}}>− {money(+s.total_recebido)}</span>
+                        </div>
+                        <div className="flex justify-between py-0.5" style={{fontSize:'11px',fontWeight:700}}>
+                          <span style={{color:'var(--t2)'}}>= A receber</span>
+                          <span style={{color:'var(--gn)'}}>{money(+s.a_receber)}</span>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Coluna a pagar */}
+                    {+s.total_compras > 0 && (
+                      <>
+                        <div style={{fontSize:'8px',fontWeight:700,color:'var(--rd)',textTransform:'uppercase',letterSpacing:'.5px',marginTop:'6px',marginBottom:'2px'}}>
+                          ▼ Nós devemos
+                        </div>
+                        <div className="flex justify-between py-0.5" style={{fontSize:'11px'}}>
+                          <span style={{color:'var(--t3)'}}>🪵 Compras ({s.qtd_compras}) · {(+s.ton_compradas).toFixed(1)}t</span>
+                          <span style={{fontWeight:600,color:'var(--rd)'}}>{money(+s.total_compras)}</span>
+                        </div>
+                        <div className="flex justify-between py-0.5" style={{fontSize:'11px'}}>
+                          <span style={{color:'var(--t3)'}}>💸 Pago</span>
+                          <span style={{fontWeight:600,color:'var(--gn)'}}>− {money(+s.total_pago)}</span>
+                        </div>
+                        <div className="flex justify-between py-0.5" style={{fontSize:'11px',fontWeight:700}}>
+                          <span style={{color:'var(--t2)'}}>= A pagar</span>
+                          <span style={{color:'var(--rd)'}}>{money(+s.a_pagar)}</span>
+                        </div>
+                      </>
+                    )}
+
+                    <div style={{height:'1px',background:'var(--bd)',margin:'6px 0'}} />
+                    <div className="flex justify-between items-center">
+                      <span style={{fontSize:'13px',fontWeight:800}}>SALDO</span>
+                      <span style={{fontSize:'15px',fontWeight:800,color:sf>0?'var(--gn)':sf<0?'var(--rd)':'var(--t3)'}}>
+                        {money(sf)}
+                      </span>
+                    </div>
+                    <div style={{fontSize:'8px',color:'var(--t3)',textAlign:'right',marginTop:'1px'}}>
+                      {sf>0?'eles nos devem':sf<0?'nós devemos':'quitado'}
+                    </div>
+
+                    <div className="flex gap-2 mt-2">
+                      <Btn onClick={()=>setVerExtrato(verExtrato===s.parceiro?null:s.parceiro)} size="sm" variant="secondary">
+                        {verExtrato===s.parceiro?'▲ Fechar':'📄 Extrato'}
+                      </Btn>
+                      <Btn onClick={()=>{
+                        setNewPay({payment_date:td(), parceiro:s.parceiro})
+                        setPayTipo(sf>=0?'receber':'pagar')
+                        setPayModal(true)
+                      }} size="sm" variant="secondary">
+                        {sf>=0?'💵 Receber':'💸 Pagar'}
+                      </Btn>
+                    </div>
+
+                    {/* Extrato detalhado */}
+                    {verExtrato===s.parceiro && (
+                      <div className="mt-2 rounded-lg overflow-hidden" style={{border:'1px solid var(--bd)'}}>
+                        <div className="grid px-2 py-1.5" style={{gridTemplateColumns:'50px 1fr 62px 62px',background:'var(--s2)',fontSize:'8px',fontWeight:700,color:'var(--t3)',textTransform:'uppercase'}}>
+                          <span>Data</span><span>Lançamento</span><span style={{textAlign:'right'}}>Crédito</span><span style={{textAlign:'right'}}>Débito</span>
+                        </div>
+                        {(() => {
+                          const L = lancs.filter((l:any)=>l.parceiro===s.parceiro)
+                          let acum = +s.saldo_anterior || 0
+                          return L.map((l:any,j:number)=>{
+                            acum += (+l.credito||0) - (+l.debito||0)
+                            const cor = l.tipo==='VENDA'?'var(--cy)':l.tipo==='COMPRA MADEIRA'?'var(--rd)':'var(--gn)'
+                            return (
+                              <div key={j} className="grid px-2 py-1.5" style={{gridTemplateColumns:'50px 1fr 62px 62px',background:'var(--s1)',borderTop:'1px solid var(--bd)',fontSize:'9px'}}>
+                                <span style={{color:'var(--t3)'}}>{fmtD(l.data)?.slice(0,5)}</span>
+                                <div style={{overflow:'hidden'}}>
+                                  <div style={{fontWeight:700,color:cor}}>{l.tipo}</div>
+                                  <div style={{color:'var(--t3)',fontSize:'8px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                                    {l.descricao}{l.documento&&l.documento!=='—'?` · ${l.documento}`:''}{+l.toneladas>0?` · ${(+l.toneladas).toFixed(1)}t`:''}
+                                  </div>
+                                </div>
+                                <span style={{textAlign:'right',color:+l.credito!==0?'var(--gn)':'var(--t3)'}}>
+                                  {+l.credito!==0?(+l.credito).toLocaleString('pt-BR',{maximumFractionDigits:0}):'—'}
+                                </span>
+                                <span style={{textAlign:'right',color:+l.debito!==0?'var(--rd)':'var(--t3)'}}>
+                                  {+l.debito!==0?(+l.debito).toLocaleString('pt-BR',{maximumFractionDigits:0}):'—'}
+                                </span>
+                              </div>
+                            )
+                          })
+                        })()}
+                        <div className="px-2 py-1.5 flex justify-between" style={{background:'rgba(249,115,22,.1)',borderTop:'2px solid rgba(249,115,22,.3)',fontSize:'10px',fontWeight:800}}>
+                          <span>SALDO FINAL</span>
+                          <span style={{color:sf>0?'var(--gn)':'var(--rd)'}}>{money(sf)}</span>
+                        </div>
                       </div>
                     )}
-                    <div className="flex justify-between py-1" style={{fontSize:'12px'}}>
-                      <span style={{color:'var(--t3)'}}>🛒 Vendas</span>
-                      <span style={{fontWeight:700,color:'var(--cy)'}}>{money(+s.total_vendas)}</span>
-                    </div>
-                    <div className="flex justify-between py-1" style={{fontSize:'12px'}}>
-                      <span style={{color:'var(--t3)'}}>💵 Pagamentos</span>
-                      <span style={{fontWeight:700,color:'var(--gn)'}}>− {money(+s.total_pago)}</span>
-                    </div>
-                    <div style={{height:'1px',background:'var(--bd)',margin:'5px 0'}} />
-                    <div className="flex justify-between" style={{fontSize:'14px'}}>
-                      <span style={{fontWeight:700}}>SALDO ATUAL</span>
-                      <span style={{fontWeight:800,color:sa>0?'#f97316':sa<0?'var(--bl)':'var(--gn)'}}>{money(sa)}</span>
-                    </div>
                   </div>
                 )
               })}
             </div>
           )}
 
+          {/* Movimento mensal */}
           {extrato.length > 0 && (
             <>
               <div style={{fontSize:'10px',fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:'6px'}}>
                 📆 Movimento mês a mês
               </div>
               <div className="rounded-xl overflow-hidden" style={{border:'1px solid var(--bd)'}}>
-                <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 56px 76px 76px 76px',background:'var(--s2)',fontSize:'9px',fontWeight:700,color:'var(--t3)',textTransform:'uppercase'}}>
-                  <span>Cliente</span><span>Mês</span><span style={{textAlign:'right'}}>Vendas</span><span style={{textAlign:'right'}}>Pagou</span><span style={{textAlign:'right'}}>Saldo</span>
+                <div className="grid px-2 py-2" style={{gridTemplateColumns:'1fr 44px 60px 60px 62px',background:'var(--s2)',fontSize:'8px',fontWeight:700,color:'var(--t3)',textTransform:'uppercase'}}>
+                  <span>Parceiro</span><span>Mês</span><span style={{textAlign:'right'}}>Vendas</span><span style={{textAlign:'right'}}>Compras</span><span style={{textAlign:'right'}}>Saldo</span>
                 </div>
                 {extrato.map((e:any,i:number)=>(
-                  <div key={i} className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 56px 76px 76px 76px',background:'var(--s1)',borderTop:'1px solid var(--bd)',fontSize:'10px'}}>
-                    <span style={{fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.cliente}</span>
-                    <span style={{color:'var(--t2)'}}>{e.mes?.slice(5)}/{e.mes?.slice(2,4)}</span>
-                    <span style={{textAlign:'right',color:'var(--cy)'}}>{(+e.vendas).toLocaleString('pt-BR',{maximumFractionDigits:0})}</span>
-                    <span style={{textAlign:'right',color:'var(--gn)'}}>{(+e.pagamentos).toLocaleString('pt-BR',{maximumFractionDigits:0})}</span>
-                    <span style={{textAlign:'right',color:+e.saldo_mes>0?'#f97316':'var(--t3)',fontWeight:700}}>{(+e.saldo_mes).toLocaleString('pt-BR',{maximumFractionDigits:0})}</span>
+                  <div key={i} className="grid px-2 py-2" style={{gridTemplateColumns:'1fr 44px 60px 60px 62px',background:'var(--s1)',borderTop:'1px solid var(--bd)',fontSize:'9px'}}>
+                    <span style={{fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.parceiro}</span>
+                    <span style={{color:'var(--t3)'}}>{e.mes?.slice(5)}/{e.mes?.slice(2,4)}</span>
+                    <span style={{textAlign:'right',color:'var(--cy)'}}>{+e.vendas>0?(+e.vendas).toLocaleString('pt-BR',{maximumFractionDigits:0}):'—'}</span>
+                    <span style={{textAlign:'right',color:'var(--rd)'}}>{+e.compras>0?(+e.compras).toLocaleString('pt-BR',{maximumFractionDigits:0}):'—'}</span>
+                    <span style={{textAlign:'right',fontWeight:700,color:+e.saldo_mes>0?'var(--gn)':+e.saldo_mes<0?'var(--rd)':'var(--t3)'}}>
+                      {(+e.saldo_mes).toLocaleString('pt-BR',{maximumFractionDigits:0})}
+                    </span>
                   </div>
                 ))}
               </div>
             </>
           )}
 
-          <Modal open={payModal} onClose={()=>setPayModal(false)} title="💵 Registrar Pagamento"
+          {/* Modal de lançamento */}
+          <Modal open={payModal} onClose={()=>setPayModal(false)} title={payTipo==='receber'?'💵 Registrar Recebimento':'💸 Registrar Pagamento'}
             footer={<><Btn onClick={()=>setPayModal(false)}>Cancelar</Btn><Btn onClick={savePayment} variant="primary" size="md">Salvar</Btn></>}>
-            <Select label="Cliente *" value={newPay.client_name||''} onChange={(v:string)=>setNewPay((e:any)=>({...e,client_name:v}))}
-              options={[{value:'',label:'Selecione...'}, ...clients.map(c2=>({value:c2.name,label:c2.name}))]} />
+
+            <div className="flex gap-2 mb-3">
+              {([['receber','💵 Recebi (cliente pagou)'],['pagar','💸 Paguei (para fornecedor)']] as ['receber'|'pagar',string][]).map(([k,l])=>(
+                <div key={k} onClick={()=>setPayTipo(k)}
+                  style={{flex:1,textAlign:'center',padding:'8px',borderRadius:'10px',fontSize:'10px',fontWeight:700,cursor:'pointer',
+                    background:payTipo===k?'rgba(249,115,22,.12)':'var(--s2)',
+                    border:`1px solid ${payTipo===k?'rgba(249,115,22,.4)':'var(--bd)'}`,
+                    color:payTipo===k?'#f97316':'var(--t2)'}}>{l}</div>
+              ))}
+            </div>
+
+            <Select label="Parceiro *" value={newPay.parceiro||''} onChange={(v:string)=>{
+                const pc = parceiros.find((x:any)=>x.nome_razao===v)
+                setNewPay((e:any)=>({...e, parceiro:v, parceiro_id: pc?.id||null}))
+              }}
+              options={[{value:'',label:'Selecione...'}, ...parceiros
+                .filter((p:any)=> payTipo==='receber' ? p.is_cliente : p.is_fornecedor)
+                .map((p:any)=>({value:p.nome_razao,label:p.nome_razao}))]} />
+
             <div className="grid grid-cols-2 gap-x-3">
               <Input label="Data *" value={newPay.payment_date} onChange={(v:string)=>setNewPay((e:any)=>({...e,payment_date:v}))} type="date" />
               <Input label="Valor R$ *" value={newPay.value} onChange={(v:string)=>setNewPay((e:any)=>({...e,value:v}))} type="number" placeholder="0.00" />
             </div>
             <Select label="Forma" value={newPay.method||''} onChange={(v:string)=>setNewPay((e:any)=>({...e,method:v}))}
-              options={[{value:'',label:'—'},{value:'PIX',label:'PIX'},{value:'Transferência',label:'Transferência'},{value:'Boleto',label:'Boleto'},{value:'Dinheiro',label:'Dinheiro'},{value:'Cheque',label:'Cheque'}]} />
-            <Input label="NF de referência" value={newPay.invoice_ref} onChange={(v:string)=>setNewPay((e:any)=>({...e,invoice_ref:v}))} placeholder="Opcional" />
+              options={[{value:'',label:'—'},{value:'PIX',label:'PIX'},{value:'Transferência',label:'Transferência'},{value:'Boleto',label:'Boleto'},{value:'Dinheiro',label:'Dinheiro'},{value:'Cheque',label:'Cheque'},{value:'Compensação',label:'Compensação (troca)'}]} />
+            <Input label="NF / documento de referência" value={newPay.invoice_ref} onChange={(v:string)=>setNewPay((e:any)=>({...e,invoice_ref:v}))} placeholder="Opcional" />
             <Textarea label="Observações" value={newPay.notes} onChange={(v:string)=>setNewPay((e:any)=>({...e,notes:v}))} rows={2} placeholder="Opcional..." />
           </Modal>
         </>
