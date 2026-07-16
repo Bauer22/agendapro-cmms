@@ -30,6 +30,10 @@ export default function WoodPage({ profile, can }: Props) {
   const [tab, setTab] = useState<'lista'|'relatorio'>('lista')
   const [rFrom, setRFrom] = useState(''); const [rTo, setRTo] = useState('')
   const [rForn, setRForn] = useState('')
+  const [rMot, setRMot] = useState('')
+  const [rClasse, setRClasse] = useState('')
+  const [rVeic, setRVeic] = useState('')
+  const [rView, setRView] = useState<'forn'|'mot'|'veic'|'classe'>('forn')
   const { confirm, dialog } = useConfirm()
 
   useEffect(() => { load(); loadSuppliers() }, [])
@@ -138,8 +142,12 @@ export default function WoodPage({ profile, can }: Props) {
 
   // ── Relatório ──
   const rep = entries.filter(e =>
-    (!rFrom || (e.data_entrada||'') >= rFrom) && (!rTo || (e.data_entrada||'') <= rTo) &&
-    (!rForn || e.supplier_id === rForn))
+    (!rFrom || (e.data_entrada||'') >= rFrom) &&
+    (!rTo   || (e.data_entrada||'') <= rTo) &&
+    (!rForn || e.supplier_id === rForn) &&
+    (!rMot  || e.driver_id === rMot || (e.driver||'') === rMot) &&
+    (!rClasse || e.wood_class === rClasse) &&
+    (!rVeic || e.veiculo_id === rVeic || (e.plate||'') === rVeic))
   const repTons = rep.reduce((s,e)=>s+(parseFloat(e.weight_tons)||0),0)
   const repM3   = rep.reduce((s,e)=>s+(parseFloat(e.volume_m3)||0),0)
   const repVal  = rep.reduce((s,e)=>s+(parseFloat(e.total_value)||0),0)
@@ -154,36 +162,128 @@ export default function WoodPage({ profile, can }: Props) {
   })
   const fornRows = Object.values(byForn).sort((a,b)=>b.tons-a.tons)
 
+  // Agrupa por qualquer chave (motorista, veículo, classe)
+  function agrupar(keyFn: (e:any)=>string) {
+    const m: Record<string,{nome:string;tons:number;m3:number;cargas:number;val:number}> = {}
+    rep.forEach(e => {
+      const k = keyFn(e) || '—'
+      if (!m[k]) m[k] = {nome:k, tons:0, m3:0, cargas:0, val:0}
+      m[k].tons   += parseFloat(e.weight_tons)||0
+      m[k].m3     += parseFloat(e.volume_m3)||0
+      m[k].val    += parseFloat(e.total_value)||0
+      m[k].cargas += 1
+    })
+    return Object.values(m).sort((a,b)=>b.tons-a.tons)
+  }
+  const motRows    = agrupar(e => e.driver)
+  const veicRows   = agrupar(e => e.plate)
+  const classeRows = agrupar(e => e.wood_class)
+
+  // Cruzamento motorista x fornecedor (viagens por rota)
+  const rotaRows = (() => {
+    const m: Record<string,{mot:string;forn:string;cargas:number;tons:number;val:number}> = {}
+    rep.forEach(e => {
+      const mo = e.driver || '—', fo = e.supplier_name || '—'
+      const k = mo + '||' + fo
+      if (!m[k]) m[k] = {mot:mo, forn:fo, cargas:0, tons:0, val:0}
+      m[k].cargas += 1
+      m[k].tons   += parseFloat(e.weight_tons)||0
+      m[k].val    += parseFloat(e.total_value)||0
+    })
+    return Object.values(m).sort((a,b)=>b.tons-a.tons)
+  })()
+
+  const viewRows = rView==='mot' ? motRows : rView==='veic' ? veicRows : rView==='classe' ? classeRows : fornRows
+  const viewLabel = rView==='mot' ? 'Motorista' : rView==='veic' ? 'Placa' : rView==='classe' ? 'Classe' : 'Fornecedor'
+
+  // média por carga
+  const mediaCarga = rep.length > 0 ? repTons / rep.length : 0
+
   async function exportPDF() {
     try {
       const { default: jsPDF } = await import('jspdf')
       const { default: autoTable } = await import('jspdf-autotable')
       const doc = new jsPDF()
-      doc.setFillColor(6,13,26); doc.rect(0,0,210,25,'F')
-      doc.setTextColor(249,115,22); doc.setFontSize(14); doc.setFont('helvetica','bold')
-      doc.text('Industrial8 — Entrada de Madeira', 12, 11)
-      doc.setTextColor(148,163,184); doc.setFontSize(8); doc.setFont('helvetica','normal')
-      let fi = ''
-      if (rFrom||rTo) fi += `Período: ${rFrom?fmtD(rFrom):'início'} a ${rTo?fmtD(rTo):'hoje'} | `
-      if (rForn) fi += `Fornecedor: ${suppliers.find(s=>s.id===rForn)?.name||''}`
-      doc.text(fi || `Gerado em ${new Date().toLocaleDateString('pt-BR')}`, 12, 18)
+      const money = (v:number) => (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})
 
+      doc.setFillColor(6,13,26); doc.rect(0,0,210,26,'F')
+      doc.setTextColor(249,115,22); doc.setFontSize(14); doc.setFont('helvetica','bold')
+      doc.text('Industrial8 — Relatório de Entrada de Madeira', 12, 11)
+      doc.setTextColor(148,163,184); doc.setFontSize(7); doc.setFont('helvetica','normal')
+
+      const fs: string[] = []
+      if (rFrom || rTo) fs.push(`Período: ${rFrom?fmtD(rFrom):'início'} a ${rTo?fmtD(rTo):'hoje'}`)
+      if (rForn)   fs.push(`Fornecedor: ${suppliers.find(s=>s.id===rForn)?.name||''}`)
+      if (rMot)    fs.push(`Motorista: ${rMot}`)
+      if (rClasse) fs.push(`Classe: ${rClasse}`)
+      if (rVeic)   fs.push(`Placa: ${rVeic}`)
+      doc.text(fs.length ? fs.join('  |  ') : 'Todos os registros', 12, 17)
+      doc.text(`${rep.length} viagens · ${repTons.toFixed(2)} t · ${repM3.toFixed(2)} m³ · R$ ${money(repVal)} · média ${mediaCarga.toFixed(2)} t/viagem`, 12, 22)
+
+      // 1) Por fornecedor
       autoTable(doc, {
-        startY: 30, head: [['Fornecedor','Cargas','Toneladas','Metros cúbicos','Valor R$']],
-        body: fornRows.map(f=>[f.nome, String(f.cargas), f.tons.toFixed(3)+' t', f.m3.toFixed(2)+' m³', f.val.toLocaleString('pt-BR',{minimumFractionDigits:2})]),
-        foot: [['TOTAL', String(rep.length), repTons.toFixed(3)+' t', repM3.toFixed(2)+' m³', repVal.toLocaleString('pt-BR',{minimumFractionDigits:2})]],
+        startY: 31,
+        head: [['Fornecedor','Viagens','Toneladas','m³','Média t/viagem','Valor R$']],
+        body: fornRows.map(f=>[f.nome, String(f.cargas), f.tons.toFixed(3), f.m3.toFixed(2),
+          (f.tons/f.cargas).toFixed(2), money(f.val)]),
+        foot: [['TOTAL', String(rep.length), repTons.toFixed(3), repM3.toFixed(2),
+          mediaCarga.toFixed(2), money(repVal)]],
         theme:'grid', headStyles:{fillColor:[249,115,22]}, footStyles:{fillColor:[30,58,110]}, styles:{fontSize:8},
       })
-      const y = (doc as any).lastAutoTable.finalY + 8
+
+      // 2) Por motorista
+      let y = (doc as any).lastAutoTable.finalY + 7
       autoTable(doc, {
-        startY: y, head: [['Data','Descarga','Fornecedor','Classe','Motorista','Placa','Ton','R$/t','Valor']],
-        body: rep.map(e=>[fmtD(e.data_entrada), e.unload_time?.slice(0,5)||e.arrival_time?.slice(0,5)||'—',
+        startY: y,
+        head: [['Motorista','Viagens','Toneladas','m³','Média t/viagem']],
+        body: motRows.map(f=>[f.nome, String(f.cargas), f.tons.toFixed(3), f.m3.toFixed(2), (f.tons/f.cargas).toFixed(2)]),
+        foot: [['TOTAL', String(rep.length), repTons.toFixed(3), repM3.toFixed(2), mediaCarga.toFixed(2)]],
+        theme:'grid', headStyles:{fillColor:[34,197,94]}, footStyles:{fillColor:[30,58,110]}, styles:{fontSize:8},
+      })
+
+      // 3) Viagens por rota
+      y = (doc as any).lastAutoTable.finalY + 7
+      autoTable(doc, {
+        startY: y,
+        head: [['Motorista','Fornecedor','Viagens','Toneladas','Média t/viagem']],
+        body: rotaRows.map(r=>[r.mot, r.forn, String(r.cargas), r.tons.toFixed(3), (r.tons/r.cargas).toFixed(2)]),
+        theme:'striped', headStyles:{fillColor:[59,130,246]}, styles:{fontSize:7},
+      })
+
+      // 4) Por placa e classe
+      y = (doc as any).lastAutoTable.finalY + 7
+      autoTable(doc, {
+        startY: y,
+        head: [['Placa','Viagens','Toneladas','Média t/viagem']],
+        body: veicRows.map(f=>[f.nome, String(f.cargas), f.tons.toFixed(3), (f.tons/f.cargas).toFixed(2)]),
+        theme:'grid', headStyles:{fillColor:[168,85,247]}, styles:{fontSize:7},
+      })
+
+      y = (doc as any).lastAutoTable.finalY + 7
+      autoTable(doc, {
+        startY: y,
+        head: [['Classe da madeira','Viagens','Toneladas','m³','Valor R$']],
+        body: classeRows.map(f=>[f.nome, String(f.cargas), f.tons.toFixed(3), f.m3.toFixed(2), money(f.val)]),
+        theme:'grid', headStyles:{fillColor:[245,158,11]}, styles:{fontSize:7},
+      })
+
+      // 5) Detalhado
+      doc.addPage()
+      autoTable(doc, {
+        startY: 14,
+        head: [['Data','Descarga','Fornecedor','Classe','Motorista','Placa','Ton','R$/t','Valor']],
+        body: rep.map(e=>[
+          fmtD(e.data_entrada),
+          e.unload_time?.slice(0,5) || e.arrival_time?.slice(0,5) || '—',
           e.supplier_name||'—', e.wood_class||'—', e.driver||'—', e.plate||'—',
           (parseFloat(e.weight_tons)||0).toFixed(2),
-          e.unit_value?parseFloat(e.unit_value).toFixed(2):'—',
-          e.total_value?parseFloat(e.total_value).toLocaleString('pt-BR',{minimumFractionDigits:2}):'—']),
-        theme:'striped', headStyles:{fillColor:[30,58,110]}, styles:{fontSize:7},
+          e.unit_value ? parseFloat(e.unit_value).toFixed(2) : '—',
+          e.total_value ? money(parseFloat(e.total_value)) : '—',
+        ]),
+        foot: [['','','','','','TOTAL', repTons.toFixed(2), '', money(repVal)]],
+        theme:'striped', headStyles:{fillColor:[30,58,110]}, footStyles:{fillColor:[249,115,22]}, styles:{fontSize:6.5},
       })
+
       doc.save(`madeira_${td()}.pdf`)
       toast.success('PDF gerado ✅')
     } catch(err:any) { toast.error('Erro ao gerar PDF: '+err.message) }
@@ -217,6 +317,7 @@ export default function WoodPage({ profile, can }: Props) {
 
       {tab==='relatorio' && (
         <>
+          {/* ═══ FILTROS ═══ */}
           <div className="rounded-xl p-3 mb-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
             <div style={{fontSize:'9px',fontWeight:700,color:'rgba(249,115,22,.65)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'8px'}}>FILTROS</div>
             <div className="grid grid-cols-2 gap-x-3">
@@ -225,37 +326,105 @@ export default function WoodPage({ profile, can }: Props) {
             </div>
             <Select label="Fornecedor" value={rForn} onChange={setRForn}
               options={[{value:'',label:'Todos os fornecedores'}, ...suppliers.map(s=>({value:s.id,label:s.name}))]} />
-            {(rFrom||rTo||rForn) && <Btn onClick={()=>{setRFrom('');setRTo('');setRForn('')}} size="sm" variant="secondary">✕ Limpar</Btn>}
+            <Select label="Motorista" value={rMot} onChange={setRMot}
+              options={[{value:'',label:'Todos os motoristas'},
+                ...Array.from(new Set(entries.map(e=>e.driver).filter(Boolean))).sort().map(d=>({value:d,label:d}))]} />
+            <div className="grid grid-cols-2 gap-x-3">
+              <Select label="Classe" value={rClasse} onChange={setRClasse}
+                options={[{value:'',label:'Todas'}, ...WOOD_CLASSES.map(x=>({value:x,label:x}))]} />
+              <Select label="Placa" value={rVeic} onChange={setRVeic}
+                options={[{value:'',label:'Todas'},
+                  ...Array.from(new Set(entries.map(e=>e.plate).filter(Boolean))).sort().map(x=>({value:x,label:x}))]} />
+            </div>
+            {(rFrom||rTo||rForn||rMot||rClasse||rVeic) && (
+              <Btn onClick={()=>{setRFrom('');setRTo('');setRForn('');setRMot('');setRClasse('');setRVeic('')}} size="sm" variant="secondary">✕ Limpar filtros</Btn>
+            )}
           </div>
 
-          <div className="grid grid-cols-4 gap-2 mb-3">
+          {/* ═══ KPIs ═══ */}
+          <div className="grid grid-cols-4 gap-2 mb-2">
+            <KPI num={rep.length} label="Viagens" color="blue" />
             <KPI num={`${repTons.toFixed(1)}t`} label="Toneladas" color="green" />
-            <KPI num={`${repM3.toFixed(1)}m³`} label="m³" color="orange" />
-            <KPI num={rep.length} label="Cargas" color="blue" />
+            <KPI num={`${mediaCarga.toFixed(2)}t`} label="Média/carga" color="amber" />
             <KPI num={`R$${(repVal/1000).toFixed(0)}k`} label="Valor" color="purple" />
           </div>
 
-          {fornRows.length===0 ? <Empty icon="📊" text="Nenhum dado no período." /> : (
-            <div className="rounded-xl overflow-hidden mb-3" style={{border:'1px solid var(--bd)'}}>
-              <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 36px 56px 48px 80px',background:'var(--s2)',fontSize:'9px',fontWeight:700,color:'var(--t3)',textTransform:'uppercase'}}>
-                <span>Fornecedor</span><span style={{textAlign:'right'}}>Qtd</span><span style={{textAlign:'right'}}>Ton</span><span style={{textAlign:'right'}}>m³</span><span style={{textAlign:'right'}}>Valor</span>
+          <div className="rounded-xl px-3 py-2 mb-3 flex items-center justify-center gap-3"
+            style={{background:'var(--s1)',border:'1px solid var(--bd)',fontSize:'10px'}}>
+            <span style={{color:'var(--t3)'}}>📦 {repM3.toFixed(1)} m³</span>
+            <span style={{color:'var(--t3)'}}>·</span>
+            <span style={{color:'var(--t3)'}}>🚗 {new Set(rep.map(e=>e.driver).filter(Boolean)).size} motorista(s)</span>
+            <span style={{color:'var(--t3)'}}>·</span>
+            <span style={{color:'var(--t3)'}}>🏭 {new Set(rep.map(e=>e.supplier_name).filter(Boolean)).size} fornecedor(es)</span>
+          </div>
+
+          {rep.length===0 ? <Empty icon="📊" text="Nenhum dado no período." /> : (
+            <>
+              {/* ═══ SELETOR DE AGRUPAMENTO ═══ */}
+              <div className="flex gap-1.5 mb-2 overflow-x-auto pb-1">
+                {([['forn','🏭 Fornecedor'],['mot','🚗 Motorista'],['veic','🚛 Placa'],['classe','🪵 Classe']] as ['forn'|'mot'|'veic'|'classe',string][]).map(([k,l])=>(
+                  <div key={k} onClick={()=>setRView(k)}
+                    style={{flexShrink:0,padding:'6px 11px',borderRadius:'16px',fontSize:'10px',fontWeight:700,cursor:'pointer',
+                      background:rView===k?'rgba(249,115,22,.14)':'var(--s2)',
+                      border:`1px solid ${rView===k?'rgba(249,115,22,.4)':'var(--bd)'}`,
+                      color:rView===k?'#f97316':'var(--t3)',whiteSpace:'nowrap'}}>{l}</div>
+                ))}
               </div>
-              {fornRows.map((f,i)=>(
-                <div key={i} className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 36px 56px 48px 80px',background:'var(--s1)',borderTop:'1px solid var(--bd)',fontSize:'11px'}}>
-                  <span style={{fontWeight:700}}>{f.nome}</span>
-                  <span style={{textAlign:'right',color:'var(--t2)'}}>{f.cargas}</span>
-                  <span style={{textAlign:'right',color:'var(--cy)'}}>{f.tons.toFixed(1)}</span>
-                  <span style={{textAlign:'right',color:'var(--am)'}}>{f.m3.toFixed(1)}</span>
-                  <span style={{textAlign:'right',color:'#f97316',fontWeight:700}}>{f.val>0?f.val.toLocaleString('pt-BR',{maximumFractionDigits:0}):'—'}</span>
+
+              {/* ═══ TABELA AGRUPADA ═══ */}
+              <div className="rounded-xl overflow-hidden mb-3" style={{border:'1px solid var(--bd)'}}>
+                <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 44px 56px 48px 76px',background:'var(--s2)',fontSize:'9px',fontWeight:700,color:'var(--t3)',textTransform:'uppercase'}}>
+                  <span>{viewLabel}</span><span style={{textAlign:'right'}}>Viag.</span><span style={{textAlign:'right'}}>Ton</span><span style={{textAlign:'right'}}>m³</span><span style={{textAlign:'right'}}>Valor</span>
                 </div>
-              ))}
-              <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 36px 56px 48px 80px',background:'rgba(249,115,22,.1)',borderTop:'2px solid rgba(249,115,22,.3)',fontSize:'11px',fontWeight:700}}>
-                <span>TOTAL</span><span style={{textAlign:'right'}}>{rep.length}</span>
-                <span style={{textAlign:'right',color:'var(--cy)'}}>{repTons.toFixed(1)}</span>
-                <span style={{textAlign:'right',color:'var(--am)'}}>{repM3.toFixed(1)}</span>
-                <span style={{textAlign:'right',color:'#f97316'}}>{repVal.toLocaleString('pt-BR',{maximumFractionDigits:0})}</span>
+                {viewRows.map((f,i)=>{
+                  const pct = repTons>0 ? f.tons/repTons*100 : 0
+                  return (
+                    <div key={i} style={{background:'var(--s1)',borderTop:'1px solid var(--bd)'}}>
+                      <div className="grid px-3 pt-2" style={{gridTemplateColumns:'1fr 44px 56px 48px 76px',fontSize:'11px'}}>
+                        <span style={{fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.nome}</span>
+                        <span style={{textAlign:'right',color:'var(--t2)'}}>{f.cargas}</span>
+                        <span style={{textAlign:'right',color:'var(--cy)'}}>{f.tons.toFixed(1)}</span>
+                        <span style={{textAlign:'right',color:'var(--am)'}}>{f.m3>0?f.m3.toFixed(1):'—'}</span>
+                        <span style={{textAlign:'right',color:'#f97316',fontWeight:700}}>{f.val>0?f.val.toLocaleString('pt-BR',{maximumFractionDigits:0}):'—'}</span>
+                      </div>
+                      <div className="px-3 pb-2 pt-1">
+                        <div style={{height:'3px',background:'rgba(255,255,255,.05)',borderRadius:'2px',overflow:'hidden'}}>
+                          <div style={{height:'100%',width:`${Math.min(pct,100)}%`,background:'linear-gradient(90deg,#f97316,#fb923c)',borderRadius:'2px'}} />
+                        </div>
+                        <div style={{fontSize:'8px',color:'var(--t3)',marginTop:'2px'}}>
+                          {pct.toFixed(1)}% · média {(f.tons/f.cargas).toFixed(2)} t/viagem
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+                <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 44px 56px 48px 76px',background:'rgba(249,115,22,.1)',borderTop:'2px solid rgba(249,115,22,.3)',fontSize:'11px',fontWeight:800}}>
+                  <span>TOTAL</span>
+                  <span style={{textAlign:'right'}}>{rep.length}</span>
+                  <span style={{textAlign:'right',color:'var(--cy)'}}>{repTons.toFixed(1)}</span>
+                  <span style={{textAlign:'right',color:'var(--am)'}}>{repM3.toFixed(1)}</span>
+                  <span style={{textAlign:'right',color:'#f97316'}}>{repVal.toLocaleString('pt-BR',{maximumFractionDigits:0})}</span>
+                </div>
               </div>
-            </div>
+
+              {/* ═══ VIAGENS POR ROTA (motorista x fornecedor) ═══ */}
+              <div style={{fontSize:'10px',fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:'6px'}}>
+                🛣 Viagens por rota — motorista × fornecedor
+              </div>
+              <div className="rounded-xl overflow-hidden mb-3" style={{border:'1px solid var(--bd)'}}>
+                <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 1fr 40px 56px',background:'var(--s2)',fontSize:'9px',fontWeight:700,color:'var(--t3)',textTransform:'uppercase'}}>
+                  <span>Motorista</span><span>Fornecedor</span><span style={{textAlign:'right'}}>Viag.</span><span style={{textAlign:'right'}}>Ton</span>
+                </div>
+                {rotaRows.map((r,i)=>(
+                  <div key={i} className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 1fr 40px 56px',background:'var(--s1)',borderTop:'1px solid var(--bd)',fontSize:'10px'}}>
+                    <span style={{fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.mot}</span>
+                    <span style={{color:'var(--t2)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.forn}</span>
+                    <span style={{textAlign:'right',color:'var(--t2)'}}>{r.cargas}</span>
+                    <span style={{textAlign:'right',color:'var(--cy)',fontWeight:700}}>{r.tons.toFixed(1)}</span>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </>
       )}
