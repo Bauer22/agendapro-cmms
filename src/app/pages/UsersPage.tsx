@@ -35,6 +35,12 @@ export default function UsersPage({ profile, can }: Props) {
   const [allModules, setAllModules] = useState<any[]>([])
   const [userMods, setUserMods] = useState<Record<string,{view:boolean;edit:boolean;del:boolean}>>({})
   const [presets, setPresets] = useState<any[]>([])
+  const [pwdModal, setPwdModal] = useState(false)
+  const [pwdUser, setPwdUser]   = useState<any>(null)
+  const [pwd1, setPwd1]         = useState('')
+  const [pwd2, setPwd2]         = useState('')
+  const [pwdShow, setPwdShow]   = useState(false)
+  const [pwdSaving, setPwdSaving] = useState(false)
   const { confirm, dialog } = useConfirm()
 
   useEffect(() => { load() }, [])
@@ -161,9 +167,43 @@ export default function UsersPage({ profile, can }: Props) {
     setSaving(false)
   }
 
-  async function resetPassword(u: UserProfile) {
-    toast('Para alterar senha de outro usuário, acesse:\nSupabase → Authentication → Users → selecione o usuário → Reset Password', { duration:8000, icon:'ℹ️' })
+  function openPassword(u: any) {
+    setPwdUser(u); setPwd1(''); setPwd2(''); setPwdShow(false); setPwdModal(true)
   }
+
+  function gerarSenha() {
+    const chars = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    let s = ''
+    for (let i = 0; i < 10; i++) s += chars[Math.floor(Math.random() * chars.length)]
+    setPwd1(s); setPwd2(s); setPwdShow(true)
+  }
+
+  async function savePassword() {
+    if (pwd1.length < 6)  { toast.error('A senha precisa ter ao menos 6 caracteres'); return }
+    if (pwd1 !== pwd2)    { toast.error('As senhas não conferem'); return }
+    setPwdSaving(true)
+    try {
+      const { data: sess } = await supabase.auth.getSession()
+      const token = sess?.session?.access_token
+      if (!token) { toast.error('Sessão expirada — faça login de novo'); setPwdSaving(false); return }
+
+      const res = await fetch('/api/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ user_id: pwdUser.id, new_password: pwd1 }),
+      })
+      const json = await res.json()
+      if (!res.ok) { toast.error('Erro: ' + (json.error || res.statusText)); setPwdSaving(false); return }
+
+      toast.success(json.message || 'Senha alterada ✅')
+      setPwdModal(false); setPwd1(''); setPwd2('')
+    } catch (e: any) {
+      toast.error('Erro: ' + e.message)
+    }
+    setPwdSaving(false)
+  }
+
+  async function resetPassword(u: UserProfile) { openPassword(u) }
 
   async function toggleBlock(u: UserProfile) {
     const action = u.blocked ? 'desbloquear' : 'bloquear'
@@ -177,6 +217,56 @@ export default function UsersPage({ profile, can }: Props) {
   return (
     <div>
       {dialog}
+      {/* ═══ TROCAR SENHA ═══ */}
+      <Modal open={pwdModal} onClose={()=>setPwdModal(false)} title={`🔑 Alterar senha — ${pwdUser?.display_name||pwdUser?.email||''}`}
+        footer={<>
+          <Btn onClick={()=>setPwdModal(false)}>Cancelar</Btn>
+          <Btn onClick={savePassword} variant="primary" size="md" disabled={pwdSaving}>
+            {pwdSaving ? 'Alterando...' : 'Alterar senha'}
+          </Btn>
+        </>}>
+
+        <div className="rounded-lg px-3 py-2 mb-3" style={{background:'rgba(249,115,22,.08)',border:'1px solid rgba(249,115,22,.25)',fontSize:'10px',color:'var(--t2)',lineHeight:1.5}}>
+          ⚠️ A senha é trocada na hora. O usuário será desconectado das sessões abertas e precisará
+          entrar com a senha nova. Anote e repasse para ele.
+        </div>
+
+        <div className="flex justify-between items-center mb-2">
+          <span style={{fontSize:'9px',fontWeight:700,color:'rgba(249,115,22,.65)',textTransform:'uppercase',letterSpacing:'1px'}}>
+            Nova senha
+          </span>
+          <div className="flex gap-1.5">
+            <Btn onClick={gerarSenha} size="sm" variant="secondary">🎲 Gerar</Btn>
+            <Btn onClick={()=>setPwdShow(v=>!v)} size="sm" variant="secondary">{pwdShow?'🙈 Ocultar':'👁 Mostrar'}</Btn>
+          </div>
+        </div>
+
+        <Input label="Nova senha *" value={pwd1} onChange={setPwd1}
+          type={pwdShow ? 'text' : 'password'} placeholder="Mínimo 6 caracteres" />
+        <Input label="Confirmar senha *" value={pwd2} onChange={setPwd2}
+          type={pwdShow ? 'text' : 'password'} placeholder="Repita a senha" />
+
+        {pwd1 && (
+          <div className="flex flex-col gap-1 mt-1">
+            <div style={{fontSize:'10px',color: pwd1.length>=6 ? 'var(--gn)' : 'var(--rd)'}}>
+              {pwd1.length>=6 ? '✅' : '❌'} Mínimo 6 caracteres ({pwd1.length})
+            </div>
+            {pwd2 && (
+              <div style={{fontSize:'10px',color: pwd1===pwd2 ? 'var(--gn)' : 'var(--rd)'}}>
+                {pwd1===pwd2 ? '✅ As senhas conferem' : '❌ As senhas não conferem'}
+              </div>
+            )}
+          </div>
+        )}
+
+        {pwdShow && pwd1 && (
+          <div className="rounded-lg px-3 py-2 mt-2" style={{background:'var(--s2)',border:'1px solid var(--bd)'}}>
+            <div style={{fontSize:'9px',color:'var(--t3)',marginBottom:'3px'}}>Senha para repassar:</div>
+            <div style={{fontSize:'15px',fontWeight:800,color:'var(--cy)',letterSpacing:'1px',fontFamily:'monospace'}}>{pwd1}</div>
+          </div>
+        )}
+      </Modal>
+
       <Modal open={modModal} onClose={()=>setModModal(false)} title={`Permissões — ${modUser?.display_name||''}`}
         footer={<><Btn onClick={()=>setModModal(false)}>Cancelar</Btn><Btn onClick={saveModules} variant="primary" size="md">Salvar</Btn></>}>
 
@@ -287,6 +377,7 @@ export default function UsersPage({ profile, can }: Props) {
               </div>
               <div className="flex gap-1">
                 <button onClick={()=>openModules(u)} title="Gerenciar módulos" style={{background:'none',border:'none',color:'var(--cy)',cursor:'pointer',fontSize:'14px'}}>🔧</button>
+                <button onClick={()=>openPassword(u)} title="Alterar senha" style={{background:'none',border:'none',color:'var(--am)',cursor:'pointer',fontSize:'14px'}}>🔑</button>
                 <button onClick={()=>openEdit(u)} style={{background:'none',border:'none',color:'var(--t2)',cursor:'pointer',fontSize:'14px'}}>✏️</button>
                 {u.id !== profile?.id && (
                   <button onClick={()=>toggleBlock(u)} style={{background:'none',border:'none',color:u.blocked?'var(--gn)':'var(--am)',cursor:'pointer',fontSize:'14px'}}>
