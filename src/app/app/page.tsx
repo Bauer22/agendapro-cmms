@@ -64,9 +64,10 @@ import WoodPage        from '@/app/pages/WoodPage'
 import CadastrosPage   from '@/app/pages/CadastrosPage'
 import FuelPage        from '@/app/pages/FuelPage'
 import ProductionPage  from '@/app/pages/ProductionPage'
+import GerencialPage   from '@/app/pages/GerencialPage'
 import SalesPage       from '@/app/pages/SalesPage'
 
-type Page = 'dashboard'|'os'|'machines'|'pm'|'tasks'|'parts'|'suppliers'|'cadastros'|'fuel'|'production'|'reports'|'users'|'settings'|'finance'|'qr'|'downtime'|'superadmin'|'chat'|'scheduling'|'documents'|'epi'|'oee'|'training'|'audit'|'energy'|'wood'|'sales'
+type Page = 'dashboard'|'os'|'machines'|'pm'|'tasks'|'parts'|'suppliers'|'cadastros'|'fuel'|'production'|'gerencial'|'reports'|'users'|'settings'|'finance'|'qr'|'downtime'|'superadmin'|'chat'|'scheduling'|'documents'|'epi'|'oee'|'training'|'audit'|'energy'|'wood'|'sales'
 
 
 export default function App() {
@@ -209,6 +210,7 @@ export default function App() {
     {id:'wood' as Page,       label:'Madeira',     icon:<span>🪵</span>},
     {id:'production' as Page, label:'Produção',    icon:<span>🏭</span>},
     {id:'fuel' as Page,       label:'Combustível', icon:<span>⛽</span>},
+    {id:'gerencial' as Page,  label:'Gerencial',   icon:<span>📈</span>},
     {id:'sales' as Page,      label:'Vendas',      icon:<span>🛒</span>},
     {id:'users' as Page,      label:'Usuários',    icon:IC.users},
     {id:'superadmin' as Page, label:'Super Admin', icon:IC.sadm},
@@ -247,6 +249,7 @@ export default function App() {
     cadastros:   <CadastrosPage   profile={profile} can={can} />,
     fuel:        <FuelPage        profile={profile} can={can} />,
     production:  <ProductionPage  profile={profile} can={can} />,
+    gerencial:   <GerencialPage   profile={profile} can={can} />,
     sales:       <SalesPage       profile={profile} can={can} />,
     superadmin:  <SuperAdminPage profile={profile} />,
   }
