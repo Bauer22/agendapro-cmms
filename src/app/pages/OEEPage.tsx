@@ -18,7 +18,7 @@ export default function OEEPage({ profile, can }: Props) {
   useEffect(() => { load(); supabase.from('machines').select('id,name,icon').then(({data})=>setMachines(data||[])) }, [])
 
   async function load() {
-    const { data, error } = await supabase.from('oee_records').select('*').order('record_date',{ascending:false}).limit(100)
+    const { data, error } = await supabase.from('oee_records').select('*').order('record_date',{ascending:false}).order('created_at',{ascending:false}).limit(100)
     if (error) toast.error(error.message)
     setRecords(data||[]); setLoading(false)
   }

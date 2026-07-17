@@ -30,7 +30,7 @@ export default function ProductionPage({ profile, can }: Props) {
   async function load() {
     setLoading(true)
     const [p, w] = await Promise.all([
-      supabase.from('production_records').select('*').order('prod_date',{ascending:false}).limit(300),
+      supabase.from('production_records').select('*').order('prod_date',{ascending:false}).order('created_at',{ascending:false}).limit(300),
       supabase.from('wood_entries').select('data_entrada,weight_tons,peso_liquido,total_value,unit_value,volume_m3').limit(1000),
     ])
     if (p.error) toast.error('Erro: '+p.error.message)

@@ -19,7 +19,7 @@ export default function SchedulingPage({ profile, can }: Props) {
   useEffect(() => { load(); loadMeta() }, [])
 
   async function load() {
-    const { data, error } = await supabase.from('scheduling').select('*').order('scheduled_date')
+    const { data, error } = await supabase.from('scheduling').select('*').order('scheduled_date',{ascending:false}).order('scheduled_time',{ascending:false})
     if (error) toast.error('Erro: '+error.message)
     setItems(data||[]); setLoading(false)
   }

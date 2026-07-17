@@ -31,7 +31,7 @@ export default function MaintPage({ profile, can }: Props) {
 
   async function load() {
     const [r, m] = await Promise.all([
-      supabase.from('maintenance').select('*').order('date',{ascending:false}).limit(100),
+      supabase.from('maintenance').select('*').order('date',{ascending:false}).order('created_at',{ascending:false}).limit(100),
       supabase.from('machines').select('id,name,icon,code'),
     ])
     setRecs(r.data||[]); setMach(m.data||[]); setLoad(false)

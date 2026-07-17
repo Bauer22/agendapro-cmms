@@ -17,7 +17,7 @@ export default function EnergyPage({ profile, can }: Props) {
   useEffect(() => { load() }, [])
 
   async function load() {
-    const { data, error } = await supabase.from('energy_records').select('*').order('record_date',{ascending:false}).limit(100)
+    const { data, error } = await supabase.from('energy_records').select('*').order('record_date',{ascending:false}).order('created_at',{ascending:false}).limit(100)
     if (error) toast.error(error.message)
     setRecords(data||[]); setLoading(false)
   }

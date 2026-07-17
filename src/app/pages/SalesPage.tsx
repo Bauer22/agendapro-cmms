@@ -89,7 +89,7 @@ export default function SalesPage({ profile, can }: Props) {
   useEffect(() => { if (tab !== 'relatorio') load() }, [tab])
 
   async function load() {
-    let q = supabase.from('sales_orders').select('*').order('created_at', { ascending: false })
+    let q = supabase.from('sales_orders').select('*').order('sale_date', { ascending: false }).order('created_at', { ascending: false })
     if (tab === 'open') q = q.eq('status', 'active')
     const { data, error } = await q
     if (error) toast.error('Erro: ' + error.message)
@@ -337,15 +337,15 @@ export default function SalesPage({ profile, can }: Props) {
                     </div>
 
                     {/* Coluna a receber */}
-                    {+s.total_vendas > 0 && (
+                    {(+s.total_vendas > 0 || +s.creditos_extras > 0) && (
                       <>
                         <div style={{fontSize:'8px',fontWeight:700,color:'var(--gn)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:'2px'}}>
                           ▲ Eles nos devem
                         </div>
-                        {+s.saldo_anterior !== 0 && (
+                        {+s.creditos_extras > 0 && (
                           <div className="flex justify-between py-0.5" style={{fontSize:'11px'}}>
-                            <span style={{color:'var(--t3)'}}>Saldo anterior</span>
-                            <span style={{fontWeight:600}}>{money(+s.saldo_anterior)}</span>
+                            <span style={{color:'var(--t3)'}}>📋 Saldo ant. + fretes</span>
+                            <span style={{fontWeight:600}}>{money(+s.creditos_extras)}</span>
                           </div>
                         )}
                         <div className="flex justify-between py-0.5" style={{fontSize:'11px'}}>
@@ -364,15 +364,23 @@ export default function SalesPage({ profile, can }: Props) {
                     )}
 
                     {/* Coluna a pagar */}
-                    {+s.total_compras > 0 && (
+                    {(+s.total_compras > 0 || +s.debitos_extras > 0) && (
                       <>
                         <div style={{fontSize:'8px',fontWeight:700,color:'var(--rd)',textTransform:'uppercase',letterSpacing:'.5px',marginTop:'6px',marginBottom:'2px'}}>
                           ▼ Nós devemos
                         </div>
-                        <div className="flex justify-between py-0.5" style={{fontSize:'11px'}}>
-                          <span style={{color:'var(--t3)'}}>🪵 Compras ({s.qtd_compras}) · {(+s.ton_compradas).toFixed(1)}t</span>
-                          <span style={{fontWeight:600,color:'var(--rd)'}}>{money(+s.total_compras)}</span>
-                        </div>
+                        {+s.total_compras > 0 && (
+                          <div className="flex justify-between py-0.5" style={{fontSize:'11px'}}>
+                            <span style={{color:'var(--t3)'}}>🪵 Compras ({s.qtd_compras}) · {(+s.ton_compradas).toFixed(1)}t</span>
+                            <span style={{fontWeight:600,color:'var(--rd)'}}>{money(+s.total_compras)}</span>
+                          </div>
+                        )}
+                        {+s.debitos_extras > 0 && (
+                          <div className="flex justify-between py-0.5" style={{fontSize:'11px'}}>
+                            <span style={{color:'var(--t3)'}}>⚖️ Pesagens / outros</span>
+                            <span style={{fontWeight:600,color:'var(--rd)'}}>{money(+s.debitos_extras)}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between py-0.5" style={{fontSize:'11px'}}>
                           <span style={{color:'var(--t3)'}}>💸 Pago</span>
                           <span style={{fontWeight:600,color:'var(--gn)'}}>− {money(+s.total_pago)}</span>
@@ -416,10 +424,10 @@ export default function SalesPage({ profile, can }: Props) {
                         </div>
                         {(() => {
                           const L = lancs.filter((l:any)=>l.parceiro===s.parceiro)
-                          let acum = +s.saldo_anterior || 0
+                          let acum = 0
                           return L.map((l:any,j:number)=>{
                             acum += (+l.credito||0) - (+l.debito||0)
-                            const cor = l.tipo==='VENDA'?'var(--cy)':l.tipo==='COMPRA MADEIRA'?'var(--rd)':'var(--gn)'
+                            const cor = l.tipo==='VENDA'?'var(--cy)':(l.tipo==='COMPRA MADEIRA'||l.tipo==='COMPRA PINUS')?'var(--rd)':l.tipo==='CRÉDITO'?'var(--am)':l.tipo==='DÉBITO'?'var(--pp)':'var(--gn)'
                             return (
                               <div key={j} className="grid px-2 py-1.5" style={{gridTemplateColumns:'50px 1fr 62px 62px',background:'var(--s1)',borderTop:'1px solid var(--bd)',fontSize:'9px'}}>
                                 <span style={{color:'var(--t3)'}}>{fmtD(l.data)?.slice(0,5)}</span>

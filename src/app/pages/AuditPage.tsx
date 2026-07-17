@@ -22,7 +22,7 @@ export default function AuditPage({ profile, can }: Props) {
   useEffect(() => { load(); supabase.from('machines').select('id,name,icon').then(({data})=>setMachines(data||[])) }, [])
 
   async function load() {
-    const { data, error } = await supabase.from('audits').select('*').order('audit_date',{ascending:false})
+    const { data, error } = await supabase.from('audits').select('*').order('audit_date',{ascending:false}).order('created_at',{ascending:false})
     if (error) toast.error(error.message)
     setAudits(data||[]); setLoading(false)
   }

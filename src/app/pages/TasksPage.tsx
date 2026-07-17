@@ -23,7 +23,7 @@ export default function TasksPage({ profile, can }: Props) {
   useEffect(() => { load(); loadUsers() }, [date])
 
   async function load() {
-    const { data } = await supabase.from('tasks').select('*').eq('date', date).order('created_at')
+    const { data } = await supabase.from('tasks').select('*').eq('date', date).order('created_at',{ascending:false})
     let list = data || []
     if (fPrio) list = list.filter((t:Task) => t.priority === fPrio)
     list.sort((a:Task,b:Task) => { if(a.done!==b.done) return a.done?1:-1; const pw:any={high:0,medium:1,low:2}; return pw[a.priority]-pw[b.priority] })

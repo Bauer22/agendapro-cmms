@@ -230,12 +230,12 @@ export default function ReportsPage({ profile, can }: Props) {
         addTable(doc, 'Relatório OEE', ['Data','Máquina','Turno','Disponib.','Perform.','Qualidade','OEE','Obs'], rows)
 
       } else if (moduleId === 'wood') {
-        const { data } = await supabase.from('wood_entries').select('*').order('entry_date',{ascending:false})
+        const { data } = await supabase.from('wood_entries').select('*').order('data_entrada',{ascending:false})
         const rows = (data||[]).map((r:any) => [r.entry_date, r.species, r.origin||'', r.supplier_name||'', `${r.volume_m3||0} m³`, `${r.log_count||0}`, r.quality||'', `R$ ${(r.total_value||0).toFixed(2)}`, r.truck_plate||'', r.romaneio||''])
         addTable(doc, 'Entrada de Madeira', ['Data','Espécie','Origem','Fornecedor','Volume','Toras','Qualidade','Valor','Placa','Romaneio'], rows)
 
       } else if (moduleId === 'sales') {
-        const { data } = await supabase.from('sales_orders').select('*').order('order_date',{ascending:false})
+        const { data } = await supabase.from('sales_orders').select('*').order('sale_date',{ascending:false})
         const rows = (data||[]).map((r:any) => [r.order_number||'', r.order_date, r.client_name, r.status, `R$ ${(r.total_value||0).toFixed(2)}`, r.delivery_date||'', r.notes||''])
         addTable(doc, 'Pedidos de Venda', ['Nº Pedido','Data','Cliente','Status','Total','Entrega','Obs'], rows)
 

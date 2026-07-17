@@ -26,7 +26,7 @@ export default function TrainingPage({ profile, can }: Props) {
   }) }, [])
 
   async function load() {
-    const { data, error } = await supabase.from('trainings').select('*').order('training_date',{ascending:false})
+    const { data, error } = await supabase.from('trainings').select('*').order('training_date',{ascending:false}).order('created_at',{ascending:false})
     if (error) toast.error(error.message)
     setTrainings(data||[]); setLoading(false)
   }

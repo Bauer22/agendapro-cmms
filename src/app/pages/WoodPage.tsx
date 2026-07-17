@@ -42,7 +42,8 @@ export default function WoodPage({ profile, can }: Props) {
     const { data, error } = await supabase
       .from('wood_entries').select('*')
       .order('data_entrada', { ascending: false })
-      .order('arrival_time', { ascending: false })
+      .order('unload_time', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
       .limit(200)
     if (error) toast.error('Erro ao carregar: ' + error.message)
     setEntries(data || [])

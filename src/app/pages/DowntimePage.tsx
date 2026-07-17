@@ -25,7 +25,7 @@ export default function DowntimePage({ profile, can }: Props) {
 
   async function load() {
     const [r, m] = await Promise.all([
-      supabase.from('downtime_records').select('*').order('start_time',{ascending:false}).limit(100),
+      supabase.from('downtime_records').select('*').order('start_time',{ascending:false}).order('created_at',{ascending:false}).limit(100),
       supabase.from('machines').select('id,name,icon,code'),
     ])
     setRecords(r.data||[])

@@ -46,9 +46,9 @@ export default function FuelPage({ profile, can }: Props) {
   async function loadAll() {
     setLoading(true)
     const [r, e, x] = await Promise.all([
-      supabase.from('fuel_records').select('*').order('record_date',{ascending:false}).limit(2000),
-      supabase.from('fuel_entries').select('*').order('created_at',{ascending:false}).limit(1000),
-      supabase.from('vehicle_expenses').select('*').order('expense_date',{ascending:false}).limit(1000),
+      supabase.from('fuel_records').select('*').order('record_date',{ascending:false}).order('record_time',{ascending:false}).order('created_at',{ascending:false}).limit(2000),
+      supabase.from('fuel_entries').select('*').order('entry_date',{ascending:false}).order('created_at',{ascending:false}).limit(1000),
+      supabase.from('vehicle_expenses').select('*').order('expense_date',{ascending:false}).order('created_at',{ascending:false}).limit(1000),
     ])
     if (r.error) toast.error('Erro: '+r.error.message)
     setRecords(r.data||[]); setEntries(e.data||[]); setExpenses(x.data||[])
