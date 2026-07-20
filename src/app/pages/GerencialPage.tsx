@@ -131,13 +131,15 @@ export default function GerencialPage({ profile, can }: Props) {
     const m: Record<string,any> = {}
     fConta.forEach(x => {
       const k = x.parceiro
-      if (!m[k]) m[k] = {parceiro:k, compras:0, vendas:0, tonC:0, tonV:0}
+      if (!m[k]) m[k] = {parceiro:k, compras:0, vendas:0, tonC:0, tonV:0, credito:0, debito:0}
       m[k].compras += +x.compras_madeira||0
       m[k].vendas  += +x.vendas||0
       m[k].tonC    += +x.ton_compradas||0
       m[k].tonV    += +x.ton_vendidas||0
+      m[k].credito += +x.ajuste_credito||0
+      m[k].debito  += +x.ajuste_debito||0
     })
-    return Object.values(m).map((x:any)=>({...x, saldo: x.vendas - x.compras}))
+    return Object.values(m).map((x:any)=>({...x, saldo: (x.vendas + x.credito) - (x.compras + x.debito)}))
       .sort((a:any,b:any)=>Math.abs(b.saldo)-Math.abs(a.saldo))
   })()
 
@@ -351,6 +353,8 @@ export default function GerencialPage({ profile, can }: Props) {
                     </div>
                     <Row label="🪵 Compras de madeira" value={money(c.compras)} color="var(--rd)" />
                     <Row label="🛒 Vendas" value={money(c.vendas)} color="var(--gn)" />
+                    {c.credito>0 && <Row label="➕ Créditos (fretes/saldo ant.)" value={money(c.credito)} color="var(--gn)" />}
+                    {c.debito>0 && <Row label="➖ Débitos (pesagens/outros)" value={money(c.debito)} color="var(--rd)" />}
                     <div style={{height:'1px',background:'var(--bd)',margin:'5px 0'}} />
                     <div className="flex justify-between" style={{fontSize:'13px'}}>
                       <span style={{fontWeight:700}}>SALDO</span>
