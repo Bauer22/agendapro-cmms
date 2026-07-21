@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Btn, Modal, Input, Select, SH, Empty, KPI, Badge, Textarea, useConfirm } from '@/components/ui'
+import { Btn, Modal, Input, Select, SelectComCadastro, SH, Empty, KPI, Badge, Textarea, useConfirm } from '@/components/ui'
 import { fmtD, td } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import type { UserProfile } from '@/types'
@@ -81,11 +81,12 @@ export default function SalesPage({ profile, can }: Props) {
 
   // Lista de parceiros para o modal (clientes + fornecedores)
   const [parceiros, setParceiros] = useState<any[]>([])
-  useEffect(() => {
+  function loadParceiros() {
     supabase.from('cadastros').select('id,nome_razao,is_cliente,is_fornecedor')
       .eq('status', true).or('is_cliente.eq.true,is_fornecedor.eq.true').order('nome_razao')
       .then(({data}) => setParceiros(data || []))
-  }, [])
+  }
+  useEffect(() => { loadParceiros() }, [])
   useEffect(() => { if (tab !== 'relatorio') load() }, [tab])
 
   async function load() {
@@ -498,13 +499,18 @@ export default function SalesPage({ profile, can }: Props) {
               ))}
             </div>
 
-            <Select label="Parceiro *" value={newPay.parceiro||''} onChange={(v:string)=>{
-                const pc = parceiros.find((x:any)=>x.nome_razao===v)
-                setNewPay((e:any)=>({...e, parceiro:v, parceiro_id: pc?.id||null}))
+            <SelectComCadastro label="Parceiro *"
+              tipo={payTipo==='receber' ? 'cliente' : 'fornecedor'}
+              value={newPay.parceiro_id||''}
+              onChange={(v:string)=>{
+                const pc = parceiros.find((x:any)=>x.id===v)
+                setNewPay((e:any)=>({...e, parceiro: pc?.nome_razao||'', parceiro_id: v||null}))
               }}
-              options={[{value:'',label:'Selecione...'}, ...parceiros
+              options={parceiros
                 .filter((p:any)=> payTipo==='receber' ? p.is_cliente : p.is_fornecedor)
-                .map((p:any)=>({value:p.nome_razao,label:p.nome_razao}))]} />
+                .map((p:any)=>({value:p.id,label:p.nome_razao}))}
+              companyId={profile?.company_id} createdBy={profile?.display_name}
+              onCreatedRefresh={() => loadParceiros()} />
 
             <div className="grid grid-cols-2 gap-x-3">
               <Input label="Data *" value={newPay.payment_date} onChange={(v:string)=>setNewPay((e:any)=>({...e,payment_date:v}))} type="date" />
@@ -675,11 +681,17 @@ export default function SalesPage({ profile, can }: Props) {
           <Input label="Hora Saída *" value={editing.exit_time} onChange={(v:string) => setEditing((e:any) => ({...e, exit_time:v}))} type="time" />
         </div>
 
-        <Select label="Cliente *" value={editing.client_id||''} onChange={(v:string) => setEditing((e:any) => ({...e, client_id:v}))}
-          options={[{value:'',label:'Selecione o cliente...'}, ...clients.map(c => ({value:c.id, label:c.name}))]} />
+        <SelectComCadastro label="Cliente *" tipo="cliente" value={editing.client_id||''}
+          onChange={(v:string) => setEditing((e:any) => ({...e, client_id:v}))}
+          options={clients.map(c => ({value:c.id, label:c.name}))}
+          companyId={profile?.company_id} createdBy={profile?.display_name}
+          onCreatedRefresh={() => loadMeta()} />
 
-        <Select label="Produto *" value={editing.product_id||''} onChange={(v:string) => setEditing((e:any) => ({...e, product_id:v}))}
-          options={[{value:'',label:'Selecione o produto...'}, ...products.map(p => ({value:p.id, label:p.name}))]} />
+        <SelectComCadastro label="Produto *" tipo="produto" value={editing.product_id||''}
+          onChange={(v:string) => setEditing((e:any) => ({...e, product_id:v}))}
+          options={products.map(p => ({value:p.id, label:p.name}))}
+          companyId={profile?.company_id} createdBy={profile?.display_name}
+          onCreatedRefresh={() => loadMeta()} />
 
         <div style={{fontSize:'9px',fontWeight:700,color:'rgba(249,115,22,.65)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'4px',marginTop:'4px'}}>
           ⚠️ Preencha ao menos Toneladas ou Metros
@@ -707,18 +719,20 @@ export default function SalesPage({ profile, can }: Props) {
         </div>
 
         {motoristas.length > 0 ? (
-          <Select label="Motorista *" value={editing.driver_id||''} onChange={(v:string) => {
+          <SelectComCadastro label="Motorista *" tipo="motorista" value={editing.driver_id||''} onChange={(v:string) => {
             const m = motoristas.find(x=>x.id===v)
             setEditing((e:any)=>({...e, driver_id:v, driver: m?.name||''}))
-          }} options={[{value:'',label:'Selecione o motorista...'}, ...motoristas.map(m=>({value:m.id,label:m.name}))]} />
+          }} options={motoristas.map(m=>({value:m.id,label:m.name}))}
+             companyId={profile?.company_id} createdBy={profile?.display_name} onCreatedRefresh={() => loadMeta()} />
         ) : (
           <Input label="Motorista *" value={editing.driver} onChange={(v:string) => setEditing((e:any) => ({...e, driver:v}))} placeholder="Nome completo do motorista" />
         )}
         {veiculos.length > 0 ? (
-          <Select label="Placa / Veículo *" value={editing.veiculo_id||''} onChange={(v:string) => {
+          <SelectComCadastro label="Placa / Veículo *" tipo="veiculo" value={editing.veiculo_id||''} onChange={(v:string) => {
             const ve = veiculos.find(x=>x.id===v)
             setEditing((e:any)=>({...e, veiculo_id:v, plate: ve?.placa||''}))
-          }} options={[{value:'',label:'Selecione o veículo...'}, ...veiculos.map(ve=>({value:ve.id,label:`${ve.placa} (${ve.tipo})`}))]} />
+          }} options={veiculos.map(ve=>({value:ve.id,label:`${ve.placa} (${ve.tipo})`}))}
+             companyId={profile?.company_id} createdBy={profile?.display_name} onCreatedRefresh={() => loadMeta()} />
         ) : (
           <Input label="Placa *" value={editing.plate} onChange={(v:string) => setEditing((e:any) => ({...e, plate:maskPlate(v)}))} placeholder="AAA0A00 ou AAA0000" />
         )}

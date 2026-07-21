@@ -1,5 +1,7 @@
 'use client'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
+import toast from 'react-hot-toast'
 
 // ── Button
 type BtnVariant = 'primary'|'secondary'|'danger'
@@ -159,3 +161,140 @@ export function useConfirm() {
   ) : null
   return { confirm, dialog }
 }
+
+// ── SelectComCadastro
+// Select com opção "+ Cadastrar novo..." embutida. Ao escolher, abre um mini-modal
+// específico do tipo de entidade, insere no Supabase e já seleciona o item criado.
+//
+// tipo: 'cliente' | 'fornecedor' | 'motorista' | 'produto' | 'veiculo' | 'parceiro'
+//   'parceiro' cadastra em `cadastros` com is_cliente E is_fornecedor marcados juntos
+//   (uso: telas onde o mesmo dropdown lista clientes e fornecedores, ex. Pagamentos)
+//
+// onCreated(item) — chamado com {id, name} (ou {id, placa} para veículo) após salvar,
+// para o componente pai atualizar sua lista local e selecionar o novo item.
+
+const NOVO_VALUE = '__novo__'
+
+type TipoCadastroRapido = 'cliente'|'fornecedor'|'motorista'|'produto'|'veiculo'|'parceiro'
+
+const TIPO_LABEL: Record<TipoCadastroRapido,string> = {
+  cliente: 'Cliente', fornecedor: 'Fornecedor', motorista: 'Motorista',
+  produto: 'Produto', veiculo: 'Veículo', parceiro: 'Parceiro',
+}
+
+export function SelectComCadastro({
+  label, value, onChange, options, tipo, companyId, createdBy, className, onCreatedRefresh,
+}: {
+  label?: string
+  value: string
+  onChange: (v: string) => void
+  options: {value:string,label:string}[]
+  tipo: TipoCadastroRapido
+  companyId?: string|null
+  createdBy?: string
+  className?: string
+  onCreatedRefresh?: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState<any>({})
+  const [localOptions, setLocalOptions] = useState(options)
+
+  useEffect(() => { setLocalOptions(options) }, [options.length])
+
+  function handleChange(v: string) {
+    if (v === NOVO_VALUE) { setForm({}); setOpen(true); return }
+    onChange(v)
+  }
+
+  async function handleSave() {
+    const nome = (form.name || form.placa || '').trim()
+    if (!nome) { toast.error(`Informe o nome do ${TIPO_LABEL[tipo].toLowerCase()}`); return }
+    setSaving(true)
+
+    let error: any = null
+    let novoItem: {value:string,label:string}|null = null
+
+    if (tipo === 'veiculo') {
+      const placa = nome.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,7)
+      const { data, error: e } = await supabase.from('veiculos')
+        .insert({ placa, tipo: form.tipoVeic || 'Caminhão', status: true, created_by: createdBy||'', company_id: companyId||null })
+        .select('id,placa').single()
+      error = e
+      if (data) novoItem = { value: data.id, label: data.placa }
+    } else if (tipo === 'produto') {
+      const { data, error: e } = await supabase.from('products')
+        .insert({ name: nome, unit: form.unit || 'ton', active: true, company_id: companyId||null })
+        .select('id,name').single()
+      error = e
+      if (data) novoItem = { value: data.id, label: data.name }
+    } else {
+      // cliente, fornecedor, motorista, parceiro -> tabela `cadastros`
+      const papeis =
+        tipo === 'cliente'    ? { is_cliente: true } :
+        tipo === 'fornecedor' ? { is_fornecedor: true } :
+        tipo === 'motorista'  ? { is_motorista: true } :
+        { is_cliente: true, is_fornecedor: true } // parceiro
+      const { data, error: e } = await supabase.from('cadastros')
+        .insert({
+          nome_razao: nome,
+          documento: form.document || null,
+          telefone: form.phone || null,
+          email: form.email || null,
+          status: true, ...papeis,
+          created_by: createdBy||'', company_id: companyId||null,
+        })
+        .select('id,nome_razao').single()
+      error = e
+      if (data) novoItem = { value: data.id, label: data.nome_razao }
+    }
+
+    setSaving(false)
+    if (error) { toast.error('Erro ao cadastrar: ' + error.message); return }
+    if (novoItem) {
+      setLocalOptions(prev => [...prev, novoItem!])
+      onChange(novoItem.value)
+      toast.success(`${TIPO_LABEL[tipo]} cadastrado ✅`)
+      onCreatedRefresh?.()
+    }
+    setOpen(false); setForm({})
+  }
+
+  const opts = [
+    { value:'', label:'Selecione...' },
+    ...localOptions,
+    { value: NOVO_VALUE, label: `+ Cadastrar novo ${TIPO_LABEL[tipo].toLowerCase()}...` },
+  ]
+
+  return (
+    <>
+      <Select label={label} value={value} onChange={handleChange} options={opts} className={className} />
+
+      <Modal open={open} onClose={()=>setOpen(false)} title={`+ Novo ${TIPO_LABEL[tipo]}`}
+        footer={<><Btn onClick={()=>setOpen(false)}>Cancelar</Btn><Btn onClick={handleSave} variant="primary" size="md" disabled={saving}>{saving?'Salvando...':'Salvar'}</Btn></>}>
+
+        {tipo === 'veiculo' ? (
+          <>
+            <Input label="Placa *" value={form.name} onChange={(v:string)=>setForm((e:any)=>({...e,name:v.toUpperCase()}))} placeholder="ABC1D23" />
+            <Select label="Tipo" value={form.tipoVeic||'Caminhão'} onChange={(v:string)=>setForm((e:any)=>({...e,tipoVeic:v}))}
+              options={['Caminhão','Carreta','Truck','Toco','Outro']} />
+          </>
+        ) : tipo === 'produto' ? (
+          <>
+            <Input label="Nome do Produto *" value={form.name} onChange={(v:string)=>setForm((e:any)=>({...e,name:v}))} placeholder="Ex: Lenha Picada, Cavaco..." />
+            <Select label="Unidade" value={form.unit||'ton'} onChange={(v:string)=>setForm((e:any)=>({...e,unit:v}))}
+              options={[{value:'ton',label:'Toneladas'},{value:'m3',label:'Metros cúbicos'},{value:'un',label:'Unidade'}]} />
+          </>
+        ) : (
+          <>
+            <Input label="Nome *" value={form.name} onChange={(v:string)=>setForm((e:any)=>({...e,name:v}))} placeholder={`Nome do ${TIPO_LABEL[tipo].toLowerCase()}`} />
+            <Input label="CPF / CNPJ" value={form.document} onChange={(v:string)=>setForm((e:any)=>({...e,document:v}))} placeholder="Opcional" />
+            <Input label="Telefone" value={form.phone} onChange={(v:string)=>setForm((e:any)=>({...e,phone:v}))} type="tel" placeholder="Opcional" />
+            {tipo !== 'motorista' && <Input label="E-mail" value={form.email} onChange={(v:string)=>setForm((e:any)=>({...e,email:v}))} type="email" placeholder="Opcional" />}
+          </>
+        )}
+      </Modal>
+    </>
+  )
+}
+
