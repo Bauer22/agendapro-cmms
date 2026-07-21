@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Btn, Modal, Input, Select, Textarea, SH, Empty, Badge, useConfirm } from '@/components/ui'
+import { Btn, Modal, Input, Select, SelectComCadastro, Textarea, SH, Empty, Badge, useConfirm } from '@/components/ui'
 import { fmtD, td } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import type { Part, UserProfile } from '@/types'
@@ -351,8 +351,9 @@ export default function PartsPage({ profile, can }: Props) {
           <Input label="Data" value={move.date||td()} onChange={(v:string)=>setMove((e:any)=>({...e,date:v}))} type="date" />
         </div>
         {move.type==='in' && (
-          <Select label="Fornecedor (opcional)" value={move.supplier_id} onChange={(v:string)=>setMove((e:any)=>({...e,supplier_id:v}))}
-            options={[{value:'',label:'Nenhum'},...suppliers.map(s=>({value:s.id,label:s.nome_razao}))]} />
+          <SelectComCadastro label="Fornecedor (opcional)" tipo="fornecedor" value={move.supplier_id||''} onChange={(v:string)=>setMove((e:any)=>({...e,supplier_id:v}))}
+            options={suppliers.map(s=>({value:s.id,label:s.nome_razao}))}
+            companyId={profile?.company_id} createdBy={profile?.display_name} onCreatedRefresh={() => load()} />
         )}
         <Select label="Vincular a OS" value={move.os_id} onChange={(v:string)=>setMove((e:any)=>({...e,os_id:v}))}
           options={[{value:'',label:'Nenhuma'},...osList.map(o=>({value:o.id,label:`${o.number} — ${o.title?.slice(0,30)}`}))]} />
@@ -390,8 +391,9 @@ export default function PartsPage({ profile, can }: Props) {
           <Input label="Solicitação" value={editPO.date_requested} onChange={(v:string)=>setEditPO((e:any)=>({...e,date_requested:v}))} type="date" />
           <Input label="Previsão" value={editPO.date_expected} onChange={(v:string)=>setEditPO((e:any)=>({...e,date_expected:v}))} type="date" />
         </div>
-        <Select label="Fornecedor" value={editPO.supplier_id} onChange={(v:string)=>setEditPO((e:any)=>({...e,supplier_id:v}))}
-          options={[{value:'',label:'Nenhum'},...suppliers.map(s=>({value:s.id,label:s.nome_razao}))]} />
+        <SelectComCadastro label="Fornecedor" tipo="fornecedor" value={editPO.supplier_id||''} onChange={(v:string)=>setEditPO((e:any)=>({...e,supplier_id:v}))}
+          options={suppliers.map(s=>({value:s.id,label:s.nome_razao}))}
+          companyId={profile?.company_id} createdBy={profile?.display_name} onCreatedRefresh={() => load()} />
         <Select label="Status" value={editPO.status||'pending'} onChange={(v:string)=>setEditPO((e:any)=>({...e,status:v}))} options={PO_STATUS} />
         {editPO.status==='received' && (
           <div className="rounded-xl p-2.5 mb-2" style={{background:'rgba(16,185,129,.08)',border:'1px solid rgba(16,185,129,.25)'}}>

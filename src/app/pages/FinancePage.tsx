@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Btn, Modal, Input, Select, Textarea, SH, Empty, Badge, useConfirm, Chips } from '@/components/ui'
+import { Btn, Modal, Input, Select, SelectComCadastro, Textarea, SH, Empty, Badge, useConfirm, Chips } from '@/components/ui'
 import { fmtD, td } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import type { UserProfile } from '@/types'
@@ -306,8 +306,9 @@ export default function FinancePage({ profile, can }: Props) {
           {/* Bill Modal */}
           <Modal open={modal&&tab==='bills'} onClose={()=>setModal(false)} title={editing.id?'Editar Conta':'Nova Conta a Pagar'}
             footer={<><Btn onClick={()=>setModal(false)} variant="secondary" size="md">Cancelar</Btn><Btn onClick={saveBill} variant="primary" size="md">Salvar</Btn></>}>
-            <Select label="Fornecedor *" value={editing.fornecedor_id} onChange={(v:string)=>setEdit((e:any)=>({...e,fornecedor_id:v}))}
-              options={[{value:'',label:'Selecione...'},...suppliers.map(s=>({value:s.id,label:s.nome_razao||s.nome_fantasia}))]} />
+            <SelectComCadastro label="Fornecedor *" tipo="fornecedor" value={editing.fornecedor_id||''} onChange={(v:string)=>setEdit((e:any)=>({...e,fornecedor_id:v}))}
+              options={suppliers.map(s=>({value:s.id,label:s.nome_razao||s.nome_fantasia}))}
+              companyId={profile?.company_id} createdBy={profile?.display_name} onCreatedRefresh={() => load()} />
             <Select label="Centro de Custo" value={editing.centro_custo_id} onChange={(v:string)=>setEdit((e:any)=>({...e,centro_custo_id:v}))}
               options={[{value:'',label:'Nenhum'},...centers.map(c=>({value:c.id,label:`${c.codigo} - ${c.descricao}`}))]} />
             <div className="grid grid-cols-2 gap-x-2">

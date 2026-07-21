@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Btn, Modal, Input, Select, SH, Empty, KPI, Badge, Textarea, useConfirm } from '@/components/ui'
+import { Btn, Modal, Input, Select, SelectComCadastro, SH, Empty, KPI, Badge, Textarea, useConfirm } from '@/components/ui'
 import { fmtD, td } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import type { UserProfile } from '@/types'
@@ -591,8 +591,9 @@ export default function FuelPage({ profile, can }: Props) {
             <Input label="Data *" value={editing.record_date} onChange={(v:string)=>setEditing((e:any)=>({...e,record_date:v}))} type="date" />
             <Input label="Hora" value={editing.record_time} onChange={(v:string)=>setEditing((e:any)=>({...e,record_time:v}))} type="time" />
           </div>
-          <Select label="Veículo" value={editing.veiculo_id||''} onChange={(v:string)=>setEditing((e:any)=>({...e,veiculo_id:v,machine_id:''}))}
-            options={[{value:'',label:'Nenhum (é máquina)'}, ...veiculos.map(v=>({value:v.id,label:`${v.placa} (${v.tipo})`}))]} />
+          <SelectComCadastro label="Veículo" tipo="veiculo" value={editing.veiculo_id||''} onChange={(v:string)=>setEditing((e:any)=>({...e,veiculo_id:v,machine_id:''}))}
+            options={veiculos.map(v=>({value:v.id,label:`${v.placa} (${v.tipo})`}))}
+            companyId={profile?.company_id} createdBy={profile?.display_name} onCreatedRefresh={() => loadMeta()} />
           <Select label="Máquina" value={editing.machine_id||''} onChange={(v:string)=>setEditing((e:any)=>({...e,machine_id:v,veiculo_id:''}))}
             options={[{value:'',label:'Nenhuma (é veículo)'}, ...machines.map(m=>({value:m.id,label:`${m.icon||'⚙️'} ${m.name}`}))]} />
           <div className="grid grid-cols-2 gap-x-3">
@@ -603,8 +604,9 @@ export default function FuelPage({ profile, can }: Props) {
             <Input label="Litros *" value={editing.liters} onChange={(v:string)=>setEditing((e:any)=>({...e,liters:v}))} type="number" placeholder="0.00" />
             <Input label={`Preço/L (médio: ${money(avgPrice)})`} value={editing.unit_price} onChange={(v:string)=>setEditing((e:any)=>({...e,unit_price:v}))} type="number" placeholder={avgPrice.toFixed(4)} />
           </div>
-          <Select label="Motorista/Operador" value={editing.driver_id||''} onChange={(v:string)=>setEditing((e:any)=>({...e,driver_id:v}))}
-            options={[{value:'',label:'Nenhum'}, ...motoristas.map(m=>({value:m.id,label:m.nome_razao}))]} />
+          <SelectComCadastro label="Motorista/Operador" tipo="motorista" value={editing.driver_id||''} onChange={(v:string)=>setEditing((e:any)=>({...e,driver_id:v}))}
+            options={motoristas.map(m=>({value:m.id,label:m.nome_razao}))}
+            companyId={profile?.company_id} createdBy={profile?.display_name} onCreatedRefresh={() => loadMeta()} />
           <Textarea label="Observações" value={editing.notes} onChange={(v:string)=>setEditing((e:any)=>({...e,notes:v}))} rows={2} placeholder="Opcional..." />
         </>}
 
@@ -619,8 +621,9 @@ export default function FuelPage({ profile, can }: Props) {
               💧 Preço unitário: {money(parseFloat(editing.total_value)/parseFloat(editing.liters))}/L
             </div>
           )}
-          <Select label="Fornecedor" value={editing.supplier_id||''} onChange={(v:string)=>setEditing((e:any)=>({...e,supplier_id:v}))}
-            options={[{value:'',label:'Nenhum'}, ...fornecedores.map(f=>({value:f.id,label:f.nome_razao}))]} />
+          <SelectComCadastro label="Fornecedor" tipo="fornecedor" value={editing.supplier_id||''} onChange={(v:string)=>setEditing((e:any)=>({...e,supplier_id:v}))}
+            options={fornecedores.map(f=>({value:f.id,label:f.nome_razao}))}
+            companyId={profile?.company_id} createdBy={profile?.display_name} onCreatedRefresh={() => loadMeta()} />
           <Input label="Nota Fiscal" value={editing.invoice} onChange={(v:string)=>setEditing((e:any)=>({...e,invoice:v}))} placeholder="Nº da NF" />
           <Textarea label="Observações" value={editing.notes} onChange={(v:string)=>setEditing((e:any)=>({...e,notes:v}))} rows={2} placeholder="Opcional..." />
         </>}
@@ -630,15 +633,17 @@ export default function FuelPage({ profile, can }: Props) {
             <Input label="Data *" value={editing.expense_date} onChange={(v:string)=>setEditing((e:any)=>({...e,expense_date:v}))} type="date" />
             <Select label="Categoria" value={editing.category||'Manutenção'} onChange={(v:string)=>setEditing((e:any)=>({...e,category:v}))} options={EXP_CATS} />
           </div>
-          <Select label="Veículo *" value={editing.veiculo_id||''} onChange={(v:string)=>setEditing((e:any)=>({...e,veiculo_id:v}))}
-            options={[{value:'',label:'Selecione...'}, ...veiculos.map(v=>({value:v.id,label:`${v.placa} (${v.tipo})`}))]} />
+          <SelectComCadastro label="Veículo *" tipo="veiculo" value={editing.veiculo_id||''} onChange={(v:string)=>setEditing((e:any)=>({...e,veiculo_id:v}))}
+            options={veiculos.map(v=>({value:v.id,label:`${v.placa} (${v.tipo})`}))}
+            companyId={profile?.company_id} createdBy={profile?.display_name} onCreatedRefresh={() => loadMeta()} />
           <Input label="Descrição" value={editing.description} onChange={(v:string)=>setEditing((e:any)=>({...e,description:v}))} placeholder="Ex: Troca de pneus dianteiros" />
           <div className="grid grid-cols-2 gap-x-3">
             <Input label="Valor R$ *" value={editing.value} onChange={(v:string)=>setEditing((e:any)=>({...e,value:v}))} type="number" placeholder="0.00" />
             <Input label="KM na data" value={editing.km} onChange={(v:string)=>setEditing((e:any)=>({...e,km:v}))} type="number" placeholder="0" />
           </div>
-          <Select label="Fornecedor/Oficina" value={editing.supplier_id||''} onChange={(v:string)=>setEditing((e:any)=>({...e,supplier_id:v}))}
-            options={[{value:'',label:'Nenhum'}, ...fornecedores.map(f=>({value:f.id,label:f.nome_razao}))]} />
+          <SelectComCadastro label="Fornecedor/Oficina" tipo="fornecedor" value={editing.supplier_id||''} onChange={(v:string)=>setEditing((e:any)=>({...e,supplier_id:v}))}
+            options={fornecedores.map(f=>({value:f.id,label:f.nome_razao}))}
+            companyId={profile?.company_id} createdBy={profile?.display_name} onCreatedRefresh={() => loadMeta()} />
           <Textarea label="Observações" value={editing.notes} onChange={(v:string)=>setEditing((e:any)=>({...e,notes:v}))} rows={2} placeholder="Opcional..." />
         </>}
       </Modal>

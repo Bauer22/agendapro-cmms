@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Btn, Modal, Input, Select, Textarea, SH, Empty, Badge, useConfirm } from '@/components/ui'
+import { Btn, Modal, Input, Select, SelectComCadastro, Textarea, SH, Empty, Badge, useConfirm } from '@/components/ui'
 import { fmtD, td, PERIOD_LABEL } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import type { UserProfile } from '@/types'
@@ -494,10 +494,11 @@ export default function PMPage({ profile, can }: Props) {
         </div>
         <div className="grid grid-cols-2 gap-x-2">
           {fornecedores.length > 0 ? (
-          <Select label="Fornecedor/Oficina" value={editRepair.supplier_id||''} onChange={(v:string)=>{
+          <SelectComCadastro label="Fornecedor/Oficina" tipo="fornecedor" value={editRepair.supplier_id||''} onChange={(v:string)=>{
             const f = fornecedores.find((x:any)=>x.id===v)
             setEditRepair((e:any)=>({...e,supplier_id:v,supplier_name:f?.nome_razao||''}))
-          }} options={[{value:'',label:'Selecione...'}, ...fornecedores.map((f:any)=>({value:f.id,label:f.nome_razao}))]} />
+          }} options={fornecedores.map((f:any)=>({value:f.id,label:f.nome_razao}))}
+             companyId={profile?.company_id} createdBy={profile?.display_name} onCreatedRefresh={() => load()} />
         ) : (
           <Input label="Fornecedor/Oficina" value={editRepair.supplier_name} onChange={(v:string)=>setEditRepair((e:any)=>({...e,supplier_name:v}))} placeholder="Nome da oficina" />
         )}
