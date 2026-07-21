@@ -17,7 +17,6 @@ export default function GerencialPage({ profile, can }: Props) {
   const [tab, setTab] = useState<Tab>('custo')
   const [loading, setLoading] = useState(true)
 
-  // filtro de período
   const [period, setPeriod] = useState<'mes'|'3m'|'ano'|'custom'>('mes')
   const [pFrom, setPFrom] = useState('')
   const [pTo, setPTo]     = useState('')
@@ -47,7 +46,6 @@ export default function GerencialPage({ profile, can }: Props) {
     setLoading(false)
   }
 
-  // ── Faixa de meses conforme o filtro ──
   function mesesFiltro(): string[] {
     const now = new Date()
     const ym = (d:Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
@@ -62,7 +60,6 @@ export default function GerencialPage({ profile, can }: Props) {
       for (let m=0;m<12;m++) out.push(`${now.getFullYear()}-${String(m+1).padStart(2,'0')}`)
       return out
     }
-    // custom
     if (!pFrom || !pTo) return []
     const out:string[] = []
     const a = new Date(pFrom+'T00:00:00'), b = new Date(pTo+'T00:00:00')
@@ -73,26 +70,29 @@ export default function GerencialPage({ profile, can }: Props) {
   const meses = mesesFiltro()
   const noPeriodo = (m:string) => meses.length === 0 || meses.includes(m)
 
-  // ── Dados filtrados ──
   const fCustos  = custos.filter(x => noPeriodo(x.mes))
   const fCentros = centros.filter(x => noPeriodo(x.mes))
   const fTransp  = transp.filter(x => noPeriodo(x.mes))
   const fConta   = conta.filter(x => noPeriodo(x.mes))
   const fVendas  = vendas.filter(x => noPeriodo(x.mes))
 
-  // ── Consolidado do período ──
   const T = {
-    m3:       fCustos.reduce((s,x)=>s+(+x.m3_produzido||0),0),
-    madeira:  fCustos.reduce((s,x)=>s+(+x.custo_madeira||0),0),
-    diesel:   fCustos.reduce((s,x)=>s+(+x.custo_diesel_producao||0),0),
-    despesas: fCustos.reduce((s,x)=>s+(+x.despesas_gerais||0),0),
+    m3:             fCustos.reduce((s,x)=>s+(+x.m3_produzido||0),0),
+    materiaPrima:   fCustos.reduce((s,x)=>s+(+x.custo_materia_prima||0),0),
+    maoObra:        fCustos.reduce((s,x)=>s+(+x.custo_mao_obra||0),0),
+    manutencao:     fCustos.reduce((s,x)=>s+(+x.custo_manutencao||0),0),
+    energia:        fCustos.reduce((s,x)=>s+(+x.custo_energia||0),0),
+    administrativo: fCustos.reduce((s,x)=>s+(+x.custo_administrativo||0),0),
+    maquinas:       fCustos.reduce((s,x)=>s+(+x.custo_maquinas||0),0),
+    diversas:       fCustos.reduce((s,x)=>s+(+x.custo_diversas||0),0),
+    fixosAdm:       fCustos.reduce((s,x)=>s+(+x.custo_fixos_adm||0),0),
+    melhorias:      fCustos.reduce((s,x)=>s+(+x.custo_melhorias||0),0),
   }
-  const custoTotal = T.madeira + T.diesel + T.despesas
+  const custoTotal = T.materiaPrima + T.maoObra + T.manutencao + T.energia + T.administrativo + T.maquinas + T.diversas + T.fixosAdm + T.melhorias
   const custoM3    = T.m3 > 0 ? custoTotal / T.m3 : 0
   const fatTotal   = fVendas.reduce((s,x)=>s+(+x.faturado||0),0)
   const margem     = fatTotal - custoTotal
 
-  // ── Centros agrupados no período ──
   const centrosAgg = (() => {
     const m: Record<string,{centro:string;valor:number}> = {}
     fCentros.forEach(x => {
@@ -104,7 +104,6 @@ export default function GerencialPage({ profile, can }: Props) {
       .sort((a,b)=>b.valor-a.valor)
   })()
 
-  // ── Transportadora agregada ──
   const transpAgg = (() => {
     const m: Record<string,any> = {}
     fTransp.forEach(x => {
@@ -126,7 +125,6 @@ export default function GerencialPage({ profile, can }: Props) {
     litros:s.litros+x.litros, diesel:s.diesel+x.diesel, outras:s.outras+x.outras, total:s.total+x.total,
   }), {litros:0,diesel:0,outras:0,total:0})
 
-  // ── Conta corrente agregada no período ──
   const contaAgg = (() => {
     const m: Record<string,any> = {}
     fConta.forEach(x => {
@@ -146,7 +144,6 @@ export default function GerencialPage({ profile, can }: Props) {
     })).sort((a:any,b:any)=>Math.abs(b.saldo)-Math.abs(a.saldo))
   })()
 
-  // ── Vendas por produto ──
   const vendasProd = (() => {
     const m: Record<string,any> = {}
     fVendas.forEach(x => {
@@ -161,7 +158,7 @@ export default function GerencialPage({ profile, can }: Props) {
   })()
 
   const TABS: [Tab,string][] = [
-    ['custo','💰 Custo/m³'], ['centros','📊 Centros'], ['transporte','🚛 Transporte'],
+    ['custo','💰 Custo/m³'], ['centros','📊 Centros'], ['transporte','🚚 Transporte'],
     ['conta','🤝 Conta Corrente'], ['vendas','🛒 Vendas'],
   ]
 
@@ -178,10 +175,9 @@ export default function GerencialPage({ profile, can }: Props) {
     <div className="page-enter p-3">
       <SH label="📈 Dashboard Gerencial" />
 
-      {/* Filtro de período */}
       <div className="rounded-xl p-2.5 mb-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
         <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-          {([['mes','📅 Mês atual'],['3m','🕐 3 meses'],['ano','📆 Ano'],['custom','⚙️ Período']] as [typeof period,string][]).map(([k,l])=>(
+          {([['mes','📅 Mês atual'],['3m','🗓️ 3 meses'],['ano','📆 Ano'],['custom','⚙️ Período']] as [typeof period,string][]).map(([k,l])=>(
             <div key={k} onClick={()=>setPeriod(k)}
               style={{flexShrink:0,padding:'5px 11px',borderRadius:'16px',fontSize:'10px',fontWeight:700,cursor:'pointer',
                 background:period===k?'rgba(249,115,22,.14)':'var(--s2)',
@@ -202,7 +198,6 @@ export default function GerencialPage({ profile, can }: Props) {
         )}
       </div>
 
-      {/* KPIs principais */}
       <div className="grid grid-cols-4 gap-2 mb-3">
         <KPI num={`${T.m3.toFixed(0)}m³`} label="Produzido" color="green" />
         <KPI num={moneyK(custoTotal)} label="Custo total" color="red" />
@@ -210,7 +205,6 @@ export default function GerencialPage({ profile, can }: Props) {
         <KPI num={moneyK(fatTotal)} label="Faturado" color="blue" />
       </div>
 
-      {/* Margem */}
       <div className="rounded-xl p-3 mb-3" style={{background:'var(--s1)',border:`1px solid ${margem>=0?'rgba(34,197,94,.3)':'rgba(239,68,68,.3)'}`}}>
         <div className="flex justify-between items-center">
           <span style={{fontSize:'11px',color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.5px'}}>
@@ -223,7 +217,6 @@ export default function GerencialPage({ profile, can }: Props) {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-1.5 mb-3 overflow-x-auto pb-1">
         {TABS.map(([t,l])=>(
           <div key={t} onClick={()=>setTab(t)}
@@ -236,16 +229,21 @@ export default function GerencialPage({ profile, can }: Props) {
 
       {loading ? <Empty icon="⏳" text="Carregando..." /> : <>
 
-        {/* ═══ CUSTO/m³ ═══ */}
         {tab==='custo' && (
           <>
             <div className="rounded-xl p-3 mb-3" style={{background:'var(--s1)',border:'1px solid rgba(249,115,22,.25)'}}>
               <div style={{fontSize:'10px',fontWeight:700,color:'#f97316',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'8px'}}>
                 💰 COMPOSIÇÃO DO CUSTO POR m³
               </div>
-              <Row label="🪵 Madeira" value={`${money(T.m3>0?T.madeira/T.m3:0)}/m³`} color="var(--gn)" />
-              <Row label="⛽ Diesel produção" value={`${money(T.m3>0?T.diesel/T.m3:0)}/m³`} color="var(--am)" />
-              <Row label="📊 Despesas gerais" value={`${money(T.m3>0?T.despesas/T.m3:0)}/m³`} color="var(--pp)" />
+              <Row label="🪵 Matéria-Prima" value={`${money(T.m3>0?T.materiaPrima/T.m3:0)}/m³`} color="var(--gn)" />
+              <Row label="👷 Mão de Obra" value={`${money(T.m3>0?T.maoObra/T.m3:0)}/m³`} color="var(--cy)" />
+              <Row label="🔧 Manutenção" value={`${money(T.m3>0?T.manutencao/T.m3:0)}/m³`} color="var(--am)" />
+              <Row label="⚡ Energia" value={`${money(T.m3>0?T.energia/T.m3:0)}/m³`} color="var(--pp)" />
+              <Row label="📋 Administrativo" value={`${money(T.m3>0?T.administrativo/T.m3:0)}/m³`} color="var(--t2)" />
+              <Row label="🚜 Máquinas" value={`${money(T.m3>0?T.maquinas/T.m3:0)}/m³`} color="var(--t2)" />
+              <Row label="📦 Despesas Diversas" value={`${money(T.m3>0?T.diversas/T.m3:0)}/m³`} color="var(--t2)" />
+              <Row label="🏢 Custos Fixos e Adm" value={`${money(T.m3>0?T.fixosAdm/T.m3:0)}/m³`} color="var(--t2)" />
+              <Row label="✨ Melhorias" value={`${money(T.m3>0?T.melhorias/T.m3:0)}/m³`} color="var(--t2)" />
               <div style={{height:'1px',background:'var(--bd)',margin:'6px 0'}} />
               <Row label="CUSTO TOTAL / m³" value={money(custoM3)} color="#f97316" bold />
               <div style={{fontSize:'9px',color:'var(--t3)',marginTop:'6px'}}>
@@ -256,14 +254,14 @@ export default function GerencialPage({ profile, can }: Props) {
             {fCustos.length===0 ? <Empty icon="📊" text="Sem dados no período." /> : (
               <div className="rounded-xl overflow-hidden" style={{border:'1px solid var(--bd)'}}>
                 <div className="grid px-2 py-2" style={{gridTemplateColumns:'54px 1fr 60px 60px 62px',background:'var(--s2)',fontSize:'9px',fontWeight:700,color:'var(--t3)',textTransform:'uppercase'}}>
-                  <span>Mês</span><span style={{textAlign:'right'}}>m³</span><span style={{textAlign:'right'}}>Madeira</span><span style={{textAlign:'right'}}>Diesel</span><span style={{textAlign:'right'}}>Total/m³</span>
+                  <span>Mês</span><span style={{textAlign:'right'}}>m³</span><span style={{textAlign:'right'}}>Mat.Prima</span><span style={{textAlign:'right'}}>M.Obra</span><span style={{textAlign:'right'}}>Total/m³</span>
                 </div>
                 {fCustos.map((x,i)=>(
                   <div key={i} className="grid px-2 py-2" style={{gridTemplateColumns:'54px 1fr 60px 60px 62px',background:'var(--s1)',borderTop:'1px solid var(--bd)',fontSize:'10px'}}>
                     <span style={{color:'var(--t2)',fontWeight:700}}>{x.mes.slice(5)}/{x.mes.slice(2,4)}</span>
                     <span style={{textAlign:'right',color:'var(--gn)'}}>{(+x.m3_produzido).toFixed(0)}</span>
-                    <span style={{textAlign:'right'}}>{n2(+x.madeira_por_m3)}</span>
-                    <span style={{textAlign:'right',color:'var(--am)'}}>{n2(+x.diesel_por_m3)}</span>
+                    <span style={{textAlign:'right'}}>{n2(+x.materia_prima_por_m3)}</span>
+                    <span style={{textAlign:'right',color:'var(--am)'}}>{n2(+x.mao_obra_por_m3)}</span>
                     <span style={{textAlign:'right',color:'#f97316',fontWeight:700}}>{n2(+x.custo_total_por_m3)}</span>
                   </div>
                 ))}
@@ -272,7 +270,6 @@ export default function GerencialPage({ profile, can }: Props) {
           </>
         )}
 
-        {/* ═══ CENTROS DE CUSTO ═══ */}
         {tab==='centros' && (
           centrosAgg.length===0 ? <Empty icon="📊" text="Sem despesas no período." /> : (
             <>
@@ -303,18 +300,17 @@ export default function GerencialPage({ profile, can }: Props) {
           )
         )}
 
-        {/* ═══ TRANSPORTADORA ═══ */}
         {tab==='transporte' && (
           <>
             <div style={{fontSize:'9px',color:'var(--t3)',marginBottom:'8px'}}>
-              🚛 Diesel dos caminhões — <b style={{color:'var(--t2)'}}>não entra no custo/m³</b>
+              🚚 Diesel dos caminhões — <b style={{color:'var(--t2)'}}>não entra no custo/m³</b>
             </div>
             <div className="grid grid-cols-3 gap-2 mb-3">
               <KPI num={`${transpTot.litros.toFixed(0)}L`} label="Litros" color="blue" />
               <KPI num={moneyK(transpTot.diesel)} label="Diesel" color="orange" />
               <KPI num={moneyK(transpTot.total)} label="Custo total" color="purple" />
             </div>
-            {transpAgg.length===0 ? <Empty icon="🚛" text="Sem abastecimentos no período." /> : (
+            {transpAgg.length===0 ? <Empty icon="🚚" text="Sem abastecimentos no período." /> : (
               <div className="flex flex-col gap-2">
                 {transpAgg.map((v:any,i:number)=>(
                   <div key={i} className="rounded-xl p-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
@@ -337,7 +333,6 @@ export default function GerencialPage({ profile, can }: Props) {
           </>
         )}
 
-        {/* ═══ CONTA CORRENTE ═══ */}
         {tab==='conta' && (
           contaAgg.length===0 ? <Empty icon="🤝" text="Sem movimentação no período." /> : (
             <>
@@ -375,7 +370,6 @@ export default function GerencialPage({ profile, can }: Props) {
           )
         )}
 
-        {/* ═══ VENDAS ═══ */}
         {tab==='vendas' && (
           vendasProd.length===0 ? <Empty icon="🛒" text="Sem vendas no período." /> : (
             <>
