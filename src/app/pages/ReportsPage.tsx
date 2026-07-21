@@ -15,6 +15,8 @@ const REPORT_MODULES = [
   {id:'parts',    icon:'📦', title:'Inventário de Peças',  desc:'Estoque atual com alertas e movimentos'},
   {id:'po',       icon:'🛒', title:'Pedidos de Compra',    desc:'Pedidos por status e fornecedor'},
   {id:'finance',  icon:'💰', title:'Contas a Pagar',       desc:'Pagamentos por status e vencimento'},
+  {id:'financeiro_completo', icon:'📊', title:'Financeiro Completo', desc:'Pagamentos do período + resumo por centro de custo'},
+  {id:'parceiro', icon:'🤝', title:'Relatório por Parceiro', desc:'Compras, vendas, saldo e viagens por motorista — selecione o parceiro abaixo'},
   {id:'backup',   icon:'💾', title:'Backup Completo',      desc:'Exportar todos os dados em JSON'},
   {id:'oee',      icon:'📈', title:'Relatório OEE',         desc:'Disponibilidade, performance e qualidade por máquina'},
   {id:'wood',     icon:'🪵', title:'Entrada de Madeira',    desc:'Volume, espécie, origem e valor por período'},
@@ -39,11 +41,13 @@ export default function ReportsPage({ profile, can }: Props) {
   const [fMach, setFMach]       = useState('')
   const [fUser, setFUser]       = useState('')
   const [fStatus, setFStatus]   = useState('')
+  const [fParceiro, setFParceiro] = useState('')
+  const [parceiros, setParceiros] = useState<any[]>([])
 
   useEffect(() => { loadMeta() }, [])
 
   async function loadMeta() {
-    const [m, u, s, os, maint, parts, pm] = await Promise.all([
+    const [m, u, s, os, maint, parts, pm, cad] = await Promise.all([
       supabase.from('machines').select('id,name,icon'),
       supabase.from('profiles').select('id,display_name,email'),
       supabase.from('suppliers').select('id,name,razao_social'),
@@ -51,8 +55,11 @@ export default function ReportsPage({ profile, can }: Props) {
       supabase.from('maintenance').select('status'),
       supabase.from('parts').select('stock,min_stock'),
       supabase.from('pm_reports').select('id'),
+      supabase.from('cadastros').select('id,nome_razao').eq('status',true)
+        .or('is_cliente.eq.true,is_fornecedor.eq.true').order('nome_razao'),
     ])
     setMachines(m.data||[]); setUsers(u.data||[]); setSuppliers(s.data||[])
+    setParceiros(cad.data||[])
     const osList = os.data||[]
     const pList  = parts.data||[]
     setSummary({
@@ -74,6 +81,10 @@ export default function ReportsPage({ profile, can }: Props) {
   }
 
   async function generate(moduleId: string) {
+    if (moduleId === 'parceiro' && !fParceiro) {
+      toast.error('Selecione um parceiro no filtro acima antes de gerar este relatório')
+      return
+    }
     setGen(moduleId)
     try {
       // Dynamic import of jsPDF
@@ -103,6 +114,23 @@ export default function ReportsPage({ profile, can }: Props) {
       }
 
       const startY = filterInfo ? 32 : 30
+
+      // addTable: título + tabela padrão + salvar PDF (usada pelos módulos simples,
+      // de uma tabela só). Faltava esta definição — os 7 módulos que a chamavam
+      // (oee, wood, sales, epi, training, audit, energy) davam erro ao gerar.
+      function addTable(doc: any, title: string, head: string[], rows: any[][]) {
+        doc.setTextColor(226,232,240); doc.setFontSize(12); doc.setFont('helvetica','bold')
+        doc.text(`${title} (${rows.length})`, 12, startY)
+        autoTable(doc, {
+          startY: startY+5,
+          head: [head],
+          body: rows,
+          styles: { fontSize:7, cellPadding:2 },
+          headStyles: { fillColor:[6,13,26], textColor:[0,212,255] },
+          alternateRowStyles: { fillColor:[241,245,249] },
+        })
+        doc.save(`${title.replace(/\s+/g,'')}_${dateStr.replace(/\//g,'-')}.pdf`)
+      }
 
       if (moduleId === 'os') {
         let q = supabase.from('work_orders').select('*').order('created_at',{ascending:false})
@@ -230,14 +258,18 @@ export default function ReportsPage({ profile, can }: Props) {
         addTable(doc, 'Relatório OEE', ['Data','Máquina','Turno','Disponib.','Perform.','Qualidade','OEE','Obs'], rows)
 
       } else if (moduleId === 'wood') {
-        const { data } = await supabase.from('wood_entries').select('*').order('data_entrada',{ascending:false})
-        const rows = (data||[]).map((r:any) => [r.entry_date, r.species, r.origin||'', r.supplier_name||'', `${r.volume_m3||0} m³`, `${r.log_count||0}`, r.quality||'', `R$ ${(r.total_value||0).toFixed(2)}`, r.truck_plate||'', r.romaneio||''])
-        addTable(doc, 'Entrada de Madeira', ['Data','Espécie','Origem','Fornecedor','Volume','Toras','Qualidade','Valor','Placa','Romaneio'], rows)
+        let q = supabase.from('wood_entries').select('*').order('data_entrada',{ascending:false})
+        q = buildDateFilter(q, 'data_entrada')
+        const { data } = await q
+        const rows = (data||[]).map((r:any) => [fmtD(r.data_entrada), r.supplier_name||'—', r.wood_class||'—', `${r.weight_tons||0} t`, `${r.volume_m3||0} m³`, `R$ ${(r.unit_value||0).toFixed(2)}`, `R$ ${(r.total_value||0).toFixed(2)}`, r.driver||'—', r.plate||'—'])
+        addTable(doc, 'Entrada de Madeira', ['Data','Fornecedor','Classe','Peso','Volume','Preço/t','Valor Total','Motorista','Placa'], rows)
 
       } else if (moduleId === 'sales') {
-        const { data } = await supabase.from('sales_orders').select('*').order('sale_date',{ascending:false})
-        const rows = (data||[]).map((r:any) => [r.order_number||'', r.order_date, r.client_name, r.status, `R$ ${(r.total_value||0).toFixed(2)}`, r.delivery_date||'', r.notes||''])
-        addTable(doc, 'Pedidos de Venda', ['Nº Pedido','Data','Cliente','Status','Total','Entrega','Obs'], rows)
+        let q = supabase.from('sales_orders').select('*').order('sale_date',{ascending:false})
+        q = buildDateFilter(q, 'sale_date')
+        const { data } = await q
+        const rows = (data||[]).map((r:any) => [fmtD(r.sale_date), r.client_name||'—', r.product_name||'—', `${r.weight_tons||0} t`, `R$ ${(r.total_value||0).toFixed(2)}`, r.payment_status==='pago'?'Pago':r.payment_status==='pendente'?'Pendente':'—', r.driver||'—', r.plate||'—', r.invoice||'—'])
+        addTable(doc, 'Pedidos de Venda', ['Data','Cliente','Produto','Peso','Valor','Pagamento','Motorista','Placa','NF'], rows)
 
       } else if (moduleId === 'epi') {
         const { data } = await supabase.from('epi_deliveries').select('*').order('delivery_date',{ascending:false})
@@ -258,6 +290,156 @@ export default function ReportsPage({ profile, can }: Props) {
         const { data } = await supabase.from('energy_records').select('*').order('record_date',{ascending:false})
         const rows = (data||[]).map((r:any) => [r.record_date, r.source, r.sector||'Geral', `${r.reading||0} ${r.unit||'kWh'}`, `R$ ${(r.cost||0).toFixed(2)}`, r.notes||''])
         addTable(doc, 'Consumo de Energia', ['Data','Fonte','Setor','Leitura/Consumo','Custo','Obs'], rows)
+
+      } else if (moduleId === 'parceiro') {
+        const parceiroNome = parceiros.find((p:any)=>p.id===fParceiro)?.nome_razao || ''
+        const nomeUpper = parceiroNome.trim().toUpperCase()
+
+        let qCompras = supabase.from('purchase_tickets').select('*').eq('supplier_name', parceiroNome).order('purchase_date',{ascending:false})
+        if (dateFrom) qCompras = qCompras.gte('purchase_date', dateFrom)
+        if (dateTo)   qCompras = qCompras.lte('purchase_date', dateTo)
+        let qWood = supabase.from('wood_entries').select('*').ilike('supplier_name', parceiroNome).order('data_entrada',{ascending:false})
+        if (dateFrom) qWood = qWood.gte('data_entrada', dateFrom)
+        if (dateTo)   qWood = qWood.lte('data_entrada', dateTo)
+        let qVendas = supabase.from('sales_orders').select('*').ilike('client_name', parceiroNome).eq('status','active').order('sale_date',{ascending:false})
+        if (dateFrom) qVendas = qVendas.gte('sale_date', dateFrom)
+        if (dateTo)   qVendas = qVendas.lte('sale_date', dateTo)
+        let qSaldo = supabase.from('v_saldo_conta_corrente').select('*').eq('parceiro', nomeUpper)
+
+        const [rCompras, rWood, rVendas, rSaldo] = await Promise.all([qCompras, qWood, qVendas, qSaldo])
+        // compras: usa tiquete se existir, senão wood_entries (mesma regra da conta corrente)
+        const compras = (rCompras.data && rCompras.data.length > 0) ? rCompras.data : (rWood.data||[])
+        const vendas  = rVendas.data || []
+        const saldo   = (rSaldo.data||[])[0] || null
+
+        doc.setTextColor(226,232,240); doc.setFontSize(14); doc.setFont('helvetica','bold')
+        doc.text(`Relatório do Parceiro: ${parceiroNome}`, 12, startY)
+        let y = startY + 8
+
+        // ── Seção 1: Compras ──
+        doc.setFontSize(11); doc.setTextColor(0,212,255)
+        doc.text(`Compras (${compras.length})`, 12, y)
+        autoTable(doc, {
+          startY: y+3,
+          head: [['Data','Peso (t)','Valor']],
+          body: compras.map((c:any)=>[fmtD(c.purchase_date||c.data_entrada), `${c.weight_tons||0}`, `R$ ${(c.total_value||0).toFixed(2)}`]),
+          styles: { fontSize:7, cellPadding:2 },
+          headStyles: { fillColor:[6,13,26], textColor:[0,212,255] },
+          alternateRowStyles: { fillColor:[241,245,249] },
+        })
+        y = (doc as any).lastAutoTable.finalY + 10
+
+        // ── Seção 2: Vendas ──
+        if (y > 250) { doc.addPage(); y = 20 }
+        doc.setFontSize(11); doc.setTextColor(0,212,255)
+        doc.text(`Vendas (${vendas.length})`, 12, y)
+        autoTable(doc, {
+          startY: y+3,
+          head: [['Data','Produto','Peso (t)','Valor','Motorista','Placa']],
+          body: vendas.map((v:any)=>[fmtD(v.sale_date), v.product_name||'—', `${v.weight_tons||0}`, `R$ ${(v.total_value||0).toFixed(2)}`, v.driver||'—', v.plate||'—']),
+          styles: { fontSize:7, cellPadding:2 },
+          headStyles: { fillColor:[6,13,26], textColor:[0,212,255] },
+          alternateRowStyles: { fillColor:[241,245,249] },
+        })
+        y = (doc as any).lastAutoTable.finalY + 10
+
+        // ── Seção 3: Saldo ──
+        if (y > 250) { doc.addPage(); y = 20 }
+        doc.setFontSize(11); doc.setTextColor(0,212,255)
+        doc.text('Saldo da Conta Corrente', 12, y)
+        y += 5
+        doc.setFontSize(9); doc.setTextColor(226,232,240)
+        if (saldo) {
+          const linhas = [
+            `Total Compras: R$ ${(+saldo.total_compras||0).toFixed(2)}`,
+            `Total Vendas: R$ ${(+saldo.total_vendas||0).toFixed(2)}`,
+            `Recebido: R$ ${(+saldo.total_recebido||0).toFixed(2)}  |  Pago: R$ ${(+saldo.total_pago||0).toFixed(2)}`,
+            `Créditos: R$ ${(+saldo.total_creditos||0).toFixed(2)}  |  Débitos: R$ ${(+saldo.total_debitos||0).toFixed(2)}`,
+          ]
+          linhas.forEach(l => { doc.text(l, 12, y); y += 5 })
+          doc.setFont('helvetica','bold'); doc.setFontSize(11)
+          doc.setTextColor(saldo.saldo_final>=0?34:239, saldo.saldo_final>=0?197:68, saldo.saldo_final>=0?94:68)
+          doc.text(`SALDO: R$ ${(+saldo.saldo_final||0).toFixed(2)} (${saldo.situacao})`, 12, y)
+          y += 10
+        } else {
+          doc.text('Sem movimentação de conta corrente para este parceiro.', 12, y)
+          y += 10
+        }
+
+        // ── Seção 4: Viagens por motorista ──
+        if (y > 250) { doc.addPage(); y = 20 }
+        doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(0,212,255)
+        doc.text('Viagens por Motorista', 12, y)
+        const viagens: Record<string,{qtd:number,peso:number}> = {}
+        ;[...compras, ...vendas].forEach((r:any) => {
+          const mot = r.driver || 'Não informado'
+          if (!viagens[mot]) viagens[mot] = {qtd:0, peso:0}
+          viagens[mot].qtd += 1
+          viagens[mot].peso += +r.weight_tons || 0
+        })
+        autoTable(doc, {
+          startY: y+3,
+          head: [['Motorista','Viagens','Peso Total (t)']],
+          body: Object.entries(viagens).map(([mot,v]) => [mot, `${v.qtd}`, `${v.peso.toFixed(1)}`]),
+          styles: { fontSize:7, cellPadding:2 },
+          headStyles: { fillColor:[6,13,26], textColor:[0,212,255] },
+          alternateRowStyles: { fillColor:[241,245,249] },
+        })
+        doc.save(`Parceiro_${parceiroNome.replace(/\s+/g,'')}_${dateStr.replace(/\//g,'-')}.pdf`)
+
+      } else if (moduleId === 'financeiro_completo') {
+        let qPag = supabase.from('accounts_payable').select('*, cost_centers(codigo,descricao)').order('due_date',{ascending:false})
+        if (dateFrom) qPag = qPag.gte('due_date', dateFrom)
+        if (dateTo)   qPag = qPag.lte('due_date', dateTo)
+        const [rPag, rCentros] = await Promise.all([
+          qPag,
+          supabase.from('cost_centers').select('*').eq('active', true).order('codigo'),
+        ])
+        const pagamentos = rPag.data || []
+        const centros = rCentros.data || []
+
+        doc.setTextColor(226,232,240); doc.setFontSize(14); doc.setFont('helvetica','bold')
+        doc.text('Relatório Financeiro Completo', 12, startY)
+        let y = startY + 8
+
+        // ── Seção 1: Pagamentos do período ──
+        const totalPend = pagamentos.filter((p:any)=>p.status==='pending').reduce((s:number,p:any)=>s+(+p.valor||0),0)
+        const totalPaid = pagamentos.filter((p:any)=>p.status==='paid').reduce((s:number,p:any)=>s+(+p.valor||0),0)
+        doc.setFontSize(11); doc.setTextColor(0,212,255)
+        doc.text(`Pagamentos do Período (${pagamentos.length})`, 12, y)
+        doc.setFontSize(8); doc.setTextColor(245,158,11)
+        doc.text(`Pendente: R$ ${totalPend.toFixed(2)}  |  Pago: R$ ${totalPaid.toFixed(2)}`, 12, y+5)
+        autoTable(doc, {
+          startY: y+9,
+          head: [['Vencimento','Descrição','Centro de Custo','Valor','Status']],
+          body: pagamentos.map((p:any) => [fmtD(p.due_date), p.descricao||'—', p.cost_centers ? `${p.cost_centers.codigo} - ${p.cost_centers.descricao}` : '—', `R$ ${(+p.valor||0).toFixed(2)}`, p.status==='paid'?'Pago':p.status==='pending'?'Pendente':p.status==='overdue'?'Vencido':p.status||'—']),
+          styles: { fontSize:7, cellPadding:2 },
+          headStyles: { fillColor:[6,13,26], textColor:[0,212,255] },
+          alternateRowStyles: { fillColor:[241,245,249] },
+        })
+        y = (doc as any).lastAutoTable.finalY + 10
+
+        // ── Seção 2: Resumo por Centro de Custo ──
+        if (y > 240) { doc.addPage(); y = 20 }
+        doc.setFontSize(11); doc.setTextColor(0,212,255)
+        doc.text('Resumo por Centro de Custo', 12, y)
+        const porCentro = centros.map((c:any) => {
+          const doCC = pagamentos.filter((p:any)=>p.centro_custo_id===c.id)
+          return {
+            codigo: c.codigo, descricao: c.descricao, grupo: c.grupo||'—',
+            qtd: doCC.length,
+            total: doCC.reduce((s:number,p:any)=>s+(+p.valor||0),0),
+          }
+        }).filter((c:any)=>c.qtd>0)
+        autoTable(doc, {
+          startY: y+3,
+          head: [['Código','Descrição','Grupo','Qtd. Lançamentos','Total']],
+          body: porCentro.map((c:any)=>[c.codigo, c.descricao, c.grupo, `${c.qtd}`, `R$ ${c.total.toFixed(2)}`]),
+          styles: { fontSize:7, cellPadding:2 },
+          headStyles: { fillColor:[6,13,26], textColor:[0,212,255] },
+          alternateRowStyles: { fillColor:[241,245,249] },
+        })
+        doc.save(`FinanceiroCompleto_${dateStr.replace(/\//g,'-')}.pdf`)
 
       } else if (moduleId === 'backup') {
         const tables = ['work_orders','maintenance','machines','parts','pm_reports','tasks','accounts_payable','purchase_orders','stock_movements','suppliers','downtime_records','repair_orders','oee_records','wood_entries','sales_orders','epi_items','epi_deliveries','trainings','audits','energy_records','scheduling','documents','chat_messages']
@@ -303,8 +485,15 @@ export default function ReportsPage({ profile, can }: Props) {
             </select>
           </div>
         </div>
-        {(dateFrom||dateTo||fMach||fUser)&&(
-          <button onClick={()=>{setDateFrom('');setDateTo('');setFMach('');setFUser('');setFStatus('')}} className="mt-2 text-xs px-3 py-1 rounded-lg" style={{background:'var(--s2)',color:'var(--t2)',border:'1px solid var(--bd)',cursor:'pointer',fontFamily:'Sora,system-ui,sans-serif'}}>
+        <div className="mt-2">
+          <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{color:'var(--t2)'}}>Parceiro (cliente/fornecedor) — usado no relatório 🤝</label>
+          <select value={fParceiro} onChange={e=>setFParceiro(e.target.value)} className="w-full rounded-xl px-3 py-2 text-xs outline-none" style={{background:'var(--s2)',border:'1px solid var(--bd)',color:'var(--t1)',fontFamily:'Sora,system-ui,sans-serif',WebkitAppearance:'none'}}>
+            <option value="">Selecione um parceiro...</option>
+            {parceiros.map(p=><option key={p.id} value={p.id}>{p.nome_razao}</option>)}
+          </select>
+        </div>
+        {(dateFrom||dateTo||fMach||fUser||fParceiro)&&(
+          <button onClick={()=>{setDateFrom('');setDateTo('');setFMach('');setFUser('');setFStatus('');setFParceiro('')}} className="mt-2 text-xs px-3 py-1 rounded-lg" style={{background:'var(--s2)',color:'var(--t2)',border:'1px solid var(--bd)',cursor:'pointer',fontFamily:'Sora,system-ui,sans-serif'}}>
             ✕ Limpar filtros
           </button>
         )}
