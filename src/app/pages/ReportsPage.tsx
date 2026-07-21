@@ -366,21 +366,30 @@ export default function ReportsPage({ profile, can }: Props) {
           y += 10
         }
 
-        // ── Seção 4: Viagens por motorista ──
+        // ── Seção 4: Viagens por motorista, agrupadas por tipo ──
         if (y > 250) { doc.addPage(); y = 20 }
         doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(0,212,255)
         doc.text('Viagens por Motorista', 12, y)
-        const viagens: Record<string,{qtd:number,peso:number}> = {}
-        ;[...compras, ...vendas].forEach((r:any) => {
-          const mot = r.driver || 'Não informado'
-          if (!viagens[mot]) viagens[mot] = {qtd:0, peso:0}
-          viagens[mot].qtd += 1
-          viagens[mot].peso += +r.weight_tons || 0
+        // chave = "motorista||tipo" — tipo é "MADEIRA {fornecedor}" para compras
+        // ou o nome do produto para vendas (ex: LAMINA, ROLETE)
+        const viagens: Record<string,{motorista:string,tipo:string,qtd:number,peso:number}> = {}
+        function addViagem(mot: string, tipo: string, peso: number) {
+          const key = `${mot}||${tipo}`
+          if (!viagens[key]) viagens[key] = {motorista:mot, tipo, qtd:0, peso:0}
+          viagens[key].qtd += 1
+          viagens[key].peso += peso
+        }
+        compras.forEach((r:any) => {
+          addViagem(r.driver || 'Não informado', `MADEIRA ${parceiroNome.toUpperCase()}`, +r.weight_tons || 0)
         })
+        vendas.forEach((r:any) => {
+          addViagem(r.driver || 'Não informado', (r.product_name || 'PRODUTO NÃO INFORMADO').toUpperCase(), +r.weight_tons || 0)
+        })
+        const linhasViagem = Object.values(viagens).sort((a,b) => a.motorista.localeCompare(b.motorista) || a.tipo.localeCompare(b.tipo))
         autoTable(doc, {
           startY: y+3,
-          head: [['Motorista','Viagens','Peso Total (t)']],
-          body: Object.entries(viagens).map(([mot,v]) => [mot, `${v.qtd}`, `${v.peso.toFixed(1)}`]),
+          head: [['Motorista','Tipo de Viagem','Viagens','Peso Total (t)']],
+          body: linhasViagem.map(v => [v.motorista, v.tipo, `${v.qtd}`, `${v.peso.toFixed(1)}`]),
           styles: { fontSize:7, cellPadding:2 },
           headStyles: { fillColor:[6,13,26], textColor:[0,212,255] },
           alternateRowStyles: { fillColor:[241,245,249] },
