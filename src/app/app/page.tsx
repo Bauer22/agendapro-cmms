@@ -325,8 +325,14 @@ export default function App() {
       </header>
 
       {/* NAV */}
-      <nav className="flex-shrink-0 flex overflow-x-auto" style={{background:'rgba(12,20,36,.98)',borderBottom:'1px solid rgba(249,115,22,.2)',scrollbarWidth:'none',boxShadow:'0 4px 12px rgba(0,0,0,.4)'}}>
-        <style>{`.nav-scroll::-webkit-scrollbar{display:none}`}</style>
+      <nav className="nav-scroll flex-shrink-0 flex overflow-x-auto" style={{background:'rgba(12,20,36,.98)',borderBottom:'1px solid rgba(249,115,22,.2)',boxShadow:'0 4px 12px rgba(0,0,0,.4)'}}>
+        <style>{`
+          .nav-scroll::-webkit-scrollbar { height: 5px; }
+          .nav-scroll::-webkit-scrollbar-track { background: transparent; }
+          .nav-scroll::-webkit-scrollbar-thumb { background: rgba(249,115,22,.4); border-radius: 3px; }
+          .nav-scroll::-webkit-scrollbar-thumb:hover { background: rgba(249,115,22,.6); }
+          .nav-scroll { scrollbar-width: thin; scrollbar-color: rgba(249,115,22,.4) transparent; }
+        `}</style>
         {NAV.map(n => (
           <button key={n.id} onClick={() => setPage(n.id)}
             className="flex-shrink-0 flex flex-col items-center justify-center gap-0.5 px-3 py-2 border-none cursor-pointer transition-all relative"
