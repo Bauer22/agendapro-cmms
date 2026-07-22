@@ -42,16 +42,29 @@ function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
 
 const MODULES = [
   { icon: '🏠', title: 'Dashboard', desc: 'KPIs em tempo real, MTBF/MTTR, Pareto de falhas e calendário de ordens — tudo em uma tela.' },
+  { icon: '📈', title: 'Gerencial', desc: 'Custo por m³ detalhado por categoria, centros de custo, transportadora, conta corrente e vendas.' },
+  { icon: '🪵', title: 'Madeira / Compras', desc: 'Entrada de matéria-prima por fornecedor, tiquetes, motorista, veículo e controle de estoque.' },
+  { icon: '🛒', title: 'Vendas', desc: 'Pedidos por cliente e produto, m³/toneladas, motorista, placa e extrato de conta corrente.' },
+  { icon: '💰', title: 'Financeiro', desc: 'Contas a pagar, despesas fixas, centros de custo e relatório de pagamentos por período.' },
+  { icon: '🤝', title: 'Conta Corrente', desc: 'Saldo por cliente e fornecedor, créditos, débitos, recebimentos e pagamentos, tudo conciliado.' },
   { icon: '📋', title: 'Ordens de Serviço', desc: 'Kanban visual, regra de Fim de Semana e baixa automática de peças no estoque ao fechar a OS.' },
   { icon: '⚙️', title: 'Máquinas', desc: 'Cadastro completo com componentes, plano de manutenção e controle de horímetro.' },
   { icon: '📝', title: 'Manutenção Preventiva', desc: 'Planos por período, consertos externos com rastreio de fornecedor e custo.' },
-  { icon: '✅', title: 'Tarefas', desc: 'Calendário diário com prioridade e responsável definidos por máquina ou setor.' },
-  { icon: '📦', title: 'Peças e Estoque', desc: 'Controle por categoria, pedidos de compra e histórico completo de movimentações.' },
-  { icon: '🏭', title: 'Fornecedores', desc: 'Cadastro com contato direto via WhatsApp e telefone.' },
-  { icon: '📊', title: 'Relatórios', desc: 'PDF filtrado por data, máquina ou operador, e backup completo dos dados em JSON.' },
-  { icon: '📱', title: 'QR Code', desc: 'Etiqueta gerada e impressa por máquina — escaneie e acesse o histórico na hora.' },
   { icon: '⏱️', title: 'Paradas', desc: 'Registro de downtime com cálculo automático de MTBF/MTTR e Pareto de causas.' },
-  { icon: '💰', title: 'Financeiro', desc: 'Contas a pagar e centros de custo vinculados à manutenção.' },
+  { icon: '📊', title: 'Produção', desc: 'Registro diário por classe de madeira, m³ produzido, cavaco e consumo de matéria-prima.' },
+  { icon: '⛽', title: 'Combustível', desc: 'Abastecimentos, despesas de veículo e transportadora com custo por km e km/litro.' },
+  { icon: '📦', title: 'Peças e Estoque', desc: 'Controle por categoria, pedidos de compra e histórico completo de movimentações.' },
+  { icon: '🏭', title: 'Cadastros', desc: 'Clientes, fornecedores, motoristas e veículos com cadastro rápido direto nos lançamentos.' },
+  { icon: '⚡', title: 'Energia', desc: 'Consumo e custo por fonte e setor, integrado ao custo de produção por m³.' },
+  { icon: '🎯', title: 'OEE', desc: 'Disponibilidade, performance e qualidade por máquina, período e turno.' },
+  { icon: '🔍', title: 'Auditorias', desc: 'Checklists, scores e pendências por setor e período.' },
+  { icon: '🎓', title: 'Treinamentos', desc: 'Status e validade de certificações por funcionário.' },
+  { icon: '🦺', title: 'EPI', desc: 'Controle de entrega de equipamentos de proteção por funcionário.' },
+  { icon: '📅', title: 'Agendamentos e Tarefas', desc: 'Calendário diário com prioridade e responsável definidos por máquina ou setor.' },
+  { icon: '📄', title: 'Documentos', desc: 'Repositório central de documentos da empresa, por categoria e vencimento.' },
+  { icon: '💬', title: 'Chat', desc: 'Comunicação interna da equipe, direto dentro do sistema.' },
+  { icon: '📱', title: 'QR Code', desc: 'Etiqueta gerada e impressa por máquina — escaneie e acesse o histórico na hora.' },
+  { icon: '📑', title: 'Relatórios', desc: 'PDF completo por módulo, parceiro ou período, e backup total dos dados em JSON.' },
   { icon: '👥', title: 'Multi-empresa (SaaS)', desc: 'Um sistema, várias empresas isoladas — com painel próprio para gestão de planos.' },
 ]
 
@@ -66,7 +79,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
     const text = encodeURIComponent(
       `Olá! Tenho interesse no Industrial8.\nNome: ${form.name}\nEmpresa: ${form.company || '-'}\nTelefone: ${form.phone}\nMensagem: ${form.message || '-'}`
     )
-    window.open(`https://wa.me/5554999999999?text=${text}`, '_blank')
+    window.open(`https://wa.me/5542998491918?text=${text}`, '_blank')
     setSent(true)
   }
 
@@ -80,6 +93,12 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
         .lp-btn-ghost:hover { background: rgba(249,115,22,.1) !important; border-color: rgba(249,115,22,.4) !important; }
         .lp-card:hover { border-color: rgba(249,115,22,.4) !important; transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,.35); }
         .lp-tab { cursor: pointer; transition: all .2s; }
+        .lp-tab:hover { background: rgba(249,115,22,.14) !important; border-color: rgba(249,115,22,.4) !important; color: #fb923c !important; }
+        .lp-scrollbar::-webkit-scrollbar { height: 5px; }
+        .lp-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .lp-scrollbar::-webkit-scrollbar-thumb { background: rgba(249,115,22,.35); border-radius: 3px; }
+        .lp-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(249,115,22,.55); }
+        .lp-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(249,115,22,.35) transparent; }
         ::selection { background: rgba(249,115,22,.3); }
       `}</style>
 
@@ -98,8 +117,43 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
           </div>
         </nav>
 
+        {/* ══════════ BARRA DE NAVEGAÇÃO (scroll horizontal pelas seções) ══════════ */}
+        <div style={{ position: 'sticky', top: '61px', zIndex: 40, background: 'rgba(6,16,30,.92)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(249,115,22,.1)' }}>
+          <div
+            className="lp-scrollbar"
+            style={{
+              maxWidth: '1100px', margin: '0 auto', padding: '10px 20px', display: 'flex', gap: '8px',
+              overflowX: 'auto', WebkitOverflowScrolling: 'touch',
+            }}
+          >
+            {[
+              { id: 'hero', label: '🏠 Início' },
+              { id: 'demo', label: '🖥️ Demonstração' },
+              { id: 'modulos', label: '📦 Módulos' },
+              { id: 'contato', label: '💬 Contato' },
+            ].map(t => (
+              <a key={t.id} href={`#${t.id}`} className="lp-tab" style={{
+                flexShrink: 0, padding: '7px 15px', borderRadius: '20px', fontSize: '12px', fontWeight: 700,
+                background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.08)',
+                color: '#8fa3bf', whiteSpace: 'nowrap', textDecoration: 'none',
+              }}>
+                {t.label}
+              </a>
+            ))}
+            {MODULES.map((m, i) => (
+              <a key={i} href="#modulos" className="lp-tab" style={{
+                flexShrink: 0, padding: '7px 15px', borderRadius: '20px', fontSize: '12px', fontWeight: 700,
+                background: 'rgba(249,115,22,.06)', border: '1px solid rgba(249,115,22,.18)',
+                color: '#fb923c', whiteSpace: 'nowrap', textDecoration: 'none',
+              }}>
+                {m.icon} {m.title}
+              </a>
+            ))}
+          </div>
+        </div>
+
         {/* ══════════ HERO ══════════ */}
-        <section style={{ position: 'relative', padding: '70px 20px 60px', textAlign: 'center', overflow: 'hidden' }}>
+        <section id="hero" style={{ position: 'relative', padding: '70px 20px 60px', textAlign: 'center', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(249,115,22,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(249,115,22,.025) 1px,transparent 1px)', backgroundSize: '46px 46px' }} />
           <div style={{ position: 'absolute', top: '0%', left: '50%', transform: 'translateX(-50%)', width: '70vw', maxWidth: '700px', height: '380px', borderRadius: '50%', background: 'radial-gradient(ellipse,rgba(249,115,22,.13),transparent 65%)', animation: 'lpPulse 5s ease-in-out infinite' }} />
           <div style={{ position: 'absolute', top: '8%', right: '6%', opacity: .12 }}><Gear size={120} spin={20} reverse /></div>
@@ -107,15 +161,16 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
 
           <div style={{ position: 'relative', maxWidth: '760px', margin: '0 auto' }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', background: 'rgba(249,115,22,.08)', border: '1px solid rgba(249,115,22,.25)', borderRadius: '20px', padding: '5px 14px', fontSize: '11px', fontWeight: 700, color: '#fb923c', letterSpacing: '.5px', textTransform: 'uppercase', marginBottom: '22px' }}>
-              ⚙️ Sistema de Manutenção Industrial
+              🏭 Sistema Industrial Completo
             </div>
             <h1 style={{ fontSize: 'clamp(32px,6vw,52px)', fontWeight: 800, lineHeight: 1.08, letterSpacing: '-1px', margin: '0 0 18px' }}>
-              Sua manutenção industrial,<br />
+              Sua operação industrial,<br />
               <span style={{ color: '#f97316' }}>organizada em um só lugar</span>
             </h1>
             <p style={{ fontSize: 'clamp(14px,2vw,17px)', color: '#8fa3bf', lineHeight: 1.6, maxWidth: '560px', margin: '0 auto 32px' }}>
-              Ordens de serviço, preventivas, estoque de peças, MTBF/MTTR e relatórios — tudo
-              integrado, com QR Code por máquina e acesso multiempresa em nuvem.
+              Vendas, compras de madeira, financeiro, conta corrente, gerencial, manutenção,
+              produção e muito mais — tudo integrado, com QR Code por máquina e acesso
+              multiempresa em nuvem.
             </p>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
               <button onClick={onEnter} className="lp-btn-primary" style={{ background: 'linear-gradient(135deg,#f97316,#c85a00)', color: '#fff', border: 'none', borderRadius: '12px', padding: '13px 28px', fontSize: '14px', fontWeight: 700, fontFamily: "'Sora',system-ui", cursor: 'pointer', boxShadow: '0 6px 24px rgba(249,115,22,.45)', transition: 'all .2s' }}>
@@ -129,7 +184,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
         </section>
 
         {/* ══════════ DEMO INTERATIVA ══════════ */}
-        <section style={{ padding: '20px 20px 70px', maxWidth: '1000px', margin: '0 auto' }}>
+        <section id="demo" style={{ padding: '20px 20px 70px', maxWidth: '1000px', margin: '0 auto' }}>
           <Reveal>
             <div style={{ textAlign: 'center', marginBottom: '28px' }}>
               <h2 style={{ fontSize: 'clamp(22px,3.5vw,30px)', fontWeight: 800, marginBottom: '8px' }}>Veja o sistema por dentro</h2>
@@ -215,11 +270,11 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
         </section>
 
         {/* ══════════ MÓDULOS ══════════ */}
-        <section style={{ padding: '20px 20px 70px', maxWidth: '1100px', margin: '0 auto' }}>
+        <section id="modulos" style={{ padding: '20px 20px 70px', maxWidth: '1100px', margin: '0 auto' }}>
           <Reveal>
             <div style={{ textAlign: 'center', marginBottom: '36px' }}>
-              <h2 style={{ fontSize: 'clamp(22px,3.5vw,30px)', fontWeight: 800, marginBottom: '8px' }}>12 módulos, um sistema só</h2>
-              <p style={{ color: '#8fa3bf', fontSize: '14px' }}>Tudo o que sua equipe de manutenção precisa, sem planilhas soltas</p>
+              <h2 style={{ fontSize: 'clamp(22px,3.5vw,30px)', fontWeight: 800, marginBottom: '8px' }}>{MODULES.length} módulos, um sistema só</h2>
+              <p style={{ color: '#8fa3bf', fontSize: '14px' }}>Tudo o que sua indústria precisa, sem planilhas soltas</p>
             </div>
           </Reveal>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(230px,1fr))', gap: '14px' }}>
@@ -285,7 +340,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
             <Gear size={20} spin={10} />
             <span style={{ fontSize: '13px', fontWeight: 700 }}>industrial<span style={{ color: '#f97316' }}>8</span></span>
           </div>
-          <div style={{ fontSize: '10px', color: '#4a6380' }}>Manutenção Industrial Inteligente</div>
+          <div style={{ fontSize: '10px', color: '#4a6380' }}>Sistema Industrial</div>
         </footer>
       </div>
     </>
