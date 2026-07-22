@@ -56,8 +56,10 @@ export default function SalesPage({ profile, can }: Props) {
   }
 
   async function savePayment() {
+    if (saving) return
     if (!newPay.parceiro) { toast.error('Selecione o parceiro'); return }
     if (!newPay.value || parseFloat(newPay.value) <= 0) { toast.error('Informe o valor'); return }
+    setSaving(true)
 
     const base = {
       payment_date: newPay.payment_date || td(),
@@ -74,9 +76,19 @@ export default function SalesPage({ profile, can }: Props) {
       : { supplier_name: newPay.parceiro, supplier_id: newPay.parceiro_id || null }
 
     const { error } = await supabase.from(tabela).insert({ ...base, ...campos })
+    setSaving(false)
     if (error) { toast.error('Erro: ' + error.message); return }
     toast.success(payTipo === 'receber' ? 'Recebimento registrado ✅' : 'Pagamento registrado ✅')
     setPayModal(false); setNewPay({}); loadExtrato()
+  }
+
+  async function deleteLancamento(origem: string, id: string) {
+    const ok = await confirm('Excluir este lançamento? Essa ação não pode ser desfeita.')
+    if (!ok) return
+    const { error } = await supabase.from(origem).delete().eq('id', id)
+    if (error) { toast.error('Erro ao excluir: ' + error.message); return }
+    toast.success('Lançamento excluído ✅')
+    loadExtrato()
   }
 
   // Lista de parceiros para o modal (clientes + fornecedores)
@@ -429,8 +441,9 @@ export default function SalesPage({ profile, can }: Props) {
                           return L.map((l:any,j:number)=>{
                             acum += (+l.credito||0) - (+l.debito||0)
                             const cor = l.tipo==='VENDA'?'var(--cy)':(l.tipo==='COMPRA MADEIRA'||l.tipo==='COMPRA PINUS')?'var(--rd)':l.tipo==='CRÉDITO'?'var(--am)':l.tipo==='DÉBITO'?'var(--pp)':'var(--gn)'
+                            const podeExcluir = l.tipo==='RECEBIMENTO' || l.tipo==='PAGAMENTO'
                             return (
-                              <div key={j} className="grid px-2 py-1.5" style={{gridTemplateColumns:'50px 1fr 62px 62px',background:'var(--s1)',borderTop:'1px solid var(--bd)',fontSize:'9px'}}>
+                              <div key={j} className="grid px-2 py-1.5" style={{gridTemplateColumns: podeExcluir?'50px 1fr 62px 62px 22px':'50px 1fr 62px 62px',background:'var(--s1)',borderTop:'1px solid var(--bd)',fontSize:'9px'}}>
                                 <span style={{color:'var(--t3)'}}>{fmtD(l.data)?.slice(0,5)}</span>
                                 <div style={{overflow:'hidden'}}>
                                   <div style={{fontWeight:700,color:cor}}>{l.tipo}</div>
@@ -444,6 +457,11 @@ export default function SalesPage({ profile, can }: Props) {
                                 <span style={{textAlign:'right',color:+l.debito!==0?'var(--rd)':'var(--t3)'}}>
                                   {+l.debito!==0?(+l.debito).toLocaleString('pt-BR',{maximumFractionDigits:0}):'—'}
                                 </span>
+                                {podeExcluir && (
+                                  <span onClick={()=>deleteLancamento(l.origem, l.id)}
+                                    style={{textAlign:'center',color:'var(--rd)',cursor:'pointer',fontWeight:700}}
+                                    title="Excluir lançamento">🗑️</span>
+                                )}
                               </div>
                             )
                           })
@@ -487,7 +505,7 @@ export default function SalesPage({ profile, can }: Props) {
 
           {/* Modal de lançamento */}
           <Modal open={payModal} onClose={()=>setPayModal(false)} title={payTipo==='receber'?'💵 Registrar Recebimento':'💸 Registrar Pagamento'}
-            footer={<><Btn onClick={()=>setPayModal(false)}>Cancelar</Btn><Btn onClick={savePayment} variant="primary" size="md">Salvar</Btn></>}>
+            footer={<><Btn onClick={()=>setPayModal(false)}>Cancelar</Btn><Btn onClick={savePayment} variant="primary" size="md" disabled={saving}>{saving?'Salvando...':'Salvar'}</Btn></>}>
 
             <div className="flex gap-2 mb-3">
               {([['receber','💵 Recebi (cliente pagou)'],['pagar','💸 Paguei (para fornecedor)']] as ['receber'|'pagar',string][]).map(([k,l])=>(
