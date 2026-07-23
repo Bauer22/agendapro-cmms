@@ -134,9 +134,13 @@ export default function UsersPage({ profile, can }: Props) {
       if (isNew) {
         // Chama rota server-side que usa Service Role Key (Admin API) —
         // cria o usuário SEM enviar e-mail e SEM afetar a sessão do admin
+        const { data: sess } = await supabase.auth.getSession()
+        const token = sess?.session?.access_token
+        if (!token) { toast.error('Sessão expirada — faça login de novo'); setSaving(false); return }
+
         const res = await fetch('/api/create-user', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({
             username: editing.username,
             password: editing.password,
