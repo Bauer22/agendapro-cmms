@@ -22,6 +22,8 @@ export default function FinancePage({ profile, can }: Props) {
   const [modal, setModal]       = useState(false)
   const [editing, setEdit]      = useState<any>({})
   const [tab, setTab]           = useState('bills')
+  const [opModal, setOpModal]   = useState(false)
+  const [op, setOp]             = useState<any>({})
   const [fixed, setFixed]       = useState<any[]>([])
   const [fixModal, setFixModal] = useState(false)
   const [editFix, setEditFix]   = useState<any>({})
@@ -106,6 +108,69 @@ export default function FinancePage({ profile, can }: Props) {
     await supabase.from('fixed_expenses').update({ last_generated: `${ym}-01` }).in('id', pend.map(f=>f.id))
     toast.success(`${rows.length} lançamento(s) gerado(s) ✅`)
     load()
+  }
+
+  function imprimirOrdemPagamento(dados: any) {
+    const esc = (s:any) => String(s==null?'':s).replace(/[&<>"']/g, (c:string)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]||c))
+    const fmtR = (v:any) => 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})
+    const fmtD2 = (d:string) => d ? new Date(d+'T00:00:00').toLocaleDateString('pt-BR') : '—'
+    const linha = (l:string,v:string) => `<tr><td style="padding:8px 12px;color:#555;border-bottom:1px solid #ddd;width:35%">${esc(l)}</td><td style="padding:8px 12px;font-weight:bold;border-bottom:1px solid #ddd">${esc(v)}</td></tr>`
+    const html = `
+      <html><head><title>Ordem de Pagamento</title></head>
+      <body style="font-family:Arial,sans-serif;max-width:640px;margin:20px auto;color:#111">
+        <div style="background:#060d1a;color:#fff;padding:18px;border-radius:8px 8px 0 0">
+          <h2 style="margin:0;color:#f97316">ORDEM DE PAGAMENTO</h2>
+          <div style="font-size:12px;color:#ccc">Pagamento avulso (sem nota fiscal) · Emitido em ${new Date().toLocaleString('pt-BR')}</div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;border:1px solid #ddd">
+          ${linha('Fornecedor / Beneficiário', dados.nomeF)}
+          ${linha('Valor a pagar', fmtR(dados.valor))}
+          ${linha('Chave PIX', dados.pix || '—')}
+          ${linha('Data para pagamento', fmtD2(dados.due_date))}
+          ${linha('Descrição / Referência', dados.descricao || '—')}
+          ${linha('Solicitado por', dados.solicitante || '—')}
+        </table>
+        <div style="margin-top:50px;display:flex;justify-content:space-around;font-size:12px;text-align:center">
+          <div>_____________________________<br>Solicitante</div>
+          <div>_____________________________<br>Autorização / Financeiro</div>
+        </div>
+        <div style="margin-top:40px;font-size:10px;color:#888;text-align:center">
+          Este documento autoriza o pagamento acima descrito. Confira os dados antes de efetuar.
+        </div>
+      </body></html>`
+    const w = window.open('', '_blank')
+    if (w) { w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>w.print(), 300) }
+  }
+
+  async function salvarOrdemPagamento() {
+    if (saving) return
+    if (!op.fornecedor_id) { toast.error('Selecione o fornecedor'); return }
+    if (!op.valor || parseFloat(String(op.valor)) <= 0) { toast.error('Informe o valor'); return }
+    if (!op.due_date) { toast.error('Informe a data de pagamento'); return }
+    setSaving(true)
+    try {
+      const sup = suppliers.find((s:any)=>s.id===op.fornecedor_id)
+      const nomeF = sup ? (sup.nome_razao||sup.nome_fantasia) : ''
+      const obs = op.pix ? `PIX: ${op.pix}` : ''
+      const obj = {
+        fornecedor_id: op.fornecedor_id,
+        valor: parseFloat(String(op.valor)),
+        due_date: op.due_date,
+        data_emissao: td(),
+        descricao: op.descricao || `Ordem de pagamento — ${nomeF}`,
+        observacao: obs,
+        status: 'pending',
+        created_by: profile?.display_name||profile?.email,
+        created_at: new Date().toISOString(),
+      }
+      const { error } = await supabase.from('accounts_payable').insert(obj)
+      if (error) throw error
+      toast.success('Ordem de pagamento lançada no Financeiro ✅')
+      // Imprime automaticamente ao salvar
+      imprimirOrdemPagamento({ nomeF, valor: obj.valor, pix: op.pix, due_date: op.due_date, descricao: op.descricao, solicitante: profile?.display_name||profile?.email })
+      setOpModal(false); setOp({}); load()
+    } catch(e:any) { toast.error('Erro: '+e.message) }
+    finally { setSaving(false) }
   }
 
   async function saveBill() {
@@ -396,6 +461,7 @@ export default function FinancePage({ profile, can }: Props) {
               style={{background:'var(--s1)',border:'1px solid var(--bd)',color:'var(--t1)',fontFamily:'Sora,system-ui,sans-serif'}}
               onFocus={e=>e.target.style.borderColor='var(--cy)'} onBlur={e=>e.target.style.borderColor='var(--bd)'} />
             {can('admin')&&<Btn onClick={()=>{setEdit({status:'pending',data_emissao:td()});setModal(true)}} size="sm" variant="primary">+ Nova</Btn>}
+            {can('admin')&&<Btn onClick={()=>{setOp({due_date:td()});setOpModal(true)}} size="sm" variant="secondary">💸 Ordem de Pagamento</Btn>}
           </div>
 
           {/* Status filter */}
@@ -445,6 +511,20 @@ export default function FinancePage({ profile, can }: Props) {
           )}
 
           {/* Bill Modal */}
+          <Modal open={opModal} onClose={()=>setOpModal(false)} title="💸 Ordem de Pagamento"
+            footer={<><Btn onClick={()=>setOpModal(false)}>Cancelar</Btn><Btn onClick={salvarOrdemPagamento} variant="primary" size="md" disabled={saving}>{saving?'Salvando...':'Salvar e Imprimir'}</Btn></>}>
+            <div style={{fontSize:'11px',color:'var(--t3)',marginBottom:'10px'}}>Pagamento avulso (sem NF). Ao salvar, lança no Financeiro e abre a impressão.</div>
+            <SelectComCadastro label="Fornecedor / Beneficiário *" tipo="fornecedor" value={op.fornecedor_id||''} onChange={(v:string)=>setOp((e:any)=>({...e,fornecedor_id:v}))}
+              options={suppliers.map((s:any)=>({value:s.id,label:s.nome_razao||s.nome_fantasia}))}
+              companyId={profile?.company_id} createdBy={profile?.display_name} onCreatedRefresh={()=>load()} />
+            <div className="grid grid-cols-2 gap-x-3">
+              <Input label="Valor R$ *" type="number" value={op.valor||''} onChange={(v:string)=>setOp((e:any)=>({...e,valor:v}))} placeholder="0.00" />
+              <Input label="Data de Pagamento *" type="date" value={op.due_date||''} onChange={(v:string)=>setOp((e:any)=>({...e,due_date:v}))} />
+            </div>
+            <Input label="Chave PIX" value={op.pix||''} onChange={(v:string)=>setOp((e:any)=>({...e,pix:v}))} placeholder="CPF, CNPJ, e-mail, telefone ou chave aleatória" />
+            <Input label="Descrição / Referência" value={op.descricao||''} onChange={(v:string)=>setOp((e:any)=>({...e,descricao:v}))} placeholder="Motivo do pagamento" />
+          </Modal>
+
           <Modal open={modal&&tab==='bills'} onClose={()=>setModal(false)} title={editing.id?'Editar Conta':'Nova Conta a Pagar'}
             footer={<><Btn onClick={()=>setModal(false)} variant="secondary" size="md">Cancelar</Btn><Btn onClick={saveBill} variant="primary" size="md" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Btn></>}>
             <SelectComCadastro label="Fornecedor *" tipo="fornecedor" value={editing.fornecedor_id||''} onChange={(v:string)=>setEdit((e:any)=>({...e,fornecedor_id:v}))}
