@@ -127,6 +127,7 @@ export default function FinancePage({ profile, can }: Props) {
           ${linha('Valor a pagar', fmtR(dados.valor))}
           ${linha('Chave PIX', dados.pix || '—')}
           ${linha('Data para pagamento', fmtD2(dados.due_date))}
+          ${linha('Centro de Custo', dados.centro || '—')}
           ${linha('Descrição / Referência', dados.descricao || '—')}
           ${linha('Solicitado por', dados.solicitante || '—')}
         </table>
@@ -159,6 +160,7 @@ export default function FinancePage({ profile, can }: Props) {
         data_emissao: td(),
         descricao: op.descricao || `Ordem de pagamento — ${nomeF}`,
         observacao: obs,
+        centro_custo_id: op.centro_custo_id || null,
         status: 'pending',
         created_by: profile?.display_name||profile?.email,
         created_at: new Date().toISOString(),
@@ -167,7 +169,9 @@ export default function FinancePage({ profile, can }: Props) {
       if (error) throw error
       toast.success('Ordem de pagamento lançada no Financeiro ✅')
       // Imprime automaticamente ao salvar
-      imprimirOrdemPagamento({ nomeF, valor: obj.valor, pix: op.pix, due_date: op.due_date, descricao: op.descricao, solicitante: profile?.display_name||profile?.email })
+      const cc = centers.find((x:any)=>x.id===op.centro_custo_id)
+      const nomeCentro = cc ? `${cc.codigo} - ${cc.descricao}` : '—'
+      imprimirOrdemPagamento({ nomeF, valor: obj.valor, pix: op.pix, due_date: op.due_date, descricao: op.descricao, centro: nomeCentro, solicitante: profile?.display_name||profile?.email })
       setOpModal(false); setOp({}); load()
     } catch(e:any) { toast.error('Erro: '+e.message) }
     finally { setSaving(false) }
@@ -523,6 +527,7 @@ export default function FinancePage({ profile, can }: Props) {
             </div>
             <Input label="Chave PIX" value={op.pix||''} onChange={(v:string)=>setOp((e:any)=>({...e,pix:v}))} placeholder="CPF, CNPJ, e-mail, telefone ou chave aleatória" />
             <Input label="Descrição / Referência" value={op.descricao||''} onChange={(v:string)=>setOp((e:any)=>({...e,descricao:v}))} placeholder="Motivo do pagamento" />
+            <Select label="Centro de Custo" value={op.centro_custo_id||''} onChange={(v:string)=>setOp((e:any)=>({...e,centro_custo_id:v}))} options={[{value:'',label:'Selecione...'}, ...centers.map((c:any)=>({value:c.id,label:`${c.codigo} - ${c.descricao}`}))]} />
           </Modal>
 
           <Modal open={modal&&tab==='bills'} onClose={()=>setModal(false)} title={editing.id?'Editar Conta':'Nova Conta a Pagar'}
