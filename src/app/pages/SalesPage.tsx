@@ -72,7 +72,7 @@ export default function SalesPage({ profile, can }: Props) {
       quantity: newAut.quantity ? parseFloat(newAut.quantity) : null,
       unit: newAut.unit || 'ton',
       driver_name: newAut.driver_name || null,
-      driver_id: newAut.driver_id || null,
+      driver_id: (newAut.driver_id && newAut.driver_id !== '__OUTRO__') ? newAut.driver_id : null,
       plate: newAut.plate || null,
       operator_name: newAut.operator_name || null,
       released_by: profile?.display_name || 'SISTEMA',
@@ -843,13 +843,18 @@ export default function SalesPage({ profile, can }: Props) {
             </div>
 
             {motoristas.length > 0 ? (
-              <SelectComCadastro label="Motorista" tipo="motorista" value={newAut.driver_id||''}
-                onChange={(v:string)=>{
-                  const m = motoristas.find((x:any)=>x.id===v)
-                  setNewAut((e:any)=>({...e, driver_id:v, driver_name:m?.name||''}))
-                }}
-                options={motoristas.map((m:any)=>({value:m.id,label:m.name}))}
-                companyId={profile?.company_id} createdBy={profile?.display_name} onCreatedRefresh={()=>loadMeta()} />
+              <>
+                <Select label="Motorista" value={newAut.driver_id||''}
+                  onChange={(v:string)=>{
+                    if (v==='__OUTRO__') { setNewAut((e:any)=>({...e, driver_id:'__OUTRO__', driver_name:''})); return }
+                    const m = motoristas.find((x:any)=>x.id===v)
+                    setNewAut((e:any)=>({...e, driver_id:v, driver_name:m?.name||''}))
+                  }}
+                  options={[{value:'',label:'Selecione...'}, ...motoristas.map((m:any)=>({value:m.id,label:m.name})), {value:'__OUTRO__',label:'➕ Outro (digitar)'}]} />
+                {newAut.driver_id==='__OUTRO__' && (
+                  <Input label="Nome do motorista" value={newAut.driver_name} onChange={(v:string)=>setNewAut((e:any)=>({...e,driver_name:v}))} placeholder="Digite o nome do motorista" />
+                )}
+              </>
             ) : (
               <Input label="Motorista" value={newAut.driver_name} onChange={(v:string)=>setNewAut((e:any)=>({...e,driver_name:v}))} placeholder="Nome do motorista" />
             )}

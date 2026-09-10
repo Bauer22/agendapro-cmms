@@ -296,20 +296,20 @@ export default function ReportsPage({ profile, can }: Props) {
         const parceiroNome = parceiros.find((p:any)=>p.id===fParceiro)?.nome_razao || ''
         const nomeUpper = parceiroNome.trim().toUpperCase()
 
-        let qCompras = supabase.from('purchase_tickets').select('*').eq('supplier_name', parceiroNome).order('purchase_date',{ascending:false})
+        let qCompras = supabase.from('purchase_tickets').select('*').eq('supplier_name', parceiroNome).order('purchase_date',{ascending:true})
         if (dateFrom) qCompras = qCompras.gte('purchase_date', dateFrom)
         if (dateTo)   qCompras = qCompras.lte('purchase_date', dateTo)
-        let qWood = supabase.from('wood_entries').select('*').ilike('supplier_name', parceiroNome).order('data_entrada',{ascending:false})
+        let qWood = supabase.from('wood_entries').select('*').ilike('supplier_name', parceiroNome).order('data_entrada',{ascending:true})
         if (dateFrom) qWood = qWood.gte('data_entrada', dateFrom)
         if (dateTo)   qWood = qWood.lte('data_entrada', dateTo)
-        let qVendas = supabase.from('sales_orders').select('*').ilike('client_name', parceiroNome).eq('status','active').order('sale_date',{ascending:false})
+        let qVendas = supabase.from('sales_orders').select('*').ilike('client_name', parceiroNome).eq('status','active').order('sale_date',{ascending:true})
         if (dateFrom) qVendas = qVendas.gte('sale_date', dateFrom)
         if (dateTo)   qVendas = qVendas.lte('sale_date', dateTo)
         let qSaldo = supabase.from('v_saldo_conta_corrente').select('*').eq('parceiro', nomeUpper)
-        let qRecebido = supabase.from('client_payments').select('*').ilike('client_name', parceiroNome).order('payment_date',{ascending:false})
+        let qRecebido = supabase.from('client_payments').select('*').ilike('client_name', parceiroNome).order('payment_date',{ascending:true})
         if (dateFrom) qRecebido = qRecebido.gte('payment_date', dateFrom)
         if (dateTo)   qRecebido = qRecebido.lte('payment_date', dateTo)
-        let qPago = supabase.from('supplier_payments').select('*').ilike('supplier_name', parceiroNome).order('payment_date',{ascending:false})
+        let qPago = supabase.from('supplier_payments').select('*').ilike('supplier_name', parceiroNome).order('payment_date',{ascending:true})
         if (dateFrom) qPago = qPago.gte('payment_date', dateFrom)
         if (dateTo)   qPago = qPago.lte('payment_date', dateTo)
 
@@ -356,29 +356,34 @@ export default function ReportsPage({ profile, can }: Props) {
         })
         y = (doc as any).lastAutoTable.finalY + 10
 
-        // ── Seção 3: Saldo ──
+        // ── Seção 4: Viagens por motorista, agrupadas por tipo ──
         if (y > 250) { doc.addPage(); y = 20 }
-        doc.setFontSize(11); doc.setTextColor(0,212,255)
-        doc.text('Saldo da Conta Corrente', 12, y)
-        y += 5
-        doc.setFontSize(9); doc.setTextColor(20,20,20)
-        if (saldo) {
-          const linhas = [
-            `Total Compras: R$ ${fmtR(+saldo.total_compras||0)}`,
-            `Total Vendas: R$ ${fmtR(+saldo.total_vendas||0)}`,
-            `Recebido: R$ ${fmtR(+saldo.total_recebido||0)}  |  Pago: R$ ${fmtR(+saldo.total_pago||0)}`,
-            `Créditos: R$ ${fmtR(+saldo.total_creditos||0)}  |  Débitos: R$ ${fmtR(+saldo.total_debitos||0)}`,
-          ]
-          linhas.forEach(l => { doc.text(l, 12, y); y += 5 })
-          doc.setFont('helvetica','bold'); doc.setFontSize(11)
-          doc.setTextColor(saldo.saldo_final>=0?34:239, saldo.saldo_final>=0?197:68, saldo.saldo_final>=0?94:68)
-          doc.text(`SALDO: R$ ${fmtR(+saldo.saldo_final||0)} (${saldo.situacao})`, 12, y)
-          y += 10
-        } else {
-          doc.text('Sem movimentação de conta corrente para este parceiro.', 12, y)
-          y += 10
+        doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(0,212,255)
+        doc.text('Viagens por Motorista', 12, y)
+        // chave = "motorista||tipo" — tipo é "MADEIRA {fornecedor}" para compras
+        // ou o nome do produto para vendas (ex: LAMINA, ROLETE)
+        const viagens: Record<string,{motorista:string,tipo:string,qtd:number,peso:number}> = {}
+        const addViagem = (mot: string, tipo: string, peso: number) => {
+          const key = `${mot}||${tipo}`
+          if (!viagens[key]) viagens[key] = {motorista:mot, tipo, qtd:0, peso:0}
+          viagens[key].qtd += 1
+          viagens[key].peso += peso
         }
-
+        compras.forEach((r:any) => {
+          addViagem(r.driver || 'Não informado', `MADEIRA ${parceiroNome.toUpperCase()}`, +r.weight_tons || 0)
+        })
+        vendas.forEach((r:any) => {
+          addViagem(r.driver || 'Não informado', (r.product_name || 'PRODUTO NÃO INFORMADO').toUpperCase(), +r.weight_tons || 0)
+        })
+        const linhasViagem = Object.values(viagens).sort((a,b) => a.motorista.localeCompare(b.motorista) || a.tipo.localeCompare(b.tipo))
+        autoTable(doc, {
+          startY: y+3,
+          head: [['Motorista','Tipo de Viagem','Viagens','Peso Total (t)']],
+          body: linhasViagem.map(v => [v.motorista, v.tipo, `${v.qtd}`, `${v.peso.toFixed(1)}`]),
+          styles: { fontSize:7, cellPadding:2 },
+          headStyles: { fillColor:[6,13,26], textColor:[255,255,255] },
+          alternateRowStyles: { fillColor:[241,245,249] },
+        })
         // ── Seção: Pagamentos Recebidos no período ──
         const recebidos = rRecebido.data || []
         if (recebidos.length > 0) {
@@ -425,34 +430,29 @@ export default function ReportsPage({ profile, can }: Props) {
           y = (doc as any).lastAutoTable.finalY + 10
         }
 
-        // ── Seção 4: Viagens por motorista, agrupadas por tipo ──
+        // ── Seção 3: Saldo ──
         if (y > 250) { doc.addPage(); y = 20 }
-        doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(0,212,255)
-        doc.text('Viagens por Motorista', 12, y)
-        // chave = "motorista||tipo" — tipo é "MADEIRA {fornecedor}" para compras
-        // ou o nome do produto para vendas (ex: LAMINA, ROLETE)
-        const viagens: Record<string,{motorista:string,tipo:string,qtd:number,peso:number}> = {}
-        const addViagem = (mot: string, tipo: string, peso: number) => {
-          const key = `${mot}||${tipo}`
-          if (!viagens[key]) viagens[key] = {motorista:mot, tipo, qtd:0, peso:0}
-          viagens[key].qtd += 1
-          viagens[key].peso += peso
+        doc.setFontSize(11); doc.setTextColor(0,212,255)
+        doc.text('Saldo da Conta Corrente', 12, y)
+        y += 5
+        doc.setFontSize(9); doc.setTextColor(20,20,20)
+        if (saldo) {
+          const linhas = [
+            `Total Compras: R$ ${fmtR(+saldo.total_compras||0)}`,
+            `Total Vendas: R$ ${fmtR(+saldo.total_vendas||0)}`,
+            `Recebido: R$ ${fmtR(+saldo.total_recebido||0)}  |  Pago: R$ ${fmtR(+saldo.total_pago||0)}`,
+            `Créditos: R$ ${fmtR(+saldo.total_creditos||0)}  |  Débitos: R$ ${fmtR(+saldo.total_debitos||0)}`,
+          ]
+          linhas.forEach(l => { doc.text(l, 12, y); y += 5 })
+          doc.setFont('helvetica','bold'); doc.setFontSize(11)
+          doc.setTextColor(saldo.saldo_final>=0?34:239, saldo.saldo_final>=0?197:68, saldo.saldo_final>=0?94:68)
+          doc.text(`SALDO: R$ ${fmtR(+saldo.saldo_final||0)} (${saldo.situacao})`, 12, y)
+          y += 10
+        } else {
+          doc.text('Sem movimentação de conta corrente para este parceiro.', 12, y)
+          y += 10
         }
-        compras.forEach((r:any) => {
-          addViagem(r.driver || 'Não informado', `MADEIRA ${parceiroNome.toUpperCase()}`, +r.weight_tons || 0)
-        })
-        vendas.forEach((r:any) => {
-          addViagem(r.driver || 'Não informado', (r.product_name || 'PRODUTO NÃO INFORMADO').toUpperCase(), +r.weight_tons || 0)
-        })
-        const linhasViagem = Object.values(viagens).sort((a,b) => a.motorista.localeCompare(b.motorista) || a.tipo.localeCompare(b.tipo))
-        autoTable(doc, {
-          startY: y+3,
-          head: [['Motorista','Tipo de Viagem','Viagens','Peso Total (t)']],
-          body: linhasViagem.map(v => [v.motorista, v.tipo, `${v.qtd}`, `${v.peso.toFixed(1)}`]),
-          styles: { fontSize:7, cellPadding:2 },
-          headStyles: { fillColor:[6,13,26], textColor:[255,255,255] },
-          alternateRowStyles: { fillColor:[241,245,249] },
-        })
+
         doc.save(`Parceiro_${parceiroNome.replace(/\s+/g,'')}_${dateStr.replace(/\//g,'-')}.pdf`)
 
       } else if (moduleId === 'financeiro_completo') {
