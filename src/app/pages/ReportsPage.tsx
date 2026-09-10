@@ -384,6 +384,8 @@ export default function ReportsPage({ profile, can }: Props) {
           headStyles: { fillColor:[6,13,26], textColor:[255,255,255] },
           alternateRowStyles: { fillColor:[241,245,249] },
         })
+        y = (doc as any).lastAutoTable.finalY + 10
+
         // ── Seção: Pagamentos Recebidos no período ──
         const recebidos = rRecebido.data || []
         if (recebidos.length > 0) {
