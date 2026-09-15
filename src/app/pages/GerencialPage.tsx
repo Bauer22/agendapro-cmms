@@ -23,6 +23,7 @@ export default function GerencialPage({ profile, can }: Props) {
   const [pTo, setPTo]     = useState('')
 
   const [custos, setCustos]   = useState<any[]>([])
+  const [estoque, setEstoque] = useState<any[]>([])  // m3_consumo (tanque) por mês
   const [centros, setCentros] = useState<any[]>([])
   const [transp, setTransp]   = useState<any[]>([])
   const [conta, setConta]     = useState<any[]>([])
@@ -39,17 +40,19 @@ export default function GerencialPage({ profile, can }: Props) {
       const mesAtual = new Date().toISOString().slice(0,7)
       await supabase.rpc('fn_fechar_estoque_madeira', { p_mes: mesAtual })
     } catch (e) { /* silencioso: nao impede o carregamento */ }
-    const [c, cc, t, k, s, v] = await Promise.all([
+    const [c, cc, t, k, s, v, est] = await Promise.all([
       supabase.from('v_custo_m3_mensal').select('*'),
       supabase.from('v_custo_m3_centro').select('*'),
       supabase.from('v_transportadora').select('*'),
       supabase.from('v_conta_corrente').select('*'),
       supabase.from('v_saldo_parceiro').select('*'),
       supabase.from('v_vendas_produto_mes').select('*'),
+      supabase.from('estoque_madeira_mensal').select('mes,m3_consumo'),
     ])
     if (c.error) toast.error('Erro custo/m³: '+c.error.message)
     if (cc.error) console.warn('v_custo_m3_centro indisponível:', cc.error.message)
     setCustos(c.data||[]); setCentros(cc.data||[]); setTransp(t.data||[])
+    setEstoque(est?.data||[])
     setConta(k.data||[]);  setSaldos(s.data||[]);   setVendas(v.data||[])
     setLoading(false)
   }
@@ -107,6 +110,10 @@ export default function GerencialPage({ profile, can }: Props) {
   const mesesNoPeriodo = new Set(fCustos.map((x:any)=>x.mes)).size || 1
   const mediaProducao = T.m3 / mesesNoPeriodo                         // média de m³ por mês
   const totalCentros = fCentros.reduce((s:number,c:any)=>s+(+c.valor||0),0)  // soma dos centros de custo
+  // Renda média de produção: total m³ tanque (madeira) ÷ total m³ lâmina produzida
+  const mesesPeriodo = new Set(fCustos.map((x:any)=>x.mes))
+  const totalTanque = estoque.filter((e:any)=>mesesPeriodo.has(e.mes)).reduce((s:number,e:any)=>s+(+e.m3_consumo||0),0)
+  const rendaMedia = T.m3 > 0 ? totalTanque / T.m3 : 0
   const custoM3    = T.m3 > 0 ? custoTotal / T.m3 : 0
   const fatTotal   = fVendas.reduce((s,x)=>s+(+x.faturado||0),0)
   const margem     = fatTotal - custoTotal
@@ -288,6 +295,13 @@ export default function GerencialPage({ profile, can }: Props) {
     <div><b>${money(margem)}</b>${margem>=0?'Margem':'Prejuízo'}</div>
   </div>
 
+  <div class="kpi">
+    <div><b>${money(T.materiaPrima)}</b>Matéria-Prima (total)</div>
+    <div><b>${money(totalCentros)}</b>Centros de Custo (total)</div>
+    <div><b>${mediaProducao.toFixed(0)} m³</b>Média Produção/mês</div>
+    <div><b>${rendaMedia.toFixed(4)}</b>Renda (tanque/lâmina)</div>
+  </div>
+
   ${secCusto}
   ${secCentros}
   ${secTransp}
@@ -346,10 +360,11 @@ export default function GerencialPage({ profile, can }: Props) {
       </div>
 
       {/* Indicadores adicionais */}
-      <div className="grid grid-cols-3 gap-2 mb-3">
+      <div className="grid grid-cols-4 gap-2 mb-3">
         <KPI num={moneyK(T.materiaPrima)} label="Matéria-Prima" color="orange" />
         <KPI num={moneyK(totalCentros)} label="Centros de Custo" color="red" />
         <KPI num={`${mediaProducao.toFixed(0)}m³`} label="Média Produção/mês" color="green" />
+        <KPI num={rendaMedia.toFixed(4)} label="Renda (tanque/lâmina)" color="blue" />
       </div>
 
       {/* Margem */}
