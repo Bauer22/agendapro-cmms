@@ -133,7 +133,7 @@ export default function ProductionPage({ profile, can }: Props) {
   const repProd = rep.reduce((s,r)=>s+(parseFloat(r.produced_m3)||0),0)
   const repCav  = rep.reduce((s,r)=>s+(parseFloat(r.cavaco_m3)||0),0)
   const repTons = repTank / CONV
-  const repCost = repTons * avgTonPrice
+  const repCost = rep.reduce((s,r)=>s+calc(r).cost,0)  // soma do custo ponderado de cada lançamento (igual ao Gerencial)
   const repYield = repProd > 0 ? repTank/repProd : 0
   const repCostM3 = repProd > 0 ? repCost/repProd : 0
 
