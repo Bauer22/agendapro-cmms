@@ -103,6 +103,10 @@ export default function GerencialPage({ profile, can }: Props) {
     melhorias:     fCustos.reduce((s,x)=>s+(+x.custo_melhorias||0),0),
   }
   const custoTotal = T.materiaPrima + T.maoObra + T.manutencao + T.energia + T.caldeira + T.combustivel + T.administrativo + T.maquinas + T.diversas + T.fixosAdm + T.melhorias
+  // Indicadores extras para o dashboard
+  const mesesNoPeriodo = new Set(fCustos.map((x:any)=>x.mes)).size || 1
+  const mediaProducao = T.m3 / mesesNoPeriodo                         // média de m³ por mês
+  const totalCentros = fCentros.reduce((s:number,c:any)=>s+(+c.valor||0),0)  // soma dos centros de custo
   const custoM3    = T.m3 > 0 ? custoTotal / T.m3 : 0
   const fatTotal   = fVendas.reduce((s,x)=>s+(+x.faturado||0),0)
   const margem     = fatTotal - custoTotal
@@ -339,6 +343,13 @@ export default function GerencialPage({ profile, can }: Props) {
         <KPI num={moneyK(custoTotal)} label="Custo total" color="red" />
         <KPI num={money(custoM3).replace('R$ ','R$')} label="Custo/m³" color="orange" />
         <KPI num={moneyK(fatTotal)} label="Faturado" color="blue" />
+      </div>
+
+      {/* Indicadores adicionais */}
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        <KPI num={moneyK(T.materiaPrima)} label="Matéria-Prima" color="orange" />
+        <KPI num={moneyK(totalCentros)} label="Centros de Custo" color="red" />
+        <KPI num={`${mediaProducao.toFixed(0)}m³`} label="Média Produção/mês" color="green" />
       </div>
 
       {/* Margem */}

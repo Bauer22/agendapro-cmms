@@ -17,6 +17,7 @@ export default function ProductionPage({ profile, can }: Props) {
   const [tab, setTab] = useState<Tab>('lancamentos')
   const [records, setRecords] = useState<any[]>([])
   const [woodEntries, setWoodEntries] = useState<any[]>([])
+  const [estoqueMensal, setEstoqueMensal] = useState<any[]>([])  // preço médio ponderado por mês (mesmo do Gerencial)
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<any>({})
   const [view, setView] = useState<any>(null)
@@ -32,15 +33,17 @@ export default function ProductionPage({ profile, can }: Props) {
 
   async function load() {
     setLoading(true)
-    const [p, w, cfg] = await Promise.all([
+    const [p, w, cfg, est] = await Promise.all([
       supabase.from('production_records').select('*').order('prod_date',{ascending:false}).order('created_at',{ascending:false}).limit(300),
       supabase.from('wood_entries').select('data_entrada,weight_tons,peso_liquido,total_value,unit_value,volume_m3').limit(1000),
       supabase.from('system_config').select('valor').eq('chave','conv_tanque_tons').maybeSingle(),
+      supabase.from('estoque_madeira_mensal').select('mes,preco_medio'),
     ])
     if (cfg?.data?.valor && +cfg.data.valor > 0) setCONV(+cfg.data.valor)
     if (p.error) toast.error('Erro: '+p.error.message)
     setRecords(p.data||[])
     setWoodEntries(w.data||[])
+    setEstoqueMensal(est?.data||[])
     setLoading(false)
   }
 
@@ -57,12 +60,19 @@ export default function ProductionPage({ profile, can }: Props) {
   const totalWoodVal  = filteredWood.reduce((s,w)=>s+woodValue(w),0)
   const avgTonPrice   = totalWoodTons > 0 ? totalWoodVal/totalWoodTons : 0
 
+  // Preço ponderado do mês (mesmo do Gerencial); se não houver, usa o médio das entradas como fallback
+  function precoMesPonderado(mes:string) {
+    const e = estoqueMensal.find((x:any)=>x.mes===mes)
+    return (e && +e.preco_medio>0) ? +e.preco_medio : avgTonPrice
+  }
   function calc(r:any) {
     const tank = parseFloat(r.tank_m3)||0
     const prod = parseFloat(r.produced_m3)||0
     const tons = tank / CONV
     const yieldPct = prod > 0 ? tank/prod : 0        // renda = m³ tanque ÷ m³ produzido
-    const cost = tons * avgTonPrice                    // custo total da madeira consumida
+    const mes = (r.prod_date||'').slice(0,7)
+    const preco = precoMesPonderado(mes)              // preço médio ponderado (com estoque), igual ao Gerencial
+    const cost = tons * preco                          // custo total da madeira consumida
     const costPerM3 = prod > 0 ? cost/prod : 0        // custo por m³ produzido
     return { tons, yieldPct, cost, costPerM3 }
   }
