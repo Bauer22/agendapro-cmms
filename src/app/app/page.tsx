@@ -234,14 +234,14 @@ export default function App() {
     {id:'finance' as Page,    label:'Financeiro',  icon:IC.fin},
     {id:'reports' as Page,    label:'Relatórios',  icon:IC.rep},
     {id:'qr' as Page,         label:'QR Codes',    icon:IC.qr},
-    {id:'chat' as Page,       label:'Conversas',   icon:IC.chat},
-    {id:'scheduling' as Page, label:'Agendamentos',icon:<span>📅</span>},
-    {id:'documents' as Page,  label:'Documentos',  icon:<span>📄</span>},
+    // {id:'chat' as Page,       label:'Conversas',   icon:IC.chat},  // desativado temporariamente
+    // {id:'scheduling' as Page, label:'Agendamentos',icon:<span>📅</span>},  // desativado temporariamente
+    // {id:'documents' as Page,  label:'Documentos',  icon:<span>📄</span>},  // desativado temporariamente
     {id:'epi' as Page,        label:'EPI/Seg.',    icon:<span>🦺</span>},
-    {id:'oee' as Page,        label:'OEE',         icon:<span>📈</span>},
-    {id:'training' as Page,   label:'Treinamentos',icon:<span>🎓</span>},
-    {id:'audit' as Page,      label:'Auditorias',  icon:<span>🔍</span>},
-    {id:'energy' as Page,     label:'Energia',     icon:<span>⚡</span>},
+    // {id:'oee' as Page,        label:'OEE',         icon:<span>📈</span>},  // desativado temporariamente
+    // {id:'training' as Page,   label:'Treinamentos',icon:<span>🎓</span>},  // desativado temporariamente
+    // {id:'audit' as Page,      label:'Auditorias',  icon:<span>🔍</span>},  // desativado temporariamente
+    // {id:'energy' as Page,     label:'Energia',     icon:<span>⚡</span>},  // desativado temporariamente
     {id:'wood' as Page,       label:'Madeira',     icon:<span>🪵</span>},
     {id:'production' as Page, label:'Produção',    icon:<span>🏭</span>},
     {id:'fuel' as Page,       label:'Combustível', icon:<span>⛽</span>},
