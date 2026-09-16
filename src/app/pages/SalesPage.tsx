@@ -18,6 +18,7 @@ export default function SalesPage({ profile, can }: Props) {
   const [orders, setOrders]     = useState<any[]>([])
   const [clients, setClients]   = useState<any[]>([])
   const [motoristas, setMotoristas] = useState<any[]>([])
+  const [transportadoras, setTransportadoras] = useState<any[]>([])
   const [veiculos, setVeiculos] = useState<any[]>([])
   const [products, setProducts] = useState<any[]>([])
   const [modal, setModal]       = useState(false)
@@ -289,16 +290,18 @@ export default function SalesPage({ profile, can }: Props) {
   }
 
   async function loadMeta() {
-    const [cli, prd, mot, veic] = await Promise.all([
+    const [cli, prd, mot, veic, transp] = await Promise.all([
       supabase.from('cadastros').select('id,nome_razao').eq('is_cliente', true).eq('status', true).order('nome_razao'),
       supabase.from('products').select('id,name,unit').eq('active', true).order('name'),
       supabase.from('cadastros').select('id,nome_razao').eq('is_motorista', true).eq('status', true).order('nome_razao'),
       supabase.from('veiculos').select('id,placa,tipo').eq('status', true).order('placa'),
+      supabase.from('cadastros').select('id,nome_razao').eq('is_transportador', true).eq('status', true).order('nome_razao'),
     ])
     setClients((cli.data||[]).map((x:any)=>({id:x.id,name:x.nome_razao})))
     setProducts(prd.data || [])
     setMotoristas((mot.data||[]).map((x:any)=>({id:x.id,name:x.nome_razao})))
     setVeiculos(veic.data||[])
+    setTransportadoras((transp.data||[]).map((x:any)=>({id:x.id,name:x.nome_razao})))
   }
 
   function openNew() {
@@ -343,6 +346,10 @@ export default function SalesPage({ profile, can }: Props) {
       driver:       editing.driver.trim(),
       status:       editing.status || 'active',
       notes:        editing.notes || null,
+      transportadora_id:   (editing.transportadora_id && editing.transportadora_id!=='__OUTRO__') ? editing.transportadora_id : null,
+      transportadora_nome: editing.transportadora_nome || (transportadoras.find((t:any)=>t.id===editing.transportadora_id)?.name) || null,
+      frete_ton:    editing.frete_ton ? parseFloat(editing.frete_ton) : null,
+      frete_total:  editing.frete_ton ? (parseFloat(editing.frete_ton) * (parseFloat(editing.weight_tons)||0)) : null,
       created_by:   profile?.display_name || '',
       created_by_id: profile?.id || null,
     }
@@ -1098,6 +1105,27 @@ export default function SalesPage({ profile, can }: Props) {
              companyId={profile?.company_id} createdBy={profile?.display_name} onCreatedRefresh={() => loadMeta()} />
         ) : (
           <Input label="Placa *" value={editing.plate} onChange={(v:string) => setEditing((e:any) => ({...e, plate:maskPlate(v)}))} placeholder="AAA0A00 ou AAA0000" />
+        )}
+        {/* Frete */}
+        <div className="grid grid-cols-2 gap-x-3">
+          {transportadoras.length > 0 ? (
+            <>
+              <Select label="Transportadora (frete)" value={editing.transportadora_id||''} onChange={(v:string) => {
+                if (v==='__OUTRO__') { setEditing((e:any)=>({...e, transportadora_id:'__OUTRO__', transportadora_nome:''})); return }
+                const t = transportadoras.find((x:any)=>x.id===v)
+                setEditing((e:any)=>({...e, transportadora_id:v, transportadora_nome:t?.name||''}))
+              }} options={[{value:'',label:'Sem frete / Selecione...'}, ...transportadoras.map((t:any)=>({value:t.id,label:t.name})), {value:'__OUTRO__',label:'➕ Outra (digitar)'}]} />
+              {editing.transportadora_id==='__OUTRO__' && (
+                <Input label="Nome da transportadora" value={editing.transportadora_nome} onChange={(v:string)=>setEditing((e:any)=>({...e,transportadora_nome:v}))} placeholder="Digite" />
+              )}
+            </>
+          ) : (
+            <Input label="Transportadora (frete)" value={editing.transportadora_nome} onChange={(v:string)=>setEditing((e:any)=>({...e,transportadora_nome:v}))} placeholder="Nome da transportadora" />
+          )}
+          <Input label="Frete R$ / tonelada" value={editing.frete_ton} onChange={(v:string) => setEditing((e:any) => ({...e, frete_ton:v}))} type="number" placeholder="0.00" />
+        </div>
+        {editing.frete_ton && editing.weight_tons && (
+          <div style={{fontSize:'10px',color:'var(--t3)',marginBottom:'8px'}}>Frete total: R$ {(parseFloat(editing.frete_ton)*parseFloat(editing.weight_tons)).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
         )}
         <Textarea label="Observações" value={editing.notes} onChange={(v:string) => setEditing((e:any) => ({...e, notes:v}))} rows={2} placeholder="Opcional..." />
       </Modal>
