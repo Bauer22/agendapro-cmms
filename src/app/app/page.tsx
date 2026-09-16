@@ -59,13 +59,14 @@ import TrainingPage    from '@/app/pages/TrainingPage'
 import AuditPage       from '@/app/pages/AuditPage'
 import EnergyPage      from '@/app/pages/EnergyPage'
 import WoodPage        from '@/app/pages/WoodPage'
+import FretePage       from '@/app/pages/FretePage'
 import CadastrosPage   from '@/app/pages/CadastrosPage'
 import FuelPage        from '@/app/pages/FuelPage'
 import ProductionPage  from '@/app/pages/ProductionPage'
 import GerencialPage   from '@/app/pages/GerencialPage'
 import SalesPage       from '@/app/pages/SalesPage'
 
-type Page = 'dashboard'|'os'|'machines'|'pm'|'tasks'|'parts'|'suppliers'|'cadastros'|'fuel'|'production'|'gerencial'|'reports'|'users'|'settings'|'finance'|'qr'|'downtime'|'superadmin'|'chat'|'scheduling'|'documents'|'epi'|'oee'|'training'|'audit'|'energy'|'wood'|'sales'|'config'
+type Page = 'dashboard'|'os'|'machines'|'pm'|'tasks'|'parts'|'suppliers'|'cadastros'|'fuel'|'production'|'gerencial'|'reports'|'users'|'settings'|'finance'|'qr'|'downtime'|'superadmin'|'chat'|'scheduling'|'documents'|'epi'|'oee'|'training'|'audit'|'energy'|'wood'|'sales'|'config'|'frete'
 
 
 export default function App() {
@@ -247,6 +248,7 @@ export default function App() {
     {id:'fuel' as Page,       label:'Combustível', icon:<span>⛽</span>},
     {id:'gerencial' as Page,  label:'Gerencial',   icon:<span>📈</span>},
     {id:'sales' as Page,      label:'Vendas',      icon:<span>🛒</span>},
+    {id:'frete' as Page,      label:'Frete',       icon:<span>🚚</span>},
     {id:'users' as Page,      label:'Usuários',    icon:IC.users},
     {id:'superadmin' as Page, label:'Super Admin', icon:IC.sadm},
     {id:'settings' as Page,   label:'Config',      icon:IC.cfg},
@@ -288,6 +290,7 @@ export default function App() {
     audit:       <AuditPage       profile={profile} can={can} />,
     energy:      <EnergyPage      profile={profile} can={can} />,
     wood:        <WoodPage        profile={profile} can={can} />,
+    frete:       <FretePage       profile={profile} />,
     cadastros:   <CadastrosPage   profile={profile} can={can} />,
     fuel:        <FuelPage        profile={profile} can={can} />,
     production:  <ProductionPage  profile={profile} can={can} />,
