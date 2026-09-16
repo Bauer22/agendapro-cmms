@@ -7,7 +7,7 @@ import toast from 'react-hot-toast'
 import type { UserProfile } from '@/types'
 
 interface Props { profile: UserProfile|null; can:(p:string)=>boolean }
-type Tab = 'lancamentos'|'relatorio'
+type Tab = 'lancamentos'|'relatorio'|'estoque'
 
 const WOOD_CLASSES = ['12 a 18','18 a 24','24 a 35']
 const CONV_DEFAULT = 1.4  // fallback: m³ ÷ 1,4 = toneladas (parâmetro conv_tanque_tons da system_config)
@@ -18,6 +18,8 @@ export default function ProductionPage({ profile, can }: Props) {
   const [records, setRecords] = useState<any[]>([])
   const [woodEntries, setWoodEntries] = useState<any[]>([])
   const [estoqueMensal, setEstoqueMensal] = useState<any[]>([])  // preço médio ponderado por mês (mesmo do Gerencial)
+  const [estoqueProd, setEstoqueProd] = useState<any[]>([])
+  const [vendasProd, setVendasProd] = useState<any[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<any>({})
   const [view, setView] = useState<any>(null)
@@ -33,17 +35,21 @@ export default function ProductionPage({ profile, can }: Props) {
 
   async function load() {
     setLoading(true)
-    const [p, w, cfg, est] = await Promise.all([
+    const [p, w, cfg, est, estP, vend] = await Promise.all([
       supabase.from('production_records').select('*').order('prod_date',{ascending:false}).order('created_at',{ascending:false}).limit(300),
       supabase.from('wood_entries').select('data_entrada,weight_tons,peso_liquido,total_value,unit_value,volume_m3').limit(1000),
       supabase.from('system_config').select('valor').eq('chave','conv_tanque_tons').maybeSingle(),
       supabase.from('estoque_madeira_mensal').select('mes,preco_medio'),
+      supabase.from('v_estoque_produtos').select('*'),
+      supabase.from('sales_orders').select('sale_date,product_name,volume_m3,weight_tons,client_name').eq('status','active').in('product_name',['LÂMINAS','CAVACO']).order('sale_date',{ascending:false}).limit(500),
     ])
     if (cfg?.data?.valor && +cfg.data.valor > 0) setCONV(+cfg.data.valor)
     if (p.error) toast.error('Erro: '+p.error.message)
     setRecords(p.data||[])
     setWoodEntries(w.data||[])
     setEstoqueMensal(est?.data||[])
+    setEstoqueProd(estP?.data||[])
+    setVendasProd(vend?.data||[])
     setLoading(false)
   }
 
@@ -240,7 +246,7 @@ export default function ProductionPage({ profile, can }: Props) {
       </div>
 
       <div className="flex gap-2 mb-3">
-        {([['lancamentos','📝 Lançamentos'],['relatorio','📊 Relatório']] as [Tab,string][]).map(([t,l]) => (
+        {([['lancamentos','📝 Lançamentos'],['relatorio','📊 Relatório'],['estoque','📦 Estoque']] as [Tab,string][]).map(([t,l]) => (
           <div key={t} onClick={()=>setTab(t)}
             style={{ flex:1, textAlign:'center', padding:'8px', borderRadius:'10px', fontSize:'12px', fontWeight:700, cursor:'pointer',
               background: tab===t?'rgba(249,115,22,.12)':'var(--s1)',
@@ -297,6 +303,62 @@ export default function ProductionPage({ profile, can }: Props) {
           </div>
           )
         })())}
+
+        {/* ═══ ESTOQUE ═══ */}
+        {tab==='estoque' && (() => {
+          const fmt = (v:any,d=2) => Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d})
+          const movs: any[] = []
+          records.forEach((r:any)=>{
+            if (+r.produced_m3>0) movs.push({data:r.prod_date, produto:'LÂMINA', tipo:'Entrada', qtd:+r.produced_m3, un:'m³', ref:'Produção'})
+            if (+r.cavaco_m3>0) movs.push({data:r.prod_date, produto:'CAVACO', tipo:'Entrada', qtd:+r.cavaco_m3, un:'m³', ref:'Produção'})
+          })
+          vendasProd.forEach((v:any)=>{
+            if (v.product_name==='LÂMINAS' && +v.volume_m3>0) movs.push({data:v.sale_date, produto:'LÂMINA', tipo:'Saída', qtd:+v.volume_m3, un:'m³', ref:'Venda '+(v.client_name||'')})
+            if (v.product_name==='CAVACO' && +v.weight_tons>0) movs.push({data:v.sale_date, produto:'CAVACO', tipo:'Saída', qtd:+v.weight_tons, un:'ton', ref:'Venda '+(v.client_name||'')})
+          })
+          movs.sort((a,b)=>(b.data||'').localeCompare(a.data||''))
+          return (
+          <>
+            <div className="grid grid-cols-1 gap-2 mb-3">
+              {estoqueProd.map((e:any,i:number)=>(
+                <div key={i} className="rounded-xl p-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+                  <div style={{fontSize:'12px',fontWeight:700,color:'var(--cy)',marginBottom:'6px'}}>📦 {e.produto} <span style={{color:'var(--t3)',fontWeight:400}}>({e.unidade})</span></div>
+                  <div className="grid grid-cols-3 gap-2" style={{fontSize:'11px'}}>
+                    <div><div style={{color:'var(--t3)'}}>Entrou</div><div style={{fontWeight:700,color:'var(--gn)'}}>{fmt(e.entrada,3)}</div></div>
+                    <div><div style={{color:'var(--t3)'}}>Saiu</div><div style={{fontWeight:700,color:'var(--rd)'}}>{fmt(e.saida,3)}</div></div>
+                    <div><div style={{color:'var(--t3)'}}>Saldo</div><div style={{fontWeight:700,color:'var(--t1)'}}>{e.saldo==null?'—':fmt(e.saldo,3)}</div></div>
+                  </div>
+                  {e.obs && <div style={{fontSize:'9px',color:'var(--t3)',marginTop:'6px'}}>{e.obs}</div>}
+                </div>
+              ))}
+            </div>
+            <div className="rounded-xl p-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+              <div style={{fontSize:'10px',fontWeight:700,color:'#f97316',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'10px'}}>📋 HISTÓRICO DE MOVIMENTAÇÕES</div>
+              {movs.length===0 ? <div style={{fontSize:'11px',color:'var(--t3)'}}>Sem movimentações.</div> : (
+                <div style={{overflowX:'auto'}}>
+                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:'11px'}}>
+                    <thead><tr style={{background:'var(--s2)'}}>
+                      {['Data','Produto','Tipo','Qtd','Ref.'].map(h=>(<th key={h} style={{padding:'5px 8px',textAlign:'left',color:'var(--t2)',borderBottom:'1px solid var(--bd)'}}>{h}</th>))}
+                    </tr></thead>
+                    <tbody>
+                      {movs.slice(0,200).map((m:any,i:number)=>(
+                        <tr key={i} style={{borderBottom:'1px solid var(--bd)'}}>
+                          <td style={{padding:'4px 8px',color:'var(--t1)'}}>{fmtD(m.data)}</td>
+                          <td style={{padding:'4px 8px',color:'var(--t1)'}}>{m.produto}</td>
+                          <td style={{padding:'4px 8px',color:m.tipo==='Entrada'?'var(--gn)':'var(--rd)'}}>{m.tipo}</td>
+                          <td style={{padding:'4px 8px',color:'var(--t1)'}}>{fmt(m.qtd,3)} {m.un}</td>
+                          <td style={{padding:'4px 8px',color:'var(--t3)'}}>{m.ref}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {movs.length>200 && <div style={{fontSize:'9px',color:'var(--t3)',marginTop:'6px'}}>Mostrando as 200 mais recentes de {movs.length}.</div>}
+                </div>
+              )}
+            </div>
+          </>
+          )
+        })()}
 
         {/* ═══ RELATÓRIO ═══ */}
         {tab==='relatorio' && (
