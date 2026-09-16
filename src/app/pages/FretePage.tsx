@@ -15,6 +15,10 @@ export default function FretePage({ profile }: { profile: UserProfile }) {
   const [payModal, setPayModal]   = useState(false)
   const [pay, setPay]             = useState<any>({})
   const [detalhe, setDetalhe]     = useState<any>(null)   // transportadora selecionada para ver histórico
+  const [aba, setAba]             = useState<'conta'|'relatorio'>('conta')
+  const [relTransp, setRelTransp] = useState('')
+  const [relFrom, setRelFrom]     = useState('')
+  const [relTo, setRelTo]         = useState('')
 
   useEffect(() => { load() }, [])
 
@@ -77,6 +81,54 @@ export default function FretePage({ profile }: { profile: UserProfile }) {
     return [...debitos, ...creditos].sort((a,b)=>(b.data||'').localeCompare(a.data||''))
   })() : []
 
+  // ── Dados do relatório de uma transportadora no período ──
+  function dadosRelatorio() {
+    const nome = (relTransp||'').toUpperCase().trim()
+    const noPeriodo = (d:string) => (!relFrom || d>=relFrom) && (!relTo || d<=relTo)
+    const cargas = fretes.filter((f:any)=>f.transportadora===nome && noPeriodo(f.data))
+                         .sort((a:any,b:any)=>(a.data||'').localeCompare(b.data||''))
+    const pagos = pagamentos.filter((p:any)=>(p.transportadora_nome||'').toUpperCase().trim()===nome && noPeriodo(p.payment_date))
+                            .sort((a:any,b:any)=>(a.payment_date||'').localeCompare(b.payment_date||''))
+    const totCargas = cargas.length
+    const totTons = cargas.reduce((s:number,f:any)=>s+(+f.tons||0),0)
+    const totFrete = cargas.reduce((s:number,f:any)=>s+(+f.total||0),0)
+    const totPago = pagos.reduce((s:number,p:any)=>s+(+p.value||0),0)
+    // Saldo geral da transportadora (não só do período) — da view
+    const sv = saldos.find((s:any)=>(s.transportadora||'').toUpperCase().trim()===nome)
+    const saldoGeral = sv ? +sv.saldo : (totFrete - totPago)
+    return { nome, cargas, pagos, totCargas, totTons, totFrete, totPago, saldoGeral }
+  }
+
+  function imprimirRelatorio() {
+    if (!relTransp) { toast.error('Selecione a transportadora'); return }
+    const r = dadosRelatorio()
+    const esc = (s:any) => String(s==null?'':s).replace(/[&<>"']/g, (c:string)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]||c))
+    const periodo = (relFrom||relTo) ? `Período: ${relFrom?fmtD(relFrom):'início'} a ${relTo?fmtD(relTo):'hoje'}` : 'Todo o período'
+    const th='padding:6px 8px;background:#1e3a6e;color:#fff;font-size:11px;text-align:left'
+    const td2='padding:5px 8px;border-bottom:1px solid #ddd;font-size:11px'
+    const linhasCargas = r.cargas.map((f:any)=>`<tr><td style="${td2}">${fmtD(f.data)}</td><td style="${td2}">${esc(f.ref)}</td><td style="${td2};text-align:right">${(+f.tons).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td><td style="${td2};text-align:right">${money(f.frete_ton)}</td><td style="${td2};text-align:right">${money(f.total)}</td></tr>`).join('')
+    const linhasPagos = r.pagos.map((p:any)=>`<tr><td style="${td2}">${fmtD(p.payment_date)}</td><td style="${td2}">${esc(p.method||'—')}</td><td style="${td2};text-align:right">${money(p.value)}</td></tr>`).join('')
+    const html = `<html><head><title>Relatório de Frete</title></head><body style="font-family:Arial,sans-serif;max-width:800px;margin:20px auto;color:#111">
+      <div style="background:#060d1a;color:#fff;padding:16px;border-radius:8px 8px 0 0">
+        <h2 style="margin:0;color:#f97316">Relatório de Frete — ${esc(r.nome)}</h2>
+        <div style="font-size:12px;color:#ccc">${periodo} · Emitido em ${new Date().toLocaleString('pt-BR')}</div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;margin-top:12px"><tbody>
+        <tr><td style="${td2};color:#555">Viagens (cargas)</td><td style="${td2};text-align:right;font-weight:bold">${r.totCargas}</td></tr>
+        <tr><td style="${td2};color:#555">Toneladas transportadas</td><td style="${td2};text-align:right;font-weight:bold">${r.totTons.toLocaleString('pt-BR',{minimumFractionDigits:2})} t</td></tr>
+        <tr><td style="${td2};color:#555">Frete do período</td><td style="${td2};text-align:right;font-weight:bold">${money(r.totFrete)}</td></tr>
+        <tr><td style="${td2};color:#555">Pago no período</td><td style="${td2};text-align:right;font-weight:bold">${money(r.totPago)}</td></tr>
+        <tr><td style="${td2};color:#555">SALDO ATUAL (conta corrente)</td><td style="${td2};text-align:right;font-weight:bold;color:#c0392b">${money(r.saldoGeral)}</td></tr>
+      </tbody></table>
+      <h3 style="margin-top:24px;color:#1e3a6e">Viagens / Cargas (${r.totCargas})</h3>
+      <table style="width:100%;border-collapse:collapse"><thead><tr><th style="${th}">Data</th><th style="${th}">Referência</th><th style="${th};text-align:right">Ton</th><th style="${th};text-align:right">R$/t</th><th style="${th};text-align:right">Frete</th></tr></thead>
+      <tbody>${linhasCargas}<tr><td colspan="2" style="${td2};font-weight:bold;text-align:right">TOTAL</td><td style="${td2};text-align:right;font-weight:bold">${r.totTons.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td><td></td><td style="${td2};text-align:right;font-weight:bold">${money(r.totFrete)}</td></tr></tbody></table>
+      ${r.pagos.length? `<h3 style="margin-top:24px;color:#1e8449">Pagamentos (${r.pagos.length})</h3><table style="width:100%;border-collapse:collapse"><thead><tr><th style="${th}">Data</th><th style="${th}">Forma</th><th style="${th};text-align:right">Valor</th></tr></thead><tbody>${linhasPagos}<tr><td colspan="2" style="${td2};font-weight:bold;text-align:right">TOTAL PAGO</td><td style="${td2};text-align:right;font-weight:bold">${money(r.totPago)}</td></tr></tbody></table>`:''}
+    </body></html>`
+    const w = window.open('', '_blank')
+    if (w) { w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>w.print(), 300) }
+  }
+
   const totalDevido = saldos.reduce((s,x)=>s+(+x.frete_devido||0),0)
   const totalPago = saldos.reduce((s,x)=>s+(+x.total_pago||0),0)
   const totalSaldo = saldos.reduce((s,x)=>s+(+x.saldo||0),0)
@@ -84,9 +136,66 @@ export default function FretePage({ profile }: { profile: UserProfile }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <SH>🚚 Conta Corrente de Frete</SH>
-        <Btn onClick={()=>{setPay({payment_date:new Date().toISOString().slice(0,10)});setPayModal(true)}} variant="primary" size="sm">+ Lançar Pagamento</Btn>
+        <SH>🚚 Frete</SH>
+        {aba==='conta' && <Btn onClick={()=>{setPay({payment_date:new Date().toISOString().slice(0,10)});setPayModal(true)}} variant="primary" size="sm">+ Lançar Pagamento</Btn>}
       </div>
+
+      {/* Abas */}
+      <div className="flex gap-1.5 mb-3">
+        {([['conta','💰 Conta Corrente'],['relatorio','📄 Relatórios']] as [any,string][]).map(([t,l])=>(
+          <button key={t} onClick={()=>setAba(t)} className="px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer border"
+            style={{background:aba===t?'var(--cy)':'transparent',color:aba===t?'#000':'var(--t2)',borderColor:aba===t?'var(--cy)':'var(--bd)',fontFamily:'Sora,system-ui,sans-serif'}}>{l}</button>
+        ))}
+      </div>
+
+      {aba==='relatorio' && (() => {
+        const r = relTransp ? dadosRelatorio() : null
+        return (
+          <div className="flex flex-col gap-3">
+            <div className="rounded-2xl p-4" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+              <div style={{fontSize:'13px',fontWeight:700,color:'var(--t1)',marginBottom:'10px'}}>📄 Relatório de Frete por Transportadora</div>
+              <Select label="Transportadora" value={relTransp} onChange={(v:string)=>setRelTransp(v)}
+                options={[{value:'',label:'Selecione...'}, ...saldos.map((s:any)=>({value:s.transportadora,label:s.transportadora}))]} />
+              <div className="grid grid-cols-2 gap-x-3">
+                <Input label="De" type="date" value={relFrom} onChange={(v:string)=>setRelFrom(v)} />
+                <Input label="Até" type="date" value={relTo} onChange={(v:string)=>setRelTo(v)} />
+              </div>
+              {relTransp && <Btn onClick={imprimirRelatorio} size="md" variant="secondary">🖨️ Imprimir / PDF</Btn>}
+            </div>
+
+            {r && (
+              <div className="rounded-2xl p-4" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+                <div style={{fontSize:'13px',fontWeight:700,color:'var(--cy)',marginBottom:'10px'}}>{r.nome}</div>
+                <div className="grid grid-cols-2 gap-2 mb-3" style={{fontSize:'11px'}}>
+                  <div><div style={{color:'var(--t3)'}}>Viagens</div><div style={{fontWeight:700,color:'var(--t1)'}}>{r.totCargas}</div></div>
+                  <div><div style={{color:'var(--t3)'}}>Toneladas</div><div style={{fontWeight:700,color:'var(--t1)'}}>{r.totTons.toLocaleString('pt-BR',{minimumFractionDigits:2})} t</div></div>
+                  <div><div style={{color:'var(--t3)'}}>Frete do período</div><div style={{fontWeight:700,color:'var(--rd)'}}>{money(r.totFrete)}</div></div>
+                  <div><div style={{color:'var(--t3)'}}>Pago no período</div><div style={{fontWeight:700,color:'var(--gn)'}}>{money(r.totPago)}</div></div>
+                  <div style={{gridColumn:'span 2'}}><div style={{color:'var(--t3)'}}>Saldo atual (conta corrente)</div><div style={{fontWeight:700,fontSize:'14px',color:'var(--cy)'}}>{money(r.saldoGeral)}</div></div>
+                </div>
+                <div style={{fontSize:'11px',fontWeight:700,color:'var(--t2)',marginBottom:'4px'}}>Viagens / Cargas</div>
+                <div style={{overflowX:'auto'}}>
+                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:'10px'}}>
+                    <thead><tr style={{background:'var(--s2)'}}><th style={{padding:'4px 6px',textAlign:'left',color:'var(--t2)'}}>Data</th><th style={{padding:'4px 6px',textAlign:'left',color:'var(--t2)'}}>Ref.</th><th style={{padding:'4px 6px',textAlign:'right',color:'var(--t2)'}}>Ton</th><th style={{padding:'4px 6px',textAlign:'right',color:'var(--t2)'}}>R$/t</th><th style={{padding:'4px 6px',textAlign:'right',color:'var(--t2)'}}>Frete</th></tr></thead>
+                    <tbody>{r.cargas.map((f:any,i:number)=>(<tr key={i} style={{borderBottom:'1px solid var(--bd)'}}><td style={{padding:'4px 6px',color:'var(--t1)'}}>{fmtD(f.data)}</td><td style={{padding:'4px 6px',color:'var(--t3)'}}>{f.ref}</td><td style={{padding:'4px 6px',textAlign:'right',color:'var(--t1)'}}>{(+f.tons).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td><td style={{padding:'4px 6px',textAlign:'right',color:'var(--t1)'}}>{money(f.frete_ton)}</td><td style={{padding:'4px 6px',textAlign:'right',color:'var(--t1)'}}>{money(f.total)}</td></tr>))}
+                      <tr style={{background:'var(--s2)',fontWeight:700}}><td colSpan={2} style={{padding:'4px 6px',textAlign:'right',color:'var(--t1)'}}>TOTAL</td><td style={{padding:'4px 6px',textAlign:'right',color:'var(--t1)'}}>{r.totTons.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td><td></td><td style={{padding:'4px 6px',textAlign:'right',color:'var(--rd)'}}>{money(r.totFrete)}</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                {r.pagos.length>0 && (<>
+                  <div style={{fontSize:'11px',fontWeight:700,color:'var(--gn)',margin:'12px 0 4px'}}>Pagamentos</div>
+                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:'10px'}}>
+                    <thead><tr style={{background:'var(--s2)'}}><th style={{padding:'4px 6px',textAlign:'left',color:'var(--t2)'}}>Data</th><th style={{padding:'4px 6px',textAlign:'left',color:'var(--t2)'}}>Forma</th><th style={{padding:'4px 6px',textAlign:'right',color:'var(--t2)'}}>Valor</th></tr></thead>
+                    <tbody>{r.pagos.map((p:any,i:number)=>(<tr key={i} style={{borderBottom:'1px solid var(--bd)'}}><td style={{padding:'4px 6px',color:'var(--t1)'}}>{fmtD(p.payment_date)}</td><td style={{padding:'4px 6px',color:'var(--t3)'}}>{p.method||'—'}</td><td style={{padding:'4px 6px',textAlign:'right',color:'var(--gn)'}}>{money(p.value)}</td></tr>))}</tbody>
+                  </table>
+                </>)}
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
+      {aba==='conta' && (<>
 
       {/* Resumo */}
       <div className="grid grid-cols-3 gap-2 mb-3">
@@ -126,6 +235,8 @@ export default function FretePage({ profile }: { profile: UserProfile }) {
           ))}
         </div>
       )}
+
+      </>)}
 
       {/* Modal lançar pagamento */}
       <Modal open={payModal} onClose={()=>setPayModal(false)} title="🚚 Lançar Pagamento de Frete"
