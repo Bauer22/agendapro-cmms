@@ -106,7 +106,7 @@ export default function ProductionPage({ profile, can }: Props) {
     // Recalcula o estoque de madeira do mês da produção (mantém o custo de matéria-prima atualizado)
     try {
       const mesProd = (obj.prod_date||'').slice(0,7)
-      if (mesProd) await supabase.rpc('fn_fechar_estoque_madeira', { p_mes: mesProd })
+      if (mesProd) await supabase.rpc('fn_refechar_cascata', { p_mes_inicial: mesProd })
     } catch (e) { /* silencioso */ }
     toast.success(editing.id?'Atualizado ✅':'Produção registrada ✅')
     setSaving(false); setModal(false); load()
@@ -120,7 +120,7 @@ export default function ProductionPage({ profile, can }: Props) {
     const { error } = await supabase.from('production_records').delete().eq('id',id)
     if (error) { toast.error('Erro: '+error.message); return }
     try {
-      if (mesProd) await supabase.rpc('fn_fechar_estoque_madeira', { p_mes: mesProd })
+      if (mesProd) await supabase.rpc('fn_refechar_cascata', { p_mes_inicial: mesProd })
     } catch (e) { /* silencioso */ }
     toast.success('Excluído'); load()
   }

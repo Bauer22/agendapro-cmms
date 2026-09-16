@@ -127,6 +127,11 @@ export default function WoodPage({ profile, can }: Props) {
       user_name: profile?.display_name,
     }).then(() => {})
 
+    // Refecha o estoque em cascata a partir do mês da entrada (mantém encadeamento correto)
+    try {
+      const mesEnt = (editing.data_entrada || td()).slice(0,7)
+      if (mesEnt) await supabase.rpc('fn_refechar_cascata', { p_mes_inicial: mesEnt })
+    } catch (e) { /* silencioso */ }
     toast.success(editing.id ? 'Registro atualizado ✅' : 'Entrada registrada ✅')
     setSaving(false)
     setModal(false)
@@ -135,8 +140,13 @@ export default function WoodPage({ profile, can }: Props) {
 
   async function del(id: string) {
     if (!await confirm('Excluir esta entrada?')) return
+    const reg = entries.find((e:any)=>e.id===id)
+    const mesEnt = reg?.data_entrada ? String(reg.data_entrada).slice(0,7) : null
     const { error } = await supabase.from('wood_entries').delete().eq('id', id)
     if (error) { toast.error('Erro: ' + error.message); return }
+    try {
+      if (mesEnt) await supabase.rpc('fn_refechar_cascata', { p_mes_inicial: mesEnt })
+    } catch (e) { /* silencioso */ }
     toast.success('Excluído')
     load()
   }
