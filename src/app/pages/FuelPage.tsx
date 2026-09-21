@@ -17,6 +17,7 @@ export default function FuelPage({ profile, can }: Props) {
   const [records, setRecords]   = useState<any[]>([])
   const [entries, setEntries]   = useState<any[]>([])
   const [expenses, setExpenses] = useState<any[]>([])
+  const [custoPond, setCustoPond] = useState<any>(null)  // custo médio ponderado móvel do diesel
   const [veiculos, setVeiculos] = useState<any[]>([])
   const [machines, setMachines] = useState<any[]>([])
   const [motoristas, setMotoristas] = useState<any[]>([])
@@ -46,13 +47,15 @@ export default function FuelPage({ profile, can }: Props) {
 
   async function loadAll() {
     setLoading(true)
-    const [r, e, x] = await Promise.all([
+    const [r, e, x, cp] = await Promise.all([
       supabase.from('fuel_records').select('*').order('record_date',{ascending:false}).order('record_time',{ascending:false}).order('created_at',{ascending:false}).limit(2000),
       supabase.from('fuel_entries').select('*').order('entry_date',{ascending:false}).order('created_at',{ascending:false}).limit(1000),
       supabase.from('vehicle_expenses').select('*').order('expense_date',{ascending:false}).order('created_at',{ascending:false}).limit(1000),
+      supabase.rpc('fn_custo_diesel_ponderado'),
     ])
     if (r.error) toast.error('Erro: '+r.error.message)
     setRecords(r.data||[]); setEntries(e.data||[]); setExpenses(x.data||[])
+    if (cp?.data && cp.data[0]) setCustoPond(cp.data[0])
     setLoading(false)
   }
 
@@ -331,7 +334,7 @@ export default function FuelPage({ profile, can }: Props) {
       <div className="grid grid-cols-3 gap-2 mb-2">
         <KPI num={`${stock.toFixed(0)} L`} label="Estoque atual" color={stock<500?'red':'green'} />
         <KPI num={`${totalOut.toFixed(0)} L`} label="Total consumido" color="amber" />
-        <KPI num={money(avgPrice)} label="Preço médio/L" color="orange" />
+        <KPI num={money(custoPond ? +custoPond.custo_medio : avgPrice)} label="Custo ponderado/L" color="orange" />
       </div>
 
       {/* Cálculo do estoque explícito */}
