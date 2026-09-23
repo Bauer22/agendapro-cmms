@@ -502,12 +502,18 @@ export default function SalesPage({ profile, can }: Props) {
       doc.text('Resumo de Conta Corrente', 12, y);
       y += 6;
       doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(20,20,20);
-      doc.text('Total Vendido: ' + money(repVal||0), 12, y); y += 5;
-      doc.text('Total Recebido: ' + money(totalRecVen), 12, y); y += 5;
+      // Usa os totais ACUMULADOS da conta corrente (todas as vendas do cliente, não só o período)
+      var totVendidoCC = saldoVen.reduce(function(s,x){return s + (Number(x.total_vendas)||0);}, 0);
+      var totRecebidoCC = saldoVen.reduce(function(s,x){return s + (Number(x.total_recebido)||0);}, 0);
+      var totReceberCC = saldoVen.reduce(function(s,x){return s + (Number(x.a_receber)||0);}, 0);
+      // Se não houver dados da view (sem cliente filtrado), cai no total do período
+      var vendidoMostrar = saldoVen.length > 0 ? totVendidoCC : (repVal||0);
+      var recebidoMostrar = saldoVen.length > 0 ? totRecebidoCC : totalRecVen;
+      doc.text('Total Vendido: ' + money(vendidoMostrar), 12, y); y += 5;
+      doc.text('Total Recebido: ' + money(recebidoMostrar), 12, y); y += 5;
       if (saldoVen.length > 0) {
-        var totReceber = saldoVen.reduce(function(s,x){return s + (Number(x.a_receber)||0);}, 0);
         doc.setFont('helvetica','bold');
-        doc.text('SALDO A RECEBER: ' + money(totReceber), 12, y); y += 6;
+        doc.text('SALDO A RECEBER: ' + money(totReceberCC), 12, y); y += 6;
       }
 
 
