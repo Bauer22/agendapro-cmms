@@ -29,7 +29,7 @@ export default function SalesPage({ profile, can }: Props) {
   const [editing, setEditing]   = useState<any>({})
   const [newClient, setNewClient] = useState<any>({})
   const [newProduct, setNewProduct] = useState<any>({})
-  const [tab, setTab]           = useState<'open'|'all'|'relatorio'|'extrato'|'autoriz'>('open')
+  const [tab, setTab]           = useState<'open'|'all'|'relatorio'|'extrato'|'autoriz'|'folha'>('open')
   const [buscaVendas, setBuscaVendas] = useState('')
   const [saldos, setSaldos]     = useState<any[]>([])
   const [extrato, setExtrato]   = useState<any[]>([])
@@ -305,6 +305,53 @@ export default function SalesPage({ profile, can }: Props) {
     setTransportadoras((transp.data||[]).map((x:any)=>({id:x.id,name:x.nome_razao})))
   }
 
+  // ── Folha em branco para o conferente anotar as saídas de lâmina à mão ──
+  function imprimirFolhaSaida(nLinhas = 20) {
+    const linhas = Array.from({ length: nLinhas }).map(() => `
+      <tr>
+        <td style="border:1px solid #999;height:26px"></td>
+        <td style="border:1px solid #999"></td>
+        <td style="border:1px solid #999"></td>
+        <td style="border:1px solid #999"></td>
+        <td style="border:1px solid #999"></td>
+        <td style="border:1px solid #999"></td>
+        <td style="border:1px solid #999"></td>
+      </tr>`).join('')
+    const html = `
+      <html><head><title>Folha de Saida de Lamina</title></head>
+      <body style="font-family:Arial,sans-serif;margin:16px;color:#111">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #060d1a;padding-bottom:8px;margin-bottom:10px">
+          <div>
+            <div style="font-size:18px;font-weight:bold">Industrial8 — Folha de Saída de Lâmina</div>
+            <div style="font-size:11px;color:#555">Preencher à mão e lançar no sistema depois</div>
+          </div>
+          <div style="font-size:12px;text-align:right">
+            Data: ____/____/______<br>Conferente: __________________
+          </div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead>
+            <tr style="background:#eee">
+              <th style="border:1px solid #999;padding:4px">Hora</th>
+              <th style="border:1px solid #999;padding:4px">Cliente</th>
+              <th style="border:1px solid #999;padding:4px">Motorista</th>
+              <th style="border:1px solid #999;padding:4px">Placa</th>
+              <th style="border:1px solid #999;padding:4px">Tipo lâmina</th>
+              <th style="border:1px solid #999;padding:4px">m³ / Toneladas</th>
+              <th style="border:1px solid #999;padding:4px">NF / Obs.</th>
+            </tr>
+          </thead>
+          <tbody>${linhas}</tbody>
+        </table>
+        <div style="margin-top:36px;display:flex;justify-content:space-around;font-size:12px">
+          <div style="text-align:center">_______________________<br>Conferente</div>
+          <div style="text-align:center">_______________________<br>Responsável</div>
+        </div>
+      </body></html>`
+    const w = window.open('', '_blank')
+    if (w) { w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>w.print(), 300) }
+  }
+
   function openNew() {
     const now = new Date()
     const hh = String(now.getHours()).padStart(2,'0')
@@ -538,13 +585,13 @@ export default function SalesPage({ profile, can }: Props) {
       </div>
 
       <div className="flex gap-2 mb-3">
-        {(['open','all','relatorio','extrato','autoriz'] as const).map(t => (
-          <div key={t} onClick={() => { setTab(t); if(t!=='relatorio' && t!=='extrato' && t!=='autoriz') setLoading(true); if(t==='autoriz') loadAutorizacoes() }}
+        {(['open','all','relatorio','extrato','autoriz','folha'] as const).map(t => (
+          <div key={t} onClick={() => { setTab(t); if(t!=='relatorio' && t!=='extrato' && t!=='autoriz' && t!=='folha') setLoading(true); if(t==='autoriz') loadAutorizacoes() }}
             style={{ flex:1, textAlign:'center', padding:'7px', borderRadius:'10px', fontSize:'10px', fontWeight:700, cursor:'pointer',
               background: tab===t ? 'rgba(249,115,22,.12)' : 'var(--s1)',
               border: `1px solid ${tab===t ? 'rgba(249,115,22,.4)' : 'var(--bd)'}`,
               color: tab===t ? '#f97316' : 'var(--t2)' }}>
-            {t === 'open' ? '📋 Ativos' : t === 'all' ? '📦 Todos' : t === 'relatorio' ? '📊 Relatório' : t === 'extrato' ? '🤝 Extrato' : '📝 Autorização'}
+            {t === 'open' ? '📋 Ativos' : t === 'all' ? '📦 Todos' : t === 'relatorio' ? '📊 Relatório' : t === 'extrato' ? '🤝 Extrato' : t === 'autoriz' ? '📝 Autorização' : '📄 Folha'}
           </div>
         ))}
       </div>
@@ -942,7 +989,21 @@ export default function SalesPage({ profile, can }: Props) {
         </>
       )}
 
-      {tab !== 'relatorio' && tab !== 'extrato' && (loading ? <Empty icon="⏳" text="Carregando..." /> :
+      {tab === 'folha' && (
+        <div className="rounded-xl p-4" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+          <div style={{fontSize:'12px',fontWeight:700,color:'#f97316',marginBottom:'6px'}}>📄 Folha de Saída de Lâmina</div>
+          <div style={{fontSize:'12px',color:'var(--t2)',lineHeight:1.5,marginBottom:'14px'}}>
+            Imprima uma folha em branco para o conferente anotar as saídas de lâmina à mão.
+            Depois é só lançar cada saída no sistema pela aba <b>Ativos</b>.
+          </div>
+          <div className="flex gap-2">
+            <Btn onClick={()=>imprimirFolhaSaida(20)} variant="primary" size="md">🖨️ Imprimir folha (20 linhas)</Btn>
+            <Btn onClick={()=>imprimirFolhaSaida(30)} size="md">🖨️ 30 linhas</Btn>
+          </div>
+        </div>
+      )}
+
+      {tab !== 'relatorio' && tab !== 'extrato' && tab !== 'folha' && (loading ? <Empty icon="⏳" text="Carregando..." /> :
        orders.length === 0 ? <Empty icon="🛒" text="Nenhum romaneio encontrado." /> : (() => {
         const termo = buscaVendas.trim().toLowerCase()
         const ordersFiltrados = !termo ? orders : orders.filter((o:any) => {

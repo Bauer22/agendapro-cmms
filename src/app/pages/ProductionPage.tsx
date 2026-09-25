@@ -8,7 +8,7 @@ import toast from 'react-hot-toast'
 import type { UserProfile } from '@/types'
 
 interface Props { profile: UserProfile|null; can:(p:string)=>boolean }
-type Tab = 'lancamentos'|'relatorio'|'estoque'
+type Tab = 'lancamentos'|'relatorio'|'estoque'|'folha'
 
 const WOOD_CLASSES = ['12 a 18','18 a 24','24 a 35']
 const CONV_DEFAULT = 1.4  // fallback: m³ ÷ 1,4 = toneladas (parâmetro conv_tanque_tons da system_config)
@@ -149,6 +149,56 @@ export default function ProductionPage({ profile, can }: Props) {
   const monthRecs = records.filter(r => r.prod_date >= monthStart)
   const monthProd = monthRecs.reduce((s,r)=>s+(parseFloat(r.produced_m3)||0),0)
 
+  // ── Folha em branco para o conferente preencher à mão ──
+  function imprimirFolhaProducao(nLinhas = 20) {
+    const linhas = Array.from({ length: nLinhas }).map(() => `
+      <tr>
+        <td style="border:1px solid #999;height:26px"></td>
+        <td style="border:1px solid #999"></td>
+        <td style="border:1px solid #999"></td>
+        <td style="border:1px solid #999"></td>
+        <td style="border:1px solid #999"></td>
+        <td style="border:1px solid #999"></td>
+        <td style="border:1px solid #999"></td>
+      </tr>`).join('')
+    const html = `
+      <html><head><title>Folha de Producao</title></head>
+      <body style="font-family:Arial,sans-serif;margin:16px;color:#111">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #060d1a;padding-bottom:8px;margin-bottom:10px">
+          <div>
+            <div style="font-size:18px;font-weight:bold">Industrial8 — Folha de Produção Diária</div>
+            <div style="font-size:11px;color:#555">Preencher à mão e lançar no sistema depois</div>
+          </div>
+          <div style="font-size:12px;text-align:right">
+            Data: ____/____/______<br>Turno: ______<br>Conferente: __________________
+          </div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead>
+            <tr style="background:#eee">
+              <th style="border:1px solid #999;padding:4px">Hora</th>
+              <th style="border:1px solid #999;padding:4px">Classe madeira</th>
+              <th style="border:1px solid #999;padding:4px">Tipo lâmina</th>
+              <th style="border:1px solid #999;padding:4px">Folhas / Altura</th>
+              <th style="border:1px solid #999;padding:4px">m³ Tanque</th>
+              <th style="border:1px solid #999;padding:4px">m³ Produzido</th>
+              <th style="border:1px solid #999;padding:4px">Obs.</th>
+            </tr>
+          </thead>
+          <tbody>${linhas}</tbody>
+        </table>
+        <div style="margin-top:14px;font-size:12px">
+          Cavaco (m³): ______________ &nbsp;&nbsp;&nbsp; Total produzido (m³): ______________
+        </div>
+        <div style="margin-top:36px;display:flex;justify-content:space-around;font-size:12px">
+          <div style="text-align:center">_______________________<br>Conferente</div>
+          <div style="text-align:center">_______________________<br>Responsável</div>
+        </div>
+      </body></html>`
+    const w = window.open('', '_blank')
+    if (w) { w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>w.print(), 300) }
+  }
+
   function imprimirProducao(r: any) {
     const c = calc(r)
     const fmtBR = (v:any,d=2) => Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d})
@@ -247,7 +297,7 @@ export default function ProductionPage({ profile, can }: Props) {
       </div>
 
       <div className="flex gap-2 mb-3">
-        {([['lancamentos','📝 Lançamentos'],['relatorio','📊 Relatório'],['estoque','📦 Estoque']] as [Tab,string][]).map(([t,l]) => (
+        {([['lancamentos','📝 Lançamentos'],['relatorio','📊 Relatório'],['estoque','📦 Estoque'],['folha','📄 Folha']] as [Tab,string][]).map(([t,l]) => (
           <div key={t} onClick={()=>setTab(t)}
             style={{ flex:1, textAlign:'center', padding:'8px', borderRadius:'10px', fontSize:'12px', fontWeight:700, cursor:'pointer',
               background: tab===t?'rgba(249,115,22,.12)':'var(--s1)',
@@ -425,6 +475,21 @@ export default function ProductionPage({ profile, can }: Props) {
               </div>
             )}
           </>
+        )}
+
+        {/* ═══ FOLHA P/ CONFERENTE ═══ */}
+        {tab==='folha' && (
+          <div className="rounded-xl p-4" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+            <div style={{fontSize:'12px',fontWeight:700,color:'#f97316',marginBottom:'6px'}}>📄 Folha de Produção Diária</div>
+            <div style={{fontSize:'12px',color:'var(--t2)',lineHeight:1.5,marginBottom:'14px'}}>
+              Imprima uma folha em branco para o conferente anotar a produção à mão durante o turno.
+              Depois é só lançar os dados no sistema pela aba <b>Lançamentos</b>.
+            </div>
+            <div className="flex gap-2">
+              <Btn onClick={()=>imprimirFolhaProducao(20)} variant="primary" size="md">🖨️ Imprimir folha (20 linhas)</Btn>
+              <Btn onClick={()=>imprimirFolhaProducao(30)} size="md">🖨️ 30 linhas</Btn>
+            </div>
+          </div>
         )}
       </>}
 
