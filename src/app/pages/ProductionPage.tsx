@@ -149,50 +149,98 @@ export default function ProductionPage({ profile, can }: Props) {
   const monthRecs = records.filter(r => r.prod_date >= monthStart)
   const monthProd = monthRecs.reduce((s,r)=>s+(parseFloat(r.produced_m3)||0),0)
 
-  // ── Folha em branco para o conferente preencher à mão ──
-  function imprimirFolhaProducao(nLinhas = 20) {
-    const linhas = Array.from({ length: nLinhas }).map(() => `
+  // ── Folha em branco para o conferente preencher à mão (modelo Faganello) ──
+  // nPacotes: pacotes de capa/capinha (folhas). nRetalho: linhas por bloco de retalho.
+  function imprimirFolhaProducao(nPacotes = 60, nRetalho = 12) {
+    const bd = 'border:1px solid #444'
+    const th = `${bd};padding:3px 4px;background:#eee;font-size:10px;text-align:center`
+    const cell = `${bd};height:22px`
+
+    // Duas colunas de pacotes lado a lado: [1..metade] e [metade+1..nPacotes]
+    const metade = Math.ceil(nPacotes / 2)
+    const pacoteRows = Array.from({ length: metade }).map((_, i) => {
+      const esq = i + 1
+      const dir = metade + i + 1
+      const colDir = dir <= nPacotes
+        ? `<td style="${bd};text-align:center;width:34px;font-size:10px">${dir}</td><td style="${cell};width:120px"></td>`
+        : `<td style="${bd};width:34px"></td><td style="${cell};width:120px"></td>`
+      return `<tr>
+        <td style="${bd};text-align:center;width:34px;font-size:10px">${esq}</td><td style="${cell};width:120px"></td>
+        ${colDir}
+      </tr>`
+    }).join('')
+
+    // Bloco de retalho (Altura / Largura / Comprimento / Total m³)
+    const retalhoRows = Array.from({ length: nRetalho }).map(() => `
       <tr>
-        <td style="border:1px solid #999;height:26px"></td>
-        <td style="border:1px solid #999"></td>
-        <td style="border:1px solid #999"></td>
-        <td style="border:1px solid #999"></td>
-        <td style="border:1px solid #999"></td>
-        <td style="border:1px solid #999"></td>
-        <td style="border:1px solid #999"></td>
+        <td style="${cell};width:60px"></td>
+        <td style="${cell};width:60px"></td>
+        <td style="${cell};width:70px"></td>
+        <td style="${cell};width:60px"></td>
       </tr>`).join('')
+    const retalhoBloco = (titulo: string, totalLabel: string) => `
+      <table style="border-collapse:collapse;width:100%">
+        <thead>
+          <tr><th colspan="4" style="${th};font-size:11px">${titulo}</th></tr>
+          <tr>
+            <th style="${th}">Altura</th><th style="${th}">Largura</th>
+            <th style="${th}">Comprimento</th><th style="${th}">Total m³</th>
+          </tr>
+        </thead>
+        <tbody>${retalhoRows}</tbody>
+        <tfoot>
+          <tr><td colspan="3" style="${bd};padding:3px 4px;font-size:10px;font-weight:bold">${totalLabel}</td><td style="${cell}"></td></tr>
+        </tfoot>
+      </table>`
+
     const html = `
-      <html><head><title>Folha de Producao</title></head>
-      <body style="font-family:Arial,sans-serif;margin:16px;color:#111">
-        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #060d1a;padding-bottom:8px;margin-bottom:10px">
-          <div>
-            <div style="font-size:18px;font-weight:bold">Industrial8 — Folha de Produção Diária</div>
-            <div style="font-size:11px;color:#555">Preencher à mão e lançar no sistema depois</div>
-          </div>
-          <div style="font-size:12px;text-align:right">
-            Data: ____/____/______<br>Turno: ______<br>Conferente: __________________
-          </div>
-        </div>
-        <table style="width:100%;border-collapse:collapse;font-size:12px">
-          <thead>
-            <tr style="background:#eee">
-              <th style="border:1px solid #999;padding:4px">Hora</th>
-              <th style="border:1px solid #999;padding:4px">Classe madeira</th>
-              <th style="border:1px solid #999;padding:4px">Tipo lâmina</th>
-              <th style="border:1px solid #999;padding:4px">Folhas / Altura</th>
-              <th style="border:1px solid #999;padding:4px">m³ Tanque</th>
-              <th style="border:1px solid #999;padding:4px">m³ Produzido</th>
-              <th style="border:1px solid #999;padding:4px">Obs.</th>
-            </tr>
-          </thead>
-          <tbody>${linhas}</tbody>
+      <html><head><title>Producao Laminas</title>
+      <style>@page{size:landscape;margin:8mm} body{font-family:Arial,sans-serif;color:#111;margin:0}</style>
+      </head>
+      <body>
+        <div style="text-align:center;font-size:16px;font-weight:bold;margin-bottom:6px">PRODUÇÃO LÂMINAS</div>
+
+        <!-- Cabeçalho: DATA / ESPESSURA / COMPRIMENTO / LARGURA / TIPO LÂMINA -->
+        <table style="border-collapse:collapse;width:100%;margin-bottom:8px">
+          <tr>
+            <td style="${bd};padding:4px 6px;font-size:11px;font-weight:bold;width:16%">DATA<br><span style="font-weight:normal">____/____/______</span></td>
+            <td style="${bd};padding:4px 6px;font-size:11px;font-weight:bold;width:16%">ESPESSURA<br><span style="font-weight:normal">__________</span></td>
+            <td style="${bd};padding:4px 6px;font-size:11px;font-weight:bold;width:16%">COMPRIMENTO<br><span style="font-weight:normal">__________</span></td>
+            <td style="${bd};padding:4px 6px;font-size:11px;font-weight:bold;width:16%">LARGURA<br><span style="font-weight:normal">__________</span></td>
+            <td style="${bd};padding:4px 6px;font-size:11px;font-weight:bold">TIPO LÂMINA<br><span style="font-weight:normal">________________________</span></td>
+          </tr>
         </table>
-        <div style="margin-top:14px;font-size:12px">
-          Cavaco (m³): ______________ &nbsp;&nbsp;&nbsp; Total produzido (m³): ______________
+
+        <div style="display:flex;gap:8px;align-items:flex-start">
+          <!-- Bloco 1: pacotes (folhas) -->
+          <div style="flex:0 0 auto">
+            <table style="border-collapse:collapse">
+              <thead>
+                <tr>
+                  <th style="${th}">PACOTE</th><th style="${th}">FOLHAS</th>
+                  <th style="${th}">PACOTE</th><th style="${th}">FOLHAS</th>
+                </tr>
+              </thead>
+              <tbody>${pacoteRows}</tbody>
+              <tfoot>
+                <tr><td colspan="4" style="${bd};padding:3px 4px;font-size:10px;font-weight:bold">TOTAL FOLHAS: __________</td></tr>
+                <tr><td colspan="4" style="${bd};padding:3px 4px;font-size:10px;font-weight:bold">TOTAL M³: __________</td></tr>
+                <tr><td colspan="4" style="${bd};padding:3px 4px;font-size:10px;font-weight:bold">TIPO LÂMINA: __________</td></tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <!-- Bloco 2: retalho bom -->
+          <div style="flex:1">${retalhoBloco('PRODUÇÃO RETALHO BOM', 'TOTAL RETALHOS BOM')}</div>
+
+          <!-- Bloco 3: retalho ruim / aproveitamento -->
+          <div style="flex:1">${retalhoBloco('PRODUÇÃO RETALHO RUIM / APROVEITAMENTO', 'TOTAL RETALHOS APROVEITAMENTO')}</div>
         </div>
-        <div style="margin-top:36px;display:flex;justify-content:space-around;font-size:12px">
-          <div style="text-align:center">_______________________<br>Conferente</div>
-          <div style="text-align:center">_______________________<br>Responsável</div>
+
+        <div style="margin-top:14px;font-size:11px;display:flex;gap:30px">
+          <span>m³ TANQUE (madeira): ____________</span>
+          <span>CAVACO (m³): ____________</span>
+          <span>Conferente: __________________</span>
         </div>
       </body></html>`
     const w = window.open('', '_blank')
@@ -480,14 +528,15 @@ export default function ProductionPage({ profile, can }: Props) {
         {/* ═══ FOLHA P/ CONFERENTE ═══ */}
         {tab==='folha' && (
           <div className="rounded-xl p-4" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
-            <div style={{fontSize:'12px',fontWeight:700,color:'#f97316',marginBottom:'6px'}}>📄 Folha de Produção Diária</div>
+            <div style={{fontSize:'12px',fontWeight:700,color:'#f97316',marginBottom:'6px'}}>📄 Folha de Produção de Lâminas (1 por dia)</div>
             <div style={{fontSize:'12px',color:'var(--t2)',lineHeight:1.5,marginBottom:'14px'}}>
-              Imprima uma folha em branco para o conferente anotar a produção à mão durante o turno.
-              Depois é só lançar os dados no sistema pela aba <b>Lançamentos</b>.
+              Imprime a folha no formato usado na fábrica: cabeçalho (data, espessura, comprimento, largura, tipo),
+              pacotes de folhas e os blocos de retalho bom e aproveitamento. O conferente anota toda a produção do dia à mão
+              e depois os dados são lançados no sistema pela aba <b>Lançamentos</b>. Imprima em <b>paisagem</b>.
             </div>
             <div className="flex gap-2">
-              <Btn onClick={()=>imprimirFolhaProducao(20)} variant="primary" size="md">🖨️ Imprimir folha (20 linhas)</Btn>
-              <Btn onClick={()=>imprimirFolhaProducao(30)} size="md">🖨️ 30 linhas</Btn>
+              <Btn onClick={()=>imprimirFolhaProducao(60,12)} variant="primary" size="md">🖨️ Imprimir folha (60 pacotes)</Btn>
+              <Btn onClick={()=>imprimirFolhaProducao(40,12)} size="md">🖨️ 40 pacotes</Btn>
             </div>
           </div>
         )}
