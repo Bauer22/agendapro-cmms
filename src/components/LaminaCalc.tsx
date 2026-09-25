@@ -36,13 +36,7 @@ interface TipoLamina {
 
 interface Linha { tipoId: string; qtd: string }
 
-// espessuras oferecidas (mm) → gravadas em metros
-const ESPESSURAS = [
-  { value: '0.0026', label: '2,6 mm' },
-  { value: '0.0027', label: '2,7 mm' },
-  { value: '0.0030', label: '3,0 mm' },
-  { value: '0.0037', label: '3,7 mm' },
-]
+interface Espessura { id: string; valor_m: number; ativo?: boolean }
 
 const CATEGORIAS = [
   { value: 'capa', label: 'Capa (usa nº de folhas)' },
@@ -74,18 +68,51 @@ export default function LaminaCalc({
   createdBy?: string
 }) {
   const [tipos, setTipos] = useState<TipoLamina[]>([])
+  const [espessuras, setEspessuras] = useState<Espessura[]>([])
   const [linhas, setLinhas] = useState<Linha[]>([{ tipoId: '', qtd: '' }])
   const [modal, setModal] = useState(false)
-  const [novo, setNovo] = useState<any>({ categoria: 'capa', espessura: '0.0026' })
+  const [novo, setNovo] = useState<any>({ categoria: 'capa', espessura: '' })
+  const [novaEsp, setNovaEsp] = useState('')   // em mm, para cadastrar
   const [saving, setSaving] = useState(false)
 
   useEffect(() => { load() }, [])
 
   async function load() {
-    const { data } = await supabase
-      .from('tipos_lamina').select('*')
-      .eq('ativo', true).order('categoria').order('nome')
-    setTipos((data as TipoLamina[]) || [])
+    const [t, e] = await Promise.all([
+      supabase.from('tipos_lamina').select('*').eq('ativo', true).order('categoria').order('nome'),
+      supabase.from('espessuras_lamina').select('*').eq('ativo', true).order('valor_m'),
+    ])
+    setTipos((t.data as TipoLamina[]) || [])
+    setEspessuras((e.data as Espessura[]) || [])
+  }
+
+  // opções do select de espessura, montadas do banco (valor em metros; label em mm)
+  const espOptions = [
+    { value: '', label: espessuras.length ? 'Selecione...' : 'Cadastre uma espessura abaixo' },
+    ...espessuras.map(e => ({ value: String(e.valor_m), label: `${(e.valor_m * 1000).toLocaleString('pt-BR')} mm` })),
+  ]
+
+  async function salvarEspessura() {
+    const mm = parseFloat((novaEsp || '').replace(',', '.'))
+    if (!(mm > 0)) { toast.error('Informe a espessura em mm (ex: 2,6)'); return }
+    const valor_m = +(mm / 1000).toFixed(6)
+    if (espessuras.some(e => Math.abs(e.valor_m - valor_m) < 1e-9)) {
+      toast.error('Essa espessura já existe'); return
+    }
+    const { error } = await supabase.from('espessuras_lamina').insert({
+      company_id: companyId || null, valor_m, ativo: true, created_by: createdBy || '',
+    })
+    if (error) { toast.error('Erro: ' + error.message); return }
+    toast.success('Espessura cadastrada ✅')
+    setNovaEsp('')
+    await load()
+    setNovo((e: any) => ({ ...e, espessura: String(valor_m) }))
+  }
+
+  async function removerEspessura(id: string) {
+    const { error } = await supabase.from('espessuras_lamina').update({ ativo: false }).eq('id', id)
+    if (error) { toast.error('Erro: ' + error.message); return }
+    toast.success('Removida'); load()
   }
 
   const tipoOf = (id: string) => tipos.find(t => t.id === id)
@@ -129,7 +156,7 @@ export default function LaminaCalc({
     if (error) { toast.error('Erro: ' + error.message); setSaving(false); return }
     toast.success('Tipo cadastrado ✅')
     setSaving(false)
-    setNovo({ categoria: 'capa', espessura: '0.0026' })
+    setNovo({ categoria: 'capa', espessura: '' })
     await load()
   }
 
@@ -221,9 +248,35 @@ export default function LaminaCalc({
         </div>
 
         {usaFolhas(novo.categoria || 'capa') && (
-          <Select label="Espessura *" value={novo.espessura || '0.0026'}
-            onChange={(v: string) => setNovo((e: any) => ({ ...e, espessura: v }))}
-            options={ESPESSURAS} />
+          <>
+            <Select label="Espessura *" value={novo.espessura || ''}
+              onChange={(v: string) => setNovo((e: any) => ({ ...e, espessura: v }))}
+              options={espOptions} />
+
+            <div style={{ fontSize: '9px', fontWeight: 700, color: 'rgba(249,115,22,.65)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>
+              Espessuras cadastradas (mm)
+            </div>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', marginBottom: '6px' }}>
+              <div style={{ flex: 1 }}>
+                <Input label="Nova espessura (mm)" value={novaEsp} onChange={setNovaEsp}
+                  type="number" placeholder="Ex: 2,6" />
+              </div>
+              <div style={{ paddingTop: '18px' }}>
+                <Btn onClick={salvarEspessura} size="sm">➕ Add</Btn>
+              </div>
+            </div>
+            {espessuras.length > 0 && (
+              <div className="flex flex-col gap-1" style={{ marginBottom: '6px' }}>
+                {espessuras.map(e => (
+                  <div key={e.id} className="flex justify-between items-center rounded-lg px-2 py-1"
+                    style={{ background: 'var(--s1)', border: '1px solid var(--bd)', fontSize: '11px' }}>
+                    <span style={{ color: 'var(--t1)' }}>{(e.valor_m * 1000).toLocaleString('pt-BR')} mm</span>
+                    <Btn variant="danger" size="sm" onClick={() => removerEspessura(e.id)}>🗑</Btn>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
 
         <div style={{ fontSize: '9px', fontWeight: 700, color: 'rgba(249,115,22,.65)', textTransform: 'uppercase', letterSpacing: '1px', margin: '10px 0 6px' }}>
