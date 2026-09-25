@@ -305,47 +305,73 @@ export default function SalesPage({ profile, can }: Props) {
     setTransportadoras((transp.data||[]).map((x:any)=>({id:x.id,name:x.nome_razao})))
   }
 
-  // ── Folha em branco para o conferente anotar as saídas de lâmina à mão ──
-  function imprimirFolhaSaida(nLinhas = 20) {
-    const linhas = Array.from({ length: nLinhas }).map(() => `
+  // ── Folha em branco "SAÍDA MATRIZ" (1 por carga) — modelo Faganello ──
+  // nLinhas: linhas do bloco principal. nRetalho: linhas do bloco de retalho.
+  function imprimirFolhaSaida(nLinhas = 50, nRetalho = 22) {
+    const bd = 'border:1px solid #444'
+    const th = `${bd};padding:3px 4px;background:#eee;font-size:10px;text-align:center;font-weight:bold`
+    const cell = `${bd};height:20px`
+
+    const linhas = Array.from({ length: nLinhas }).map((_, i) => `
       <tr>
-        <td style="border:1px solid #999;height:26px"></td>
-        <td style="border:1px solid #999"></td>
-        <td style="border:1px solid #999"></td>
-        <td style="border:1px solid #999"></td>
-        <td style="border:1px solid #999"></td>
-        <td style="border:1px solid #999"></td>
-        <td style="border:1px solid #999"></td>
+        <td style="${bd};text-align:center;width:28px;font-size:10px;font-weight:bold">${i + 1}</td>
+        <td style="${cell};width:70px"></td>
+        <td style="${cell};width:110px"></td>
+        <td style="${cell};width:55px"></td>
+        <td style="${cell};width:80px"></td>
       </tr>`).join('')
+
+    const retalhoRows = Array.from({ length: nRetalho }).map(() => `
+      <tr>
+        <td style="${cell};width:60px"></td>
+        <td style="${cell};width:90px"></td>
+        <td style="${cell};width:70px"></td>
+      </tr>`).join('')
+
     const html = `
-      <html><head><title>Folha de Saida de Lamina</title></head>
-      <body style="font-family:Arial,sans-serif;margin:16px;color:#111">
-        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #060d1a;padding-bottom:8px;margin-bottom:10px">
-          <div>
-            <div style="font-size:18px;font-weight:bold">Industrial8 — Folha de Saída de Lâmina</div>
-            <div style="font-size:11px;color:#555">Preencher à mão e lançar no sistema depois</div>
-          </div>
-          <div style="font-size:12px;text-align:right">
-            Data: ____/____/______<br>Conferente: __________________
-          </div>
-        </div>
-        <table style="width:100%;border-collapse:collapse;font-size:12px">
-          <thead>
-            <tr style="background:#eee">
-              <th style="border:1px solid #999;padding:4px">Hora</th>
-              <th style="border:1px solid #999;padding:4px">Cliente</th>
-              <th style="border:1px solid #999;padding:4px">Motorista</th>
-              <th style="border:1px solid #999;padding:4px">Placa</th>
-              <th style="border:1px solid #999;padding:4px">Tipo lâmina</th>
-              <th style="border:1px solid #999;padding:4px">m³ / Toneladas</th>
-              <th style="border:1px solid #999;padding:4px">NF / Obs.</th>
-            </tr>
-          </thead>
-          <tbody>${linhas}</tbody>
+      <html><head><title>Saida Matriz</title>
+      <style>@page{size:portrait;margin:8mm} body{font-family:Arial,sans-serif;color:#111;margin:0}</style>
+      </head>
+      <body>
+        <!-- Cabeçalho -->
+        <table style="border-collapse:collapse;width:100%;margin-bottom:0">
+          <tr>
+            <td style="${bd};width:60px;text-align:center;font-size:22px">🌳</td>
+            <td style="${bd};text-align:center;font-size:16px;font-weight:bold">SAÍDA MATRIZ</td>
+          </tr>
         </table>
-        <div style="margin-top:36px;display:flex;justify-content:space-around;font-size:12px">
-          <div style="text-align:center">_______________________<br>Conferente</div>
-          <div style="text-align:center">_______________________<br>Responsável</div>
+
+        <div style="display:flex;gap:14px;align-items:flex-start;margin-top:4px">
+          <!-- Bloco principal -->
+          <div style="flex:0 0 auto">
+            <table style="border-collapse:collapse">
+              <tr>
+                <td style="${bd};padding:3px 6px;font-size:11px;font-weight:bold" colspan="2">DATA: ____/____/______</td>
+                <td style="${bd};padding:3px 6px;font-size:11px;font-weight:bold" colspan="3">MOTORISTA: _____________________</td>
+              </tr>
+              <tr>
+                <td style="${th}">Nº</td>
+                <td style="${th}">TIPO LÂMINA</td>
+                <td style="${th}">LARGURA/COMPRI.</td>
+                <td style="${th}">CHAPAS</td>
+                <td style="${th}">TOTAL FOLHAS</td>
+              </tr>
+              ${linhas}
+            </table>
+          </div>
+
+          <!-- Bloco retalho -->
+          <div style="flex:0 0 auto">
+            <table style="border-collapse:collapse">
+              <tr><td colspan="3" style="${th};font-size:13px">RETALHO</td></tr>
+              <tr>
+                <td style="${th}">ALTURA</td>
+                <td style="${th}">COMPRIMENTO</td>
+                <td style="${th}">LARGURA</td>
+              </tr>
+              ${retalhoRows}
+            </table>
+          </div>
         </div>
       </body></html>`
     const w = window.open('', '_blank')
@@ -991,14 +1017,15 @@ export default function SalesPage({ profile, can }: Props) {
 
       {tab === 'folha' && (
         <div className="rounded-xl p-4" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
-          <div style={{fontSize:'12px',fontWeight:700,color:'#f97316',marginBottom:'6px'}}>📄 Folha de Saída de Lâmina</div>
+          <div style={{fontSize:'12px',fontWeight:700,color:'#f97316',marginBottom:'6px'}}>📄 Folha "Saída Matriz" (1 por carga)</div>
           <div style={{fontSize:'12px',color:'var(--t2)',lineHeight:1.5,marginBottom:'14px'}}>
-            Imprima uma folha em branco para o conferente anotar as saídas de lâmina à mão.
-            Depois é só lançar cada saída no sistema pela aba <b>Ativos</b>.
+            Imprime a folha no formato usado na fábrica: cabeçalho (data, motorista), bloco principal
+            (tipo lâmina, largura/compri., chapas, total folhas) e bloco de retalho (altura, comprimento, largura).
+            O conferente preenche uma folha por carga e depois a saída é lançada no sistema pela aba <b>Ativos</b>.
           </div>
           <div className="flex gap-2">
-            <Btn onClick={()=>imprimirFolhaSaida(20)} variant="primary" size="md">🖨️ Imprimir folha (20 linhas)</Btn>
-            <Btn onClick={()=>imprimirFolhaSaida(30)} size="md">🖨️ 30 linhas</Btn>
+            <Btn onClick={()=>imprimirFolhaSaida(50,22)} variant="primary" size="md">🖨️ Imprimir folha (50 linhas)</Btn>
+            <Btn onClick={()=>imprimirFolhaSaida(30,14)} size="md">🖨️ 30 linhas</Btn>
           </div>
         </div>
       )}
