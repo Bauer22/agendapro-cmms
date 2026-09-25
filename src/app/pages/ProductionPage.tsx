@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Btn, Modal, Input, Select, SH, Empty, KPI, Badge, Textarea, useConfirm } from '@/components/ui'
+import LaminaCalc from '@/components/LaminaCalc'
 import { fmtD, td } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import type { UserProfile } from '@/types'
@@ -480,8 +481,12 @@ export default function ProductionPage({ profile, can }: Props) {
           </div>
         )}
 
+        <LaminaCalc value={editing.produced_m3||''}
+          onChange={(m3:string)=>setEditing((e:any)=>({...e,produced_m3:m3}))}
+          companyId={profile?.company_id} createdBy={profile?.display_name} />
+
         <Input label="Metros cúbicos PRODUZIDOS *" value={editing.produced_m3}
-          onChange={(v:string)=>setEditing((e:any)=>({...e,produced_m3:v}))} type="number" placeholder="0.000" />
+          onChange={(v:string)=>setEditing((e:any)=>({...e,produced_m3:v}))} type="number" placeholder="0.000 (ou use a calculadora acima)" />
 
         <Input label="Produção de cavaco (m³)" value={editing.cavaco_m3}
           onChange={(v:string)=>setEditing((e:any)=>({...e,cavaco_m3:v}))} type="number" placeholder="0.00" />

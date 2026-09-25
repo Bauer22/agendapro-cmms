@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Btn, Modal, Input, Select, SelectComCadastro, SH, Empty, KPI, Badge, Textarea, useConfirm } from '@/components/ui'
+import LaminaCalc from '@/components/LaminaCalc'
 import { fmtD, td } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import type { UserProfile } from '@/types'
@@ -502,18 +503,12 @@ export default function SalesPage({ profile, can }: Props) {
       doc.text('Resumo de Conta Corrente', 12, y);
       y += 6;
       doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(20,20,20);
-      // Usa os totais ACUMULADOS da conta corrente (todas as vendas do cliente, não só o período)
-      var totVendidoCC = saldoVen.reduce(function(s,x){return s + (Number(x.total_vendas)||0);}, 0);
-      var totRecebidoCC = saldoVen.reduce(function(s,x){return s + (Number(x.total_recebido)||0);}, 0);
-      var totReceberCC = saldoVen.reduce(function(s,x){return s + (Number(x.a_receber)||0);}, 0);
-      // Se não houver dados da view (sem cliente filtrado), cai no total do período
-      var vendidoMostrar = saldoVen.length > 0 ? totVendidoCC : (repVal||0);
-      var recebidoMostrar = saldoVen.length > 0 ? totRecebidoCC : totalRecVen;
-      doc.text('Total Vendido: ' + money(vendidoMostrar), 12, y); y += 5;
-      doc.text('Total Recebido: ' + money(recebidoMostrar), 12, y); y += 5;
+      doc.text('Total Vendido: ' + money(repVal||0), 12, y); y += 5;
+      doc.text('Total Recebido: ' + money(totalRecVen), 12, y); y += 5;
       if (saldoVen.length > 0) {
+        var totReceber = saldoVen.reduce(function(s,x){return s + (Number(x.a_receber)||0);}, 0);
         doc.setFont('helvetica','bold');
-        doc.text('SALDO A RECEBER: ' + money(totReceberCC), 12, y); y += 6;
+        doc.text('SALDO A RECEBER: ' + money(totReceber), 12, y); y += 6;
       }
 
 
@@ -1068,6 +1063,15 @@ export default function SalesPage({ profile, can }: Props) {
           options={products.map(p => ({value:p.id, label:p.name}))}
           companyId={profile?.company_id} createdBy={profile?.display_name}
           onCreatedRefresh={() => loadMeta()} />
+
+        {(() => {
+          const pn = (products.find(p=>p.id===editing.product_id)?.name||'').toUpperCase()
+          return pn.includes('LAMINA') || pn.includes('LÂMINA')
+        })() && (
+          <LaminaCalc value={editing.volume_m3||''}
+            onChange={(m3:string)=>setEditing((e:any)=>({...e, volume_m3:m3}))}
+            companyId={profile?.company_id} createdBy={profile?.display_name} />
+        )}
 
         <div style={{fontSize:'9px',fontWeight:700,color:'rgba(249,115,22,.65)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'4px',marginTop:'4px'}}>
           ⚠️ Preencha ao menos Toneladas ou Metros
