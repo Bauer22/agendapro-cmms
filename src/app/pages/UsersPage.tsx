@@ -17,11 +17,12 @@ const ROLE_LABELS: Record<string,string> = {
   admin:      '👑 Administrador',
   supervisor: '🛠️ Supervisor',
   operator:   '🔧 Operador',
+  producao:   '🏭 Produção',
   viewer:     '👁️ Consulta',
 }
 const ROLE_OPTS = Object.keys(ROLES).filter(k=>k!=='superadmin').map(k=>({value:k,label:ROLE_LABELS[k]||k}))
 const SHIFTS = ['A','B','C','D','ADM']
-const ROLE_COLORS: Record<string,string> = {superadmin:'orange',admin:'purple',supervisor:'amber',operator:'green',viewer:'gray'}
+const ROLE_COLORS: Record<string,string> = {superadmin:'orange',admin:'purple',supervisor:'amber',operator:'green',producao:'blue',viewer:'gray'}
 
 export default function UsersPage({ profile, can }: Props) {
   const [users, setUsers]   = useState<UserProfile[]>([])

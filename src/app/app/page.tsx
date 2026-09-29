@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { UserProfile } from '@/types'
-import { ROLES } from '@/lib/utils'
+import { ROLES, ROLE_MODULES } from '@/lib/utils'
 import toast from 'react-hot-toast'
 
 // ─── Icons ─────────────────────────────────────────────────────────────────
@@ -262,7 +262,13 @@ export default function App() {
     // o módulo precisa estar liberado (superadmin ignora essa regra).
     if (companyModules !== null && !companyModules.includes(n.id) && n.id !== 'dashboard') return false
     if (profile?.role === 'admin') return true
-    if (userModules.length === 0) return ['dashboard','os','pm','tasks'].includes(n.id)
+    if (userModules.length === 0) {
+      // Fallback por perfil: perfis com módulos definidos (ex.: produção) usam essa lista;
+      // demais perfis mantêm o conjunto básico.
+      const roleMods = ROLE_MODULES[profile?.role || '']
+      if (roleMods) return roleMods.includes(n.id)
+      return ['dashboard','os','pm','tasks'].includes(n.id)
+    }
     return userModules.includes(n.id)
   })
 

@@ -378,6 +378,29 @@ export default function SalesPage({ profile, can }: Props) {
     if (w) { w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>w.print(), 300) }
   }
 
+  // Busca pacotes pelos números digitados e soma o m³ automaticamente
+  async function buscarPacotes() {
+    const raw = String(editing.pacote_nums||'').trim()
+    if (!raw) { toast.error('Digite o(s) número(s) do pacote'); return }
+    const nums = raw.split(/[,\s]+/).map((n:string)=>parseInt(n,10)).filter((n:number)=>n>0)
+    if (nums.length===0) { toast.error('Número inválido'); return }
+    const { data, error } = await supabase.from('producao_pacotes')
+      .select('numero,categoria,tipo_nome,volume_m3,saido')
+      .in('numero', nums).eq('company_id', profile?.company_id||null)
+    if (error) { toast.error('Erro: '+error.message); return }
+    if (!data || data.length===0) { toast.error('Nenhum pacote encontrado'); return }
+    const achados = data.map((p:any)=>p.numero)
+    const faltando = nums.filter((n:number)=>!achados.includes(n))
+    const jaSaiu = data.filter((p:any)=>p.saido).map((p:any)=>p.numero)
+    const totalM3 = data.reduce((s:number,p:any)=>s+(+p.volume_m3||0),0)
+    setEditing((e:any)=>({...e, volume_m3: totalM3.toFixed(3),
+      notes: [e.notes, `Pacotes: ${achados.join(', ')}`].filter(Boolean).join(' | ')}))
+    let msg = `${data.length} pacote(s) · ${totalM3.toFixed(3)} m³`
+    if (faltando.length) msg += ` · não achei: ${faltando.join(', ')}`
+    if (jaSaiu.length) msg += ` · ⚠️ já saíram: ${jaSaiu.join(', ')}`
+    toast.success(msg)
+  }
+
   function openNew() {
     const now = new Date()
     const hh = String(now.getHours()).padStart(2,'0')
@@ -428,11 +451,21 @@ export default function SalesPage({ profile, can }: Props) {
       created_by_id: profile?.id || null,
     }
 
-    const { error } = editing.id
-      ? await supabase.from('sales_orders').update({ ...obj, updated_by: profile?.display_name, updated_at: new Date().toISOString() }).eq('id', editing.id)
-      : await supabase.from('sales_orders').insert(obj)
+    const { data: savedOrder, error } = editing.id
+      ? await supabase.from('sales_orders').update({ ...obj, updated_by: profile?.display_name, updated_at: new Date().toISOString() }).eq('id', editing.id).select().single()
+      : await supabase.from('sales_orders').insert(obj).select().single()
 
     if (error) { toast.error('Erro: ' + error.message); setSaving(false); return }
+
+    // Marca os pacotes informados como "saído" e liga à venda
+    if (editing.pacote_nums) {
+      const nums = String(editing.pacote_nums).split(/[,\s]+/).map((n:string)=>parseInt(n,10)).filter((n:number)=>n>0)
+      if (nums.length > 0) {
+        await supabase.from('producao_pacotes')
+          .update({ saido: true, saida_order_id: savedOrder?.id || editing.id || null })
+          .in('numero', nums).eq('company_id', profile?.company_id || null)
+      }
+    }
 
     // Audit trail
     await supabase.from('audit_trail').insert({
@@ -1156,9 +1189,29 @@ export default function SalesPage({ profile, can }: Props) {
           const pn = (products.find(p=>p.id===editing.product_id)?.name||'').toUpperCase()
           return pn.includes('LAMINA') || pn.includes('LÂMINA')
         })() && (
-          <LaminaCalc value={editing.volume_m3||''}
-            onChange={(m3:string)=>setEditing((e:any)=>({...e, volume_m3:m3}))}
-            companyId={profile?.company_id} createdBy={profile?.display_name} />
+          <>
+            {/* Buscar pacote pelo número (puxa m³ automático) */}
+            <div className="rounded-lg p-2 mb-2" style={{background:'var(--s2)',border:'1px solid var(--bd)'}}>
+              <div style={{fontSize:'9px',fontWeight:700,color:'rgba(249,115,22,.65)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'4px'}}>
+                🏷️ Saída por número de pacote
+              </div>
+              <div style={{display:'flex',gap:'6px',alignItems:'flex-start'}}>
+                <div style={{flex:1}}>
+                  <Input label="Nº do(s) pacote(s)" value={editing.pacote_nums||''}
+                    onChange={(v:string)=>setEditing((e:any)=>({...e, pacote_nums:v}))}
+                    placeholder="Ex: 123 ou 123, 124, 125" />
+                </div>
+                <div style={{paddingTop:'18px'}}>
+                  <Btn onClick={buscarPacotes} size="sm">🔍 Buscar</Btn>
+                </div>
+              </div>
+              <div style={{fontSize:'9px',color:'var(--t3)'}}>Puxa o m³ dos pacotes automaticamente e marca como saído ao salvar.</div>
+            </div>
+
+            <LaminaCalc value={editing.volume_m3||''}
+              onChange={(m3:string)=>setEditing((e:any)=>({...e, volume_m3:m3}))}
+              companyId={profile?.company_id} createdBy={profile?.display_name} />
+          </>
         )}
 
         <div style={{fontSize:'9px',fontWeight:700,color:'rgba(249,115,22,.65)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'4px',marginTop:'4px'}}>

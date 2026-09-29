@@ -3,12 +3,13 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Btn, Modal, Input, Select, SH, Empty, KPI, Badge, Textarea, useConfirm } from '@/components/ui'
 import LaminaCalc from '@/components/LaminaCalc'
+import PacotesProducao from '@/components/PacotesProducao'
 import { fmtD, td } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import type { UserProfile } from '@/types'
 
 interface Props { profile: UserProfile|null; can:(p:string)=>boolean }
-type Tab = 'lancamentos'|'relatorio'|'estoque'|'folha'
+type Tab = 'pacotes'|'lancamentos'|'relatorio'|'estoque'|'folha'
 
 const WOOD_CLASSES = ['12 a 18','18 a 24','24 a 35']
 const CONV_DEFAULT = 1.4  // fallback: m³ ÷ 1,4 = toneladas (parâmetro conv_tanque_tons da system_config)
@@ -345,7 +346,7 @@ export default function ProductionPage({ profile, can }: Props) {
       </div>
 
       <div className="flex gap-2 mb-3">
-        {([['lancamentos','📝 Lançamentos'],['relatorio','📊 Relatório'],['estoque','📦 Estoque'],['folha','📄 Folha']] as [Tab,string][]).map(([t,l]) => (
+        {([['pacotes','📦 Pacotes'],['lancamentos','📝 Lançamentos'],['relatorio','📊 Relatório'],['estoque','📦 Estoque'],['folha','📄 Folha']] as [Tab,string][]).map(([t,l]) => (
           <div key={t} onClick={()=>setTab(t)}
             style={{ flex:1, textAlign:'center', padding:'8px', borderRadius:'10px', fontSize:'12px', fontWeight:700, cursor:'pointer',
               background: tab===t?'rgba(249,115,22,.12)':'var(--s1)',
@@ -354,7 +355,9 @@ export default function ProductionPage({ profile, can }: Props) {
         ))}
       </div>
 
-      {loading ? <Empty icon="⏳" text="Carregando..." /> : <>
+      {tab==='pacotes' && <PacotesProducao profile={profile} />}
+
+      {tab!=='pacotes' && (loading ? <Empty icon="⏳" text="Carregando..." /> : <>
 
         {/* ═══ LANÇAMENTOS ═══ */}
         {tab==='lancamentos' && (records.length===0 ? <Empty icon="🏭" text="Nenhuma produção lançada." /> : (() => {
@@ -540,7 +543,7 @@ export default function ProductionPage({ profile, can }: Props) {
             </div>
           </div>
         )}
-      </>}
+      </>)}
 
       {/* ═══ MODAL ═══ */}
       <Modal open={!!view} onClose={()=>setView(null)} title="Detalhe da Producao"

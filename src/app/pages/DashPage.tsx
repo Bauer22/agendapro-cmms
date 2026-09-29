@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { KPI, SH, Empty, Input } from '@/components/ui'
+import PainelProducaoDia from '@/components/PainelProducaoDia'
 import { fmtD, STATUS_INFO, PRIO_COLOR, oilStatus, DPT, MPT, MFULL } from '@/lib/utils'
 import type { UserProfile } from '@/types'
 
@@ -199,6 +200,9 @@ export default function DashPage({ profile, can, onNavigate }: Props) {
 
   return (
     <div>
+      {/* Painel de produção do dia (auto-refresh 5 min) */}
+      <PainelProducaoDia />
+
       {/* KPIs */}
       <div className="rounded-xl p-2.5 mb-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
         <div className="flex gap-1.5 mb-1 overflow-x-auto pb-0.5">

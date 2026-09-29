@@ -29,7 +29,14 @@ export const ROLES: Record<string,{label:string,perms:string[]}> = {
   admin:      { label:'Administrador',  perms:['all'] },
   supervisor: { label:'Supervisor',     perms:['os','maint','pm','tasks','parts','reports','machines'] },
   operator:   { label:'Operador',       perms:['os','maint','pm','tasks'] },
+  producao:   { label:'Produção',       perms:['production','wood','sales'] },
   viewer:     { label:'Consulta',       perms:['reports'] },
+}
+
+// Módulos de menu liberados por perfil quando o usuário NÃO tem módulos
+// configurados individualmente (fallback de navegação em app/page.tsx).
+export const ROLE_MODULES: Record<string,string[]> = {
+  producao: ['dashboard','production','wood','sales'],
 }
 export const DPT = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
 export const MPT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
