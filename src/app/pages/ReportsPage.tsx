@@ -305,7 +305,7 @@ export default function ReportsPage({ profile, can }: Props) {
         let qVendas = supabase.from('sales_orders').select('*').ilike('client_name', parceiroNome).eq('status','active').order('sale_date',{ascending:true})
         if (dateFrom) qVendas = qVendas.gte('sale_date', dateFrom)
         if (dateTo)   qVendas = qVendas.lte('sale_date', dateTo)
-        let qSaldo = supabase.from('v_saldo_conta_corrente').select('*').eq('parceiro', nomeUpper)
+        let qSaldo = supabase.from('v_saldo_parceiro').select('*').eq('parceiro', nomeUpper)
         let qRecebido = supabase.from('client_payments').select('*').ilike('client_name', parceiroNome).order('payment_date',{ascending:true})
         if (dateFrom) qRecebido = qRecebido.gte('payment_date', dateFrom)
         if (dateTo)   qRecebido = qRecebido.lte('payment_date', dateTo)
@@ -314,8 +314,9 @@ export default function ReportsPage({ profile, can }: Props) {
         if (dateTo)   qPago = qPago.lte('payment_date', dateTo)
 
         const [rCompras, rWood, rVendas, rSaldo, rRecebido, rPago] = await Promise.all([qCompras, qWood, qVendas, qSaldo, qRecebido, qPago])
-        // compras: usa tiquete se existir, senão wood_entries (mesma regra da conta corrente)
-        const compras = (rCompras.data && rCompras.data.length > 0) ? rCompras.data : (rWood.data||[])
+        // compras: usa wood_entries (madeira pura) quando houver; tiquete só se não houver
+        // entrada de madeira — mesma regra da v_conta_corrente corrigida.
+        const compras = (rWood.data && rWood.data.length > 0) ? rWood.data : (rCompras.data||[])
         const vendas  = rVendas.data || []
         const saldo   = (rSaldo.data||[])[0] || null
 
