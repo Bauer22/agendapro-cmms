@@ -17,6 +17,7 @@ export default function FretePage({ profile }: { profile: UserProfile }) {
   const [detalhe, setDetalhe]     = useState<any>(null)   // transportadora selecionada para ver histórico
   const [aba, setAba]             = useState<'conta'|'relatorio'>('conta')
   const [relTransp, setRelTransp] = useState('')
+  const [relCliente, setRelCliente] = useState('')   // filtro por cliente de entrega
   const [relFrom, setRelFrom]     = useState('')
   const [relTo, setRelTo]         = useState('')
 
@@ -35,8 +36,8 @@ export default function FretePage({ profile }: { profile: UserProfile }) {
     setPagamentos(p.data || [])
     // Combinar fretes das duas fontes como "débitos"
     const cargas = [
-      ...(fv.data||[]).map((x:any)=>({ data:x.sale_date, transportadora:(x.transportadora_nome||'').toUpperCase().trim(), tons:x.weight_tons, frete_ton:x.frete_ton, total:x.frete_total, ref:'Venda '+(x.client_name||''), origem:'venda' })),
-      ...(fm.data||[]).map((x:any)=>({ data:x.data_entrada, transportadora:(x.transportadora_nome||'').toUpperCase().trim(), tons:x.weight_tons, frete_ton:x.frete_ton, total:x.frete_total, ref:'Madeira '+(x.supplier_name||''), origem:'madeira' })),
+      ...(fv.data||[]).map((x:any)=>({ data:x.sale_date, transportadora:(x.transportadora_nome||'').toUpperCase().trim(), tons:x.weight_tons, frete_ton:x.frete_ton, total:x.frete_total, ref:'Venda '+(x.client_name||''), cliente:(x.client_name||'').toUpperCase().trim(), origem:'venda' })),
+      ...(fm.data||[]).map((x:any)=>({ data:x.data_entrada, transportadora:(x.transportadora_nome||'').toUpperCase().trim(), tons:x.weight_tons, frete_ton:x.frete_ton, total:x.frete_total, ref:'Madeira '+(x.supplier_name||''), cliente:(x.supplier_name||'').toUpperCase().trim(), origem:'madeira' })),
     ]
     setFretes(cargas)
     setLoading(false)
@@ -84,8 +85,9 @@ export default function FretePage({ profile }: { profile: UserProfile }) {
   // ── Dados do relatório de uma transportadora no período ──
   function dadosRelatorio() {
     const nome = (relTransp||'').toUpperCase().trim()
+    const cli  = (relCliente||'').toUpperCase().trim()
     const noPeriodo = (d:string) => (!relFrom || d>=relFrom) && (!relTo || d<=relTo)
-    const cargas = fretes.filter((f:any)=>f.transportadora===nome && noPeriodo(f.data))
+    const cargas = fretes.filter((f:any)=>f.transportadora===nome && (!cli || f.cliente===cli) && noPeriodo(f.data))
                          .sort((a:any,b:any)=>(a.data||'').localeCompare(b.data||''))
     const pagos = pagamentos.filter((p:any)=>(p.transportadora_nome||'').toUpperCase().trim()===nome && noPeriodo(p.payment_date))
                             .sort((a:any,b:any)=>(a.payment_date||'').localeCompare(b.payment_date||''))
@@ -103,7 +105,8 @@ export default function FretePage({ profile }: { profile: UserProfile }) {
     if (!relTransp) { toast.error('Selecione a transportadora'); return }
     const r = dadosRelatorio()
     const esc = (s:any) => String(s==null?'':s).replace(/[&<>"']/g, (c:string)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]||c))
-    const periodo = (relFrom||relTo) ? `Período: ${relFrom?fmtD(relFrom):'início'} a ${relTo?fmtD(relTo):'hoje'}` : 'Todo o período'
+    const periodoBase = (relFrom||relTo) ? `Período: ${relFrom?fmtD(relFrom):'início'} a ${relTo?fmtD(relTo):'hoje'}` : 'Todo o período'
+    const periodo = relCliente ? `${periodoBase} · Cliente de entrega: ${esc(relCliente)}` : periodoBase
     const th='padding:6px 8px;background:#1e3a6e;color:#fff;font-size:11px;text-align:left'
     const td2='padding:5px 8px;border-bottom:1px solid #ddd;font-size:11px'
     const linhasCargas = r.cargas.map((f:any)=>`<tr><td style="${td2}">${fmtD(f.data)}</td><td style="${td2}">${esc(f.ref)}</td><td style="${td2};text-align:right">${(+f.tons).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td><td style="${td2};text-align:right">${money(f.frete_ton)}</td><td style="${td2};text-align:right">${money(f.total)}</td></tr>`).join('')
@@ -154,8 +157,18 @@ export default function FretePage({ profile }: { profile: UserProfile }) {
           <div className="flex flex-col gap-3">
             <div className="rounded-2xl p-4" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
               <div style={{fontSize:'13px',fontWeight:700,color:'var(--t1)',marginBottom:'10px'}}>📄 Relatório de Frete por Transportadora</div>
-              <Select label="Transportadora" value={relTransp} onChange={(v:string)=>setRelTransp(v)}
+              <Select label="Transportadora" value={relTransp} onChange={(v:string)=>{setRelTransp(v);setRelCliente('')}}
                 options={[{value:'',label:'Selecione...'}, ...saldos.map((s:any)=>({value:s.transportadora,label:s.transportadora}))]} />
+              {relTransp && (() => {
+                const nomeT = (relTransp||'').toUpperCase().trim()
+                const clientes = Array.from(new Set(
+                  fretes.filter((f:any)=>f.transportadora===nomeT && f.cliente).map((f:any)=>f.cliente)
+                )).sort()
+                return (
+                  <Select label="Cliente de entrega (opcional)" value={relCliente} onChange={(v:string)=>setRelCliente(v)}
+                    options={[{value:'',label:'Todos os clientes'}, ...clientes.map((c:string)=>({value:c,label:c}))]} />
+                )
+              })()}
               <div className="grid grid-cols-2 gap-x-3">
                 <Input label="De" type="date" value={relFrom} onChange={(v:string)=>setRelFrom(v)} />
                 <Input label="Até" type="date" value={relTo} onChange={(v:string)=>setRelTo(v)} />
@@ -165,7 +178,7 @@ export default function FretePage({ profile }: { profile: UserProfile }) {
 
             {r && (
               <div className="rounded-2xl p-4" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
-                <div style={{fontSize:'13px',fontWeight:700,color:'var(--cy)',marginBottom:'10px'}}>{r.nome}</div>
+                <div style={{fontSize:'13px',fontWeight:700,color:'var(--cy)',marginBottom:'10px'}}>{r.nome}{relCliente && <span style={{fontSize:'11px',fontWeight:600,color:'var(--t3)'}}> · entregas p/ {relCliente}</span>}</div>
                 <div className="grid grid-cols-2 gap-2 mb-3" style={{fontSize:'11px'}}>
                   <div><div style={{color:'var(--t3)'}}>Viagens</div><div style={{fontWeight:700,color:'var(--t1)'}}>{r.totCargas}</div></div>
                   <div><div style={{color:'var(--t3)'}}>Toneladas</div><div style={{fontWeight:700,color:'var(--t1)'}}>{r.totTons.toLocaleString('pt-BR',{minimumFractionDigits:2})} t</div></div>
