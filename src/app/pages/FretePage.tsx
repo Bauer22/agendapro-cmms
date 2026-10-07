@@ -81,9 +81,14 @@ export default function FretePage({ profile }: { profile: UserProfile }) {
   // Histórico de uma transportadora (débitos = fretes, créditos = pagamentos)
   const histTransp = detalhe ? (() => {
     const nome = (detalhe.transportadora||'').toUpperCase().trim()
-    const debitos = fretes.filter((f:any)=>f.transportadora===nome).map((f:any)=>({data:f.data, tipo:'Frete', valor:f.total, desc:`${f.ref} · ${f.tons}t × ${money(f.frete_ton)}`}))
+    const cargasT = fretes.filter((f:any)=>f.transportadora===nome)
+    const debitos = cargasT.map((f:any)=>({data:f.data, tipo:'Frete', valor:f.total, desc:`${f.ref} · ${f.tons}t × ${money(f.frete_ton)}`}))
+    // guia do freteiro: uma linha por carga, só p/ transportadoras listadas
+    const guias = TRANSP_COM_GUIA.includes(nome)
+      ? cargasT.map((f:any)=>({data:f.data, tipo:'Frete', valor:GUIA_FRETEIRO, desc:`Guia do freteiro · ${f.ref}`}))
+      : []
     const creditos = pagamentos.filter((p:any)=>(p.transportadora_nome||'').toUpperCase().trim()===nome).map((p:any)=>({data:p.payment_date, tipo:'Pagamento', valor:-p.value, desc:p.method||'Pagamento'}))
-    return [...debitos, ...creditos].sort((a,b)=>(b.data||'').localeCompare(a.data||''))
+    return [...debitos, ...guias, ...creditos].sort((a,b)=>(b.data||'').localeCompare(a.data||''))
   })() : []
 
   // ── Dados do relatório de uma transportadora no período ──
@@ -97,12 +102,16 @@ export default function FretePage({ profile }: { profile: UserProfile }) {
                             .sort((a:any,b:any)=>(a.payment_date||'').localeCompare(b.payment_date||''))
     const totCargas = cargas.length
     const totTons = cargas.reduce((s:number,f:any)=>s+(+f.tons||0),0)
-    const totFrete = cargas.reduce((s:number,f:any)=>s+(+f.total||0),0)
+    const totFreteViagens = cargas.reduce((s:number,f:any)=>s+(+f.total||0),0)
+    // Guia do freteiro: valor fixo por carga, só p/ transportadoras listadas
+    const temGuia = TRANSP_COM_GUIA.includes(nome)
+    const totGuia = temGuia ? GUIA_FRETEIRO * totCargas : 0
+    const totFrete = totFreteViagens + totGuia   // frete + guia = total devido do período
     const totPago = pagos.reduce((s:number,p:any)=>s+(+p.value||0),0)
-    // Saldo geral da transportadora (não só do período) — da view
+    // Saldo geral da transportadora (não só do período) — da view (já inclui guia)
     const sv = saldos.find((s:any)=>(s.transportadora||'').toUpperCase().trim()===nome)
     const saldoGeral = sv ? +sv.saldo : (totFrete - totPago)
-    return { nome, cargas, pagos, totCargas, totTons, totFrete, totPago, saldoGeral }
+    return { nome, cargas, pagos, totCargas, totTons, totFreteViagens, temGuia, totGuia, totFrete, totPago, saldoGeral }
   }
 
   function imprimirRelatorio() {
@@ -113,7 +122,10 @@ export default function FretePage({ profile }: { profile: UserProfile }) {
     const periodo = relCliente ? `${periodoBase} · Cliente de entrega: ${esc(relCliente)}` : periodoBase
     const th='padding:6px 8px;background:#1e3a6e;color:#fff;font-size:11px;text-align:left'
     const td2='padding:5px 8px;border-bottom:1px solid #ddd;font-size:11px'
-    const linhasCargas = r.cargas.map((f:any)=>`<tr><td style="${td2}">${fmtD(f.data)}</td><td style="${td2}">${esc(f.ref)}</td><td style="${td2};text-align:right">${(+f.tons).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td><td style="${td2};text-align:right">${money(f.frete_ton)}</td><td style="${td2};text-align:right">${money(f.total)}</td></tr>`).join('')
+    const linhasCargas = r.cargas.map((f:any)=>{
+      const guia = r.temGuia ? GUIA_FRETEIRO : 0
+      return `<tr><td style="${td2}">${fmtD(f.data)}</td><td style="${td2}">${esc(f.ref)}</td><td style="${td2};text-align:right">${(+f.tons).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td><td style="${td2};text-align:right">${money(f.frete_ton)}</td><td style="${td2};text-align:right">${money(f.total)}</td><td style="${td2};text-align:right">${guia?money(guia):'—'}</td><td style="${td2};text-align:right;font-weight:bold">${money((+f.total||0)+guia)}</td></tr>`
+    }).join('')
     const linhasPagos = r.pagos.map((p:any)=>`<tr><td style="${td2}">${fmtD(p.payment_date)}</td><td style="${td2}">${esc(p.method||'—')}</td><td style="${td2};text-align:right">${money(p.value)}</td></tr>`).join('')
     const html = `<html><head><title>Relatório de Frete</title></head><body style="font-family:Arial,sans-serif;max-width:800px;margin:20px auto;color:#111">
       <div style="background:#060d1a;color:#fff;padding:16px;border-radius:8px 8px 0 0">
@@ -123,13 +135,16 @@ export default function FretePage({ profile }: { profile: UserProfile }) {
       <table style="width:100%;border-collapse:collapse;margin-top:12px"><tbody>
         <tr><td style="${td2};color:#555">Viagens (cargas)</td><td style="${td2};text-align:right;font-weight:bold">${r.totCargas}</td></tr>
         <tr><td style="${td2};color:#555">Toneladas transportadas</td><td style="${td2};text-align:right;font-weight:bold">${r.totTons.toLocaleString('pt-BR',{minimumFractionDigits:2})} t</td></tr>
-        <tr><td style="${td2};color:#555">Frete do período</td><td style="${td2};text-align:right;font-weight:bold">${money(r.totFrete)}</td></tr>
+        <tr><td style="${td2};color:#555">Frete das viagens</td><td style="${td2};text-align:right;font-weight:bold">${money(r.totFreteViagens)}</td></tr>
+        ${r.temGuia?`<tr><td style="${td2};color:#555">Guia do freteiro (${r.totCargas} × ${money(GUIA_FRETEIRO)})</td><td style="${td2};text-align:right;font-weight:bold">${money(r.totGuia)}</td></tr>
+        <tr><td style="${td2};color:#555">Total devido no período (frete + guia)</td><td style="${td2};text-align:right;font-weight:bold">${money(r.totFrete)}</td></tr>`:''}
         <tr><td style="${td2};color:#555">Pago no período</td><td style="${td2};text-align:right;font-weight:bold">${money(r.totPago)}</td></tr>
         <tr><td style="${td2};color:#555">SALDO ATUAL (conta corrente)</td><td style="${td2};text-align:right;font-weight:bold;color:#c0392b">${money(r.saldoGeral)}</td></tr>
       </tbody></table>
       <h3 style="margin-top:24px;color:#1e3a6e">Viagens / Cargas (${r.totCargas})</h3>
-      <table style="width:100%;border-collapse:collapse"><thead><tr><th style="${th}">Data</th><th style="${th}">Referência</th><th style="${th};text-align:right">Ton</th><th style="${th};text-align:right">R$/t</th><th style="${th};text-align:right">Frete</th></tr></thead>
-      <tbody>${linhasCargas}<tr><td colspan="2" style="${td2};font-weight:bold;text-align:right">TOTAL</td><td style="${td2};text-align:right;font-weight:bold">${r.totTons.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td><td></td><td style="${td2};text-align:right;font-weight:bold">${money(r.totFrete)}</td></tr></tbody></table>
+      <table style="width:100%;border-collapse:collapse"><thead><tr><th style="${th}">Data</th><th style="${th}">Referência</th><th style="${th};text-align:right">Ton</th><th style="${th};text-align:right">R$/t</th><th style="${th};text-align:right">Frete</th><th style="${th};text-align:right">Guia</th><th style="${th};text-align:right">Total</th></tr></thead>
+      <tbody>${linhasCargas}<tr><td colspan="4" style="${td2};font-weight:bold;text-align:right">Subtotais</td><td style="${td2};text-align:right;font-weight:bold">${money(r.totFreteViagens)}</td><td style="${td2};text-align:right;font-weight:bold">${r.temGuia?money(r.totGuia):'—'}</td><td style="${td2};text-align:right;font-weight:bold">${money(r.totFrete)}</td></tr>
+      <tr><td colspan="6" style="${td2};font-weight:bold;text-align:right;background:#f0f0f0">TOTAL DEVIDO</td><td style="${td2};text-align:right;font-weight:bold;background:#f0f0f0">${money(r.totFrete)}</td></tr></tbody></table>
       ${r.pagos.length? `<h3 style="margin-top:24px;color:#1e8449">Pagamentos (${r.pagos.length})</h3><table style="width:100%;border-collapse:collapse"><thead><tr><th style="${th}">Data</th><th style="${th}">Forma</th><th style="${th};text-align:right">Valor</th></tr></thead><tbody>${linhasPagos}<tr><td colspan="2" style="${td2};font-weight:bold;text-align:right">TOTAL PAGO</td><td style="${td2};text-align:right;font-weight:bold">${money(r.totPago)}</td></tr></tbody></table>`:''}
     </body></html>`
     const w = window.open('', '_blank')
@@ -186,16 +201,23 @@ export default function FretePage({ profile }: { profile: UserProfile }) {
                 <div className="grid grid-cols-2 gap-2 mb-3" style={{fontSize:'11px'}}>
                   <div><div style={{color:'var(--t3)'}}>Viagens</div><div style={{fontWeight:700,color:'var(--t1)'}}>{r.totCargas}</div></div>
                   <div><div style={{color:'var(--t3)'}}>Toneladas</div><div style={{fontWeight:700,color:'var(--t1)'}}>{r.totTons.toLocaleString('pt-BR',{minimumFractionDigits:2})} t</div></div>
-                  <div><div style={{color:'var(--t3)'}}>Frete do período</div><div style={{fontWeight:700,color:'var(--rd)'}}>{money(r.totFrete)}</div></div>
-                  <div><div style={{color:'var(--t3)'}}>Pago no período</div><div style={{fontWeight:700,color:'var(--gn)'}}>{money(r.totPago)}</div></div>
+                  <div><div style={{color:'var(--t3)'}}>Frete das viagens</div><div style={{fontWeight:700,color:'var(--rd)'}}>{money(r.totFreteViagens)}</div></div>
+                  {r.temGuia
+                    ? <div><div style={{color:'var(--t3)'}}>Guia freteiro ({r.totCargas}×{money(GUIA_FRETEIRO)})</div><div style={{fontWeight:700,color:'var(--rd)'}}>{money(r.totGuia)}</div></div>
+                    : <div><div style={{color:'var(--t3)'}}>Pago no período</div><div style={{fontWeight:700,color:'var(--gn)'}}>{money(r.totPago)}</div></div>}
+                  {r.temGuia && <>
+                    <div><div style={{color:'var(--t3)'}}>Total devido (frete + guia)</div><div style={{fontWeight:700,color:'var(--rd)'}}>{money(r.totFrete)}</div></div>
+                    <div><div style={{color:'var(--t3)'}}>Pago no período</div><div style={{fontWeight:700,color:'var(--gn)'}}>{money(r.totPago)}</div></div>
+                  </>}
                   <div style={{gridColumn:'span 2'}}><div style={{color:'var(--t3)'}}>Saldo atual (conta corrente)</div><div style={{fontWeight:700,fontSize:'14px',color:'var(--cy)'}}>{money(r.saldoGeral)}</div></div>
                 </div>
                 <div style={{fontSize:'11px',fontWeight:700,color:'var(--t2)',marginBottom:'4px'}}>Viagens / Cargas</div>
                 <div style={{overflowX:'auto'}}>
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:'10px'}}>
-                    <thead><tr style={{background:'var(--s2)'}}><th style={{padding:'4px 6px',textAlign:'left',color:'var(--t2)'}}>Data</th><th style={{padding:'4px 6px',textAlign:'left',color:'var(--t2)'}}>Ref.</th><th style={{padding:'4px 6px',textAlign:'right',color:'var(--t2)'}}>Ton</th><th style={{padding:'4px 6px',textAlign:'right',color:'var(--t2)'}}>R$/t</th><th style={{padding:'4px 6px',textAlign:'right',color:'var(--t2)'}}>Frete</th></tr></thead>
-                    <tbody>{r.cargas.map((f:any,i:number)=>(<tr key={i} style={{borderBottom:'1px solid var(--bd)'}}><td style={{padding:'4px 6px',color:'var(--t1)'}}>{fmtD(f.data)}</td><td style={{padding:'4px 6px',color:'var(--t3)'}}>{f.ref}</td><td style={{padding:'4px 6px',textAlign:'right',color:'var(--t1)'}}>{(+f.tons).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td><td style={{padding:'4px 6px',textAlign:'right',color:'var(--t1)'}}>{money(f.frete_ton)}</td><td style={{padding:'4px 6px',textAlign:'right',color:'var(--t1)'}}>{money(f.total)}</td></tr>))}
-                      <tr style={{background:'var(--s2)',fontWeight:700}}><td colSpan={2} style={{padding:'4px 6px',textAlign:'right',color:'var(--t1)'}}>TOTAL</td><td style={{padding:'4px 6px',textAlign:'right',color:'var(--t1)'}}>{r.totTons.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td><td></td><td style={{padding:'4px 6px',textAlign:'right',color:'var(--rd)'}}>{money(r.totFrete)}</td></tr>
+                    <thead><tr style={{background:'var(--s2)'}}><th style={{padding:'4px 6px',textAlign:'left',color:'var(--t2)'}}>Data</th><th style={{padding:'4px 6px',textAlign:'left',color:'var(--t2)'}}>Ref.</th><th style={{padding:'4px 6px',textAlign:'right',color:'var(--t2)'}}>Ton</th><th style={{padding:'4px 6px',textAlign:'right',color:'var(--t2)'}}>R$/t</th><th style={{padding:'4px 6px',textAlign:'right',color:'var(--t2)'}}>Frete</th><th style={{padding:'4px 6px',textAlign:'right',color:'var(--t2)'}}>Guia</th><th style={{padding:'4px 6px',textAlign:'right',color:'var(--t2)'}}>Total</th></tr></thead>
+                    <tbody>{r.cargas.map((f:any,i:number)=>{const guia=r.temGuia?GUIA_FRETEIRO:0; return (<tr key={i} style={{borderBottom:'1px solid var(--bd)'}}><td style={{padding:'4px 6px',color:'var(--t1)'}}>{fmtD(f.data)}</td><td style={{padding:'4px 6px',color:'var(--t3)'}}>{f.ref}</td><td style={{padding:'4px 6px',textAlign:'right',color:'var(--t1)'}}>{(+f.tons).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td><td style={{padding:'4px 6px',textAlign:'right',color:'var(--t1)'}}>{money(f.frete_ton)}</td><td style={{padding:'4px 6px',textAlign:'right',color:'var(--t1)'}}>{money(f.total)}</td><td style={{padding:'4px 6px',textAlign:'right',color:'var(--t3)'}}>{guia?money(guia):'—'}</td><td style={{padding:'4px 6px',textAlign:'right',fontWeight:600,color:'var(--t1)'}}>{money((+f.total||0)+guia)}</td></tr>)})}
+                      <tr style={{background:'var(--s2)'}}><td colSpan={4} style={{padding:'4px 6px',textAlign:'right',color:'var(--t3)'}}>Subtotais</td><td style={{padding:'4px 6px',textAlign:'right',color:'var(--t1)'}}>{money(r.totFreteViagens)}</td><td style={{padding:'4px 6px',textAlign:'right',color:'var(--t1)'}}>{r.temGuia?money(r.totGuia):'—'}</td><td style={{padding:'4px 6px',textAlign:'right',color:'var(--t1)'}}>{money(r.totFrete)}</td></tr>
+                      <tr style={{background:'var(--s2)',fontWeight:700}}><td colSpan={6} style={{padding:'4px 6px',textAlign:'right',color:'var(--t1)'}}>TOTAL DEVIDO</td><td style={{padding:'4px 6px',textAlign:'right',color:'var(--rd)'}}>{money(r.totFrete)}</td></tr>
                     </tbody>
                   </table>
                 </div>
