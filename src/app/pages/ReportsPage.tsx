@@ -25,6 +25,8 @@ const REPORT_MODULES = [
   {id:'training', icon:'🎓', title:'Treinamentos',          desc:'Status e validade por funcionário'},
   {id:'audit',    icon:'🔍', title:'Auditorias',            desc:'Scores e pendências por período'},
   {id:'energy',   icon:'⚡', title:'Consumo de Energia',    desc:'Consumo e custo por fonte e setor'},
+  {id:'diesel_abast', icon:'⛽', title:'Diesel — Abastecimentos', desc:'Abastecimentos em máquinas e veículos por período'},
+  {id:'diesel_entradas', icon:'🛢️', title:'Diesel — Entradas (compras)', desc:'Compras de diesel no tanque por fornecedor e período'},
 ]
 
 export default function ReportsPage({ profile, can }: Props) {
@@ -292,6 +294,39 @@ export default function ReportsPage({ profile, can }: Props) {
         const rows = (data||[]).map((r:any) => [r.record_date, r.source, r.sector||'Geral', `${r.reading||0} ${r.unit||'kWh'}`, `R$ ${fmtR(r.cost||0)}`, r.notes||''])
         addTable(doc, 'Consumo de Energia', ['Data','Fonte','Setor','Leitura/Consumo','Custo','Obs'], rows)
 
+      } else if (moduleId === 'diesel_abast') {
+        let q = supabase.from('fuel_records').select('*').order('record_date',{ascending:false})
+        q = buildDateFilter(q, 'record_date')
+        const { data } = await q
+        const lst = data||[]
+        const totL = lst.reduce((s:number,r:any)=>s+(+r.liters||0),0)
+        const totV = lst.reduce((s:number,r:any)=>s+(+r.total_value||0),0)
+        const rows = lst.map((r:any)=>{
+          const lt = +r.liters||0
+          const up = r.unit_price!=null ? +r.unit_price : (lt>0 ? (+r.total_value||0)/lt : 0)
+          return [fmtD(r.record_date), (r.record_time?String(r.record_time).slice(0,5):'—'),
+            r.machine_name || r.veiculo_placa || r.plate || '—',
+            `${lt.toFixed(2)} L`, `R$ ${fmtR(up)}`, `R$ ${fmtR(r.total_value||0)}`, r.driver||r.operador||'—']
+        })
+        rows.push(['TOTAL','','', `${totL.toFixed(2)} L`, '', `R$ ${fmtR(totV)}`, ''])
+        addTable(doc, 'Diesel — Abastecimentos', ['Data','Hora','Máquina/Veículo','Litros','Valor/L','Valor Total','Operador'], rows)
+
+      } else if (moduleId === 'diesel_entradas') {
+        let q = supabase.from('fuel_entries').select('*').order('entry_date',{ascending:false})
+        q = buildDateFilter(q, 'entry_date')
+        const { data } = await q
+        const lst = data||[]
+        const totL = lst.reduce((s:number,r:any)=>s+(+r.liters||0),0)
+        const totV = lst.reduce((s:number,r:any)=>s+(+r.total_value||0),0)
+        const rows = lst.map((r:any)=>{
+          const lt = +r.liters||0
+          const up = r.unit_price!=null ? +r.unit_price : (lt>0 ? (+r.total_value||0)/lt : 0)
+          return [fmtD(r.entry_date), r.supplier_name||'—', r.fuel_type||'Diesel',
+            `${lt.toFixed(2)} L`, `R$ ${fmtR(up)}`, `R$ ${fmtR(r.total_value||0)}`, r.invoice||r.nota||'—']
+        })
+        rows.push(['TOTAL','','', `${totL.toFixed(2)} L`, '', `R$ ${fmtR(totV)}`, ''])
+        addTable(doc, 'Diesel — Entradas (compras)', ['Data','Fornecedor','Combustível','Litros','Valor/L','Valor Total','NF'], rows)
+
       } else if (moduleId === 'parceiro') {
         const parceiroNome = parceiros.find((p:any)=>p.id===fParceiro)?.nome_razao || ''
         const nomeUpper = parceiroNome.trim().toUpperCase()
@@ -312,8 +347,12 @@ export default function ReportsPage({ profile, can }: Props) {
         let qPago = supabase.from('supplier_payments').select('*').ilike('supplier_name', parceiroNome).order('payment_date',{ascending:true})
         if (dateFrom) qPago = qPago.gte('payment_date', dateFrom)
         if (dateTo)   qPago = qPago.lte('payment_date', dateTo)
+        let qAjustes = supabase.from('account_adjustments').select('*').ilike('parceiro', parceiroNome).order('adj_date',{ascending:true})
+        if (dateFrom) qAjustes = qAjustes.gte('adj_date', dateFrom)
+        if (dateTo)   qAjustes = qAjustes.lte('adj_date', dateTo)
 
-        const [rCompras, rWood, rVendas, rSaldo, rRecebido, rPago] = await Promise.all([qCompras, qWood, qVendas, qSaldo, qRecebido, qPago])
+        const [rCompras, rWood, rVendas, rSaldo, rRecebido, rPago, rAjustes] = await Promise.all([qCompras, qWood, qVendas, qSaldo, qRecebido, qPago, qAjustes])
+        const ajustes = rAjustes.data || []
         // compras: usa wood_entries (madeira pura) quando houver; tiquete só se não houver
         // entrada de madeira — mesma regra da v_conta_corrente corrigida.
         const compras = (rWood.data && rWood.data.length > 0) ? rWood.data : (rCompras.data||[])
@@ -324,21 +363,32 @@ export default function ReportsPage({ profile, can }: Props) {
         doc.text(`Relatório do Parceiro: ${parceiroNome}`, 12, startY)
         let y = startY + 8
 
-        // ── Seção 1: Compras ──
+        // ── Seção 1: Compras (detalhado) ──
         doc.setFontSize(11); doc.setTextColor(0,212,255)
         doc.text(`Compras (${compras.length})`, 12, y)
+        const totCompraT = compras.reduce((s:number,c:any)=>s+(+c.weight_tons||0),0)
+        const totCompraV = compras.reduce((s:number,c:any)=>s+(+c.total_value||0),0)
         autoTable(doc, {
           startY: y+3,
-          head: [['Data','Peso (t)','Motorista','Hora Descarga','Valor']],
-          body: compras.map((c:any)=>[
-            fmtD(c.purchase_date||c.data_entrada),
-            `${c.weight_tons||0}`,
-            c.driver||'—',
-            c.unload_time ? String(c.unload_time).slice(0,5) : '—',
-            `R$ ${fmtR(c.total_value||0)}`
-          ]),
+          head: [['Data','Fornecedor','Motorista','Placa','Peso (t)','Valor/t','Hora Desc.','Valor Total']],
+          body: compras.map((c:any)=>{
+            const peso = +c.weight_tons||0
+            const vlrT = c.unit_value!=null ? +c.unit_value : (peso>0 ? (+c.total_value||0)/peso : 0)
+            return [
+              fmtD(c.purchase_date||c.data_entrada),
+              c.supplier_name||parceiroNome||'—',
+              c.driver||'—',
+              c.plate||c.truck_plate||'—',
+              peso.toFixed(2),
+              `R$ ${fmtR(vlrT)}`,
+              c.unload_time ? String(c.unload_time).slice(0,5) : '—',
+              `R$ ${fmtR(c.total_value||0)}`
+            ]
+          }),
+          foot: [['','','','','TOTAL '+totCompraT.toFixed(2)+' t','','', 'R$ '+fmtR(totCompraV)]],
           styles: { fontSize:7, cellPadding:2 },
           headStyles: { fillColor:[6,13,26], textColor:[255,255,255] },
+          footStyles: { fillColor:[30,58,110], textColor:[255,255,255], fontStyle:'bold' },
           alternateRowStyles: { fillColor:[241,245,249] },
         })
         y = (doc as any).lastAutoTable.finalY + 10
@@ -428,6 +478,32 @@ export default function ReportsPage({ profile, can }: Props) {
             styles: { fontSize:7, cellPadding:2 },
             headStyles: { fillColor:[220,80,80], textColor:[255,255,255] },
             footStyles: { fillColor:[220,80,80], textColor:[255,255,255], fontStyle:'bold' },
+            alternateRowStyles: { fillColor:[241,245,249] },
+          })
+          y = (doc as any).lastAutoTable.finalY + 10
+        }
+
+        // ── Seção: Créditos / Débitos (ajustes) com descrição ──
+        if (ajustes.length > 0) {
+          if (y > 240) { doc.addPage(); y = 20 }
+          doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(249,115,22)
+          doc.text(`Créditos / Débitos lançados (${ajustes.length})`, 12, y)
+          const totCred = ajustes.filter((a:any)=>a.tipo==='credito').reduce((s:number,a:any)=>s+(+a.value||0),0)
+          const totDeb  = ajustes.filter((a:any)=>a.tipo==='debito').reduce((s:number,a:any)=>s+(+a.value||0),0)
+          autoTable(doc, {
+            startY: y + 3,
+            head: [['Data','Tipo','Descrição','Crédito','Débito']],
+            body: ajustes.map((a:any)=>[
+              a.adj_date ? new Date(a.adj_date+'T00:00:00').toLocaleDateString('pt-BR') : '-',
+              a.tipo==='credito' ? 'CRÉDITO' : 'DÉBITO',
+              a.descricao || a.categoria || '—',
+              a.tipo==='credito' ? 'R$ '+fmtR(a.value||0) : '—',
+              a.tipo==='debito'  ? 'R$ '+fmtR(a.value||0) : '—',
+            ]),
+            foot: [['','','TOTAL','R$ '+fmtR(totCred),'R$ '+fmtR(totDeb)]],
+            styles: { fontSize:7, cellPadding:2 },
+            headStyles: { fillColor:[249,115,22], textColor:[255,255,255] },
+            footStyles: { fillColor:[249,115,22], textColor:[255,255,255], fontStyle:'bold' },
             alternateRowStyles: { fillColor:[241,245,249] },
           })
           y = (doc as any).lastAutoTable.finalY + 10
