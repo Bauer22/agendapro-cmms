@@ -5,6 +5,10 @@ import { Btn, Modal, Input, Select, SH, Empty, Badge } from '@/components/ui'
 import type { UserProfile } from '@/types'
 import toast from 'react-hot-toast'
 
+// Guia do freteiro: valor fixo por carga, somente para transportadoras listadas aqui.
+const GUIA_FRETEIRO = 375
+const TRANSP_COM_GUIA = ['CHRYSTIANO GOBATTO LISBOA']
+
 export default function FretePage({ profile }: { profile: UserProfile }) {
   const [saldos, setSaldos]       = useState<any[]>([])
   const [pagamentos, setPagamentos] = useState<any[]>([])
