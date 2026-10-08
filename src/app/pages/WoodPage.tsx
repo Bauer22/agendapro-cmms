@@ -21,6 +21,7 @@ export default function WoodPage({ profile, can }: Props) {
   const [suppliers, setSuppliers] = useState<any[]>([])
   const [motoristas, setMotoristas] = useState<any[]>([])
   const [veiculos, setVeiculos] = useState<any[]>([])
+  const [transportadoras, setTransportadoras] = useState<any[]>([])
   const [precos, setPrecos] = useState<any[]>([])
   const [modal, setModal] = useState(false)
   const [view, setView] = useState<any>(null)
@@ -51,16 +52,18 @@ export default function WoodPage({ profile, can }: Props) {
   }
 
   async function loadSuppliers() {
-    const [forn, mots, veic, prc] = await Promise.all([
+    const [forn, mots, veic, prc, transp] = await Promise.all([
       supabase.from('cadastros').select('id,nome_razao').eq('is_fornecedor', true).eq('status', true).order('nome_razao'),
       supabase.from('cadastros').select('id,nome_razao').eq('is_motorista', true).eq('status', true).order('nome_razao'),
       supabase.from('veiculos').select('id,placa,tipo').eq('status', true).order('placa'),
       supabase.from('supplier_prices').select('supplier_name,price_ton').eq('active', true).eq('product','Pinus'),
+      supabase.from('cadastros').select('id,nome_razao').eq('is_transportador', true).eq('status', true).order('nome_razao'),
     ])
     setPrecos(prc.data || [])
     setSuppliers((forn.data||[]).map((x:any)=>({id:x.id,name:x.nome_razao})))
     setMotoristas((mots.data||[]).map((x:any)=>({id:x.id,name:x.nome_razao})))
     setVeiculos(veic.data||[])
+    setTransportadoras((transp.data||[]).map((x:any)=>({id:x.id,name:x.nome_razao})))
   }
 
   function precoDe(nomeForn: string) {
@@ -106,6 +109,12 @@ export default function WoodPage({ profile, can }: Props) {
       unit_value:    editing.unit_value ? parseFloat(editing.unit_value) : (precoDe(sup?.name||'') || null),
       total_value:   editing.total_value ? parseFloat(editing.total_value)
                      : (precoDe(sup?.name||'') * (parseFloat(editing.weight_tons)||0)) || null,
+      // Frete (custo NOSSO de trazer a madeira) — igual vendas: R$/t + transportadora.
+      // NÃO entra em total_value (conta corrente usa total_value = madeira pura);
+      // o frete entra no custo de produção via fn_fechar_estoque_madeira (total_value + frete_total).
+      frete_ton:           editing.frete_ton ? parseFloat(editing.frete_ton) : null,
+      frete_total:         editing.frete_ton ? (parseFloat(editing.frete_ton) * (parseFloat(editing.weight_tons)||0)) : null,
+      transportadora_nome: editing.transportadora_nome || null,
       observation:   editing.observation || null,
       created_by:    profile?.display_name || profile?.email || '',
       created_by_id: profile?.id || null,
@@ -507,7 +516,10 @@ export default function WoodPage({ profile, can }: Props) {
                   </div>
                 </div>
                 <div className="flex gap-1 ml-2">
-                  <Btn onClick={ev => { ev.stopPropagation(); setEditing(e); setModal(true) }} size="sm">✏️</Btn>
+                  <Btn onClick={ev => { ev.stopPropagation();
+                    // pré-seleciona a transportadora no dropdown a partir do nome gravado
+                    const tid = e.transportadora_nome ? (transportadoras.find((t:any)=>(t.name||'').toUpperCase().trim()===(e.transportadora_nome||'').toUpperCase().trim())?.id || '__OUTRO__') : ''
+                    setEditing({...e, transportadora_id: tid}); setModal(true) }} size="sm">✏️</Btn>
                   <Btn onClick={ev => { ev.stopPropagation(); del(e.id) }} variant="danger" size="sm">🗑</Btn>
                 </div>
               </div>
@@ -628,6 +640,31 @@ export default function WoodPage({ profile, can }: Props) {
           }} type="number" placeholder="0.00" />
           <Input label="Valor total R$" value={editing.total_value} onChange={(v:string) => setEditing((e:any) => ({...e, total_value: v}))} type="number" placeholder="0.00" />
         </div>
+
+        {/* Frete da madeira (custo de trazer a madeira) — igual vendas. Entra só no custo de produção. */}
+        <div className="grid grid-cols-2 gap-x-3">
+          {transportadoras.length > 0 ? (
+            <>
+              <Select label="Transportadora (frete)" value={editing.transportadora_id||''} onChange={(v:string) => {
+                if (v==='__OUTRO__') { setEditing((e:any)=>({...e, transportadora_id:'__OUTRO__', transportadora_nome:''})); return }
+                const t = transportadoras.find((x:any)=>x.id===v)
+                setEditing((e:any)=>({...e, transportadora_id:v, transportadora_nome:t?.name||''}))
+              }} options={[{value:'',label:'Sem frete / Selecione...'}, ...transportadoras.map((t:any)=>({value:t.id,label:t.name})), {value:'__OUTRO__',label:'➕ Outra (digitar)'}]} />
+              {editing.transportadora_id==='__OUTRO__' && (
+                <Input label="Nome da transportadora" value={editing.transportadora_nome} onChange={(v:string)=>setEditing((e:any)=>({...e,transportadora_nome:v}))} placeholder="Digite" />
+              )}
+            </>
+          ) : (
+            <Input label="Transportadora (frete)" value={editing.transportadora_nome||''} onChange={(v:string)=>setEditing((e:any)=>({...e,transportadora_nome:v}))} placeholder="Nome da transportadora" />
+          )}
+          <Input label="Frete R$ / tonelada" value={editing.frete_ton||''} onChange={(v:string) => setEditing((e:any) => ({...e, frete_ton:v}))} type="number" placeholder="0.00" />
+        </div>
+        {editing.frete_ton && editing.weight_tons && (
+          <div style={{fontSize:'10px',color:'var(--t3)',marginBottom:'8px'}}>
+            Frete total: R$ {(parseFloat(editing.frete_ton)*parseFloat(editing.weight_tons)).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}
+            <span style={{marginLeft:'6px',color:'var(--t3)'}}>· entra só no custo de produção (não na conta corrente)</span>
+          </div>
+        )}
 
         <Textarea label="Observação (ticket de peso, anotações)" value={editing.observation} onChange={(v:string) => setEditing((e:any) => ({...e, observation: v}))} rows={2} placeholder="Opcional..." />
       </Modal>
