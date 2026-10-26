@@ -161,6 +161,7 @@ export default function FinancePage({ profile, can }: Props) {
         descricao: op.descricao || `Ordem de pagamento — ${nomeF}`,
         observacao: obs,
         centro_custo_id: op.centro_custo_id || null,
+        machine_id: op.machine_id || null,
         status: 'pending',
         created_by: profile?.display_name||profile?.email,
         created_at: new Date().toISOString(),
@@ -528,6 +529,7 @@ export default function FinancePage({ profile, can }: Props) {
             <Input label="Chave PIX" value={op.pix||''} onChange={(v:string)=>setOp((e:any)=>({...e,pix:v}))} placeholder="CPF, CNPJ, e-mail, telefone ou chave aleatória" />
             <Input label="Descrição / Referência" value={op.descricao||''} onChange={(v:string)=>setOp((e:any)=>({...e,descricao:v}))} placeholder="Motivo do pagamento" />
             <Select label="Centro de Custo" value={op.centro_custo_id||''} onChange={(v:string)=>setOp((e:any)=>({...e,centro_custo_id:v}))} options={[{value:'',label:'Selecione...'}, ...centers.map((c:any)=>({value:c.id,label:`${c.codigo} - ${c.descricao}`}))]} />
+            <Select label="Máquina (opcional)" value={op.machine_id||''} onChange={(v:string)=>setOp((e:any)=>({...e,machine_id:v||null}))} options={[{value:'',label:'Nenhuma'}, ...machines.map((mq:any)=>({value:mq.id,label:(mq.code?mq.code+' - ':'')+mq.name}))]} />
           </Modal>
 
           <Modal open={modal&&tab==='bills'} onClose={()=>setModal(false)} title={editing.id?'Editar Conta':'Nova Conta a Pagar'}
