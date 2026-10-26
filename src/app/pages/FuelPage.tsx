@@ -72,6 +72,9 @@ export default function FuelPage({ profile, can }: Props) {
   const totalOut  = records.reduce((s,r)=>s+(parseFloat(r.liters)||0),0)
   const stock     = totalIn - totalOut
   const avgPrice  = totalIn > 0 ? entries.reduce((s,e)=>s+eVal(e),0)/totalIn : 0
+  // Custo médio OFICIAL = ponderado móvel do estoque (fn_custo_diesel_ponderado);
+  // cai p/ a média simples das compras só se a função não retornar valor.
+  const custoMedioL = (custoPond && +custoPond.custo_medio > 0) ? +custoPond.custo_medio : avgPrice
 
   function openNew() {
     const now = new Date()
@@ -93,7 +96,7 @@ export default function FuelPage({ profile, can }: Props) {
       const ma = machines.find(x=>x.id===editing.machine_id)
       const mo = motoristas.find(x=>x.id===editing.driver_id)
       const lt = parseFloat(editing.liters)
-      const up = editing.unit_price ? parseFloat(editing.unit_price) : avgPrice
+      const up = editing.unit_price ? parseFloat(editing.unit_price) : custoMedioL
       const obj = {
         record_date: editing.record_date||td(), record_time: editing.record_time||null,
         veiculo_id: editing.veiculo_id||null, veiculo_placa: ve?.placa||null,
@@ -347,7 +350,7 @@ export default function FuelPage({ profile, can }: Props) {
       <div className="grid grid-cols-3 gap-2 mb-2">
         <KPI num={`${stock.toFixed(0)} L`} label="Estoque atual" color={stock<500?'red':'green'} />
         <KPI num={`${totalOut.toFixed(0)} L`} label="Total consumido" color="amber" />
-        <KPI num={money(custoPond ? +custoPond.custo_medio : avgPrice)} label="Custo ponderado/L" color="orange" />
+        <KPI num={money(custoMedioL)} label="Custo ponderado/L" color="orange" />
       </div>
 
       {/* Cálculo do estoque explícito */}
@@ -653,7 +656,7 @@ export default function FuelPage({ profile, can }: Props) {
           </div>
           <div className="grid grid-cols-2 gap-x-3">
             <Input label="Litros *" value={editing.liters} onChange={(v:string)=>setEditing((e:any)=>({...e,liters:v}))} type="number" placeholder="0.00" />
-            <Input label={`Preço/L (médio: ${money(avgPrice)})`} value={editing.unit_price} onChange={(v:string)=>setEditing((e:any)=>({...e,unit_price:v}))} type="number" placeholder={avgPrice.toFixed(4)} />
+            <Input label={`Preço/L (ponderado: ${money(custoMedioL)})`} value={editing.unit_price} onChange={(v:string)=>setEditing((e:any)=>({...e,unit_price:v}))} type="number" placeholder={custoMedioL.toFixed(4)} />
           </div>
           <SelectComCadastro label="Motorista/Operador" tipo="motorista" value={editing.driver_id||''} onChange={(v:string)=>setEditing((e:any)=>({...e,driver_id:v}))}
             options={motoristas.map(m=>({value:m.id,label:m.nome_razao}))}
