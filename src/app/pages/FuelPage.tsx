@@ -30,6 +30,8 @@ export default function FuelPage({ profile, can }: Props) {
   // filtros do relatório
   const [rFrom, setRFrom] = useState(''); const [rTo, setRTo] = useState('')
   const [rVeic, setRVeic] = useState('')
+  const [rMachine, setRMachine] = useState('')       // filtro por máquina
+  const [rTipo, setRTipo] = useState<'todos'|'veiculos'|'maquinas'>('todos')  // tipo de frota no relatório
   const { confirm, dialog } = useConfirm()
 
   useEffect(() => { loadMeta(); loadAll() }, [])
@@ -156,10 +158,18 @@ export default function FuelPage({ profile, can }: Props) {
   }
 
   // ── Relatório filtrado ──
-  const repRecs = records.filter(r =>
-    (!rFrom || r.record_date >= rFrom) && (!rTo || r.record_date <= rTo) &&
-    (!rVeic || r.veiculo_id === rVeic))
-  const repExps = expenses.filter(x =>
+  // rTipo: 'todos' | 'veiculos' | 'maquinas'  ·  rVeic: veículo específico  ·  rMachine: máquina específica
+  const repRecs = records.filter(r => {
+    if (rFrom && r.record_date < rFrom) return false
+    if (rTo && r.record_date > rTo) return false
+    if (rTipo === 'veiculos' && !r.veiculo_id) return false
+    if (rTipo === 'maquinas' && !r.machine_id) return false
+    if (rVeic && r.veiculo_id !== rVeic) return false
+    if (rMachine && r.machine_id !== rMachine) return false
+    return true
+  })
+  // despesas só existem para veículos; some quando o filtro é de máquinas
+  const repExps = (rTipo === 'maquinas' || rMachine) ? [] : expenses.filter(x =>
     (!rFrom || x.expense_date >= rFrom) && (!rTo || x.expense_date <= rTo) &&
     (!rVeic || x.veiculo_id === rVeic))
   const repLiters = repRecs.reduce((s,r)=>s+(parseFloat(r.liters)||0),0)
@@ -298,7 +308,10 @@ export default function FuelPage({ profile, can }: Props) {
       doc.setTextColor(148,163,184); doc.setFontSize(8); doc.setFont('helvetica','normal')
       let fi = ''
       if (rFrom||rTo) fi += `Período: ${rFrom?fmtD(rFrom):'início'} a ${rTo?fmtD(rTo):'hoje'} | `
+      if (rTipo==='veiculos') fi += 'Frota: Veículos | '
+      else if (rTipo==='maquinas') fi += 'Frota: Máquinas | '
       if (rVeic) fi += `Veículo: ${veiculos.find(v=>v.id===rVeic)?.placa||''}`
+      if (rMachine) fi += `Máquina: ${machines.find(m=>m.id===rMachine)?.name||''}`
       doc.text(fi || `Gerado em ${now.toLocaleDateString('pt-BR')}`, 12, 18)
 
       autoTable(doc, {
@@ -564,9 +577,25 @@ export default function FuelPage({ profile, can }: Props) {
                 <Input label="De" value={rFrom} onChange={setRFrom} type="date" />
                 <Input label="Até" value={rTo} onChange={setRTo} type="date" />
               </div>
-              <Select label="Veículo" value={rVeic} onChange={setRVeic}
-                options={[{value:'',label:'Todos os veículos'}, ...veiculos.map(v=>({value:v.id,label:`${v.placa} (${v.tipo})`}))]} />
-              {(rFrom||rTo||rVeic) && <Btn onClick={()=>{setRFrom('');setRTo('');setRVeic('')}} size="sm" variant="secondary">✕ Limpar filtros</Btn>}
+              {/* Tipo de frota: todos / só veículos / só máquinas */}
+              <div className="flex gap-1.5 mb-2">
+                {([['todos','Todos'],['veiculos','🚛 Veículos'],['maquinas','⚙️ Máquinas']] as [typeof rTipo,string][]).map(([t,l])=>(
+                  <div key={t} onClick={()=>{setRTipo(t); if(t!=='veiculos')setRVeic(''); if(t!=='maquinas')setRMachine('')}}
+                    style={{flex:1,textAlign:'center',padding:'6px 8px',borderRadius:'8px',fontSize:'11px',fontWeight:700,cursor:'pointer',
+                      background: rTipo===t?'rgba(249,115,22,.12)':'var(--s2)',
+                      border:`1px solid ${rTipo===t?'rgba(249,115,22,.4)':'var(--bd)'}`,
+                      color: rTipo===t?'#f97316':'var(--t2)'}}>{l}</div>
+                ))}
+              </div>
+              {rTipo!=='maquinas' && (
+                <Select label="Veículo" value={rVeic} onChange={(v:string)=>{setRVeic(v); if(v)setRMachine('')}}
+                  options={[{value:'',label:'Todos os veículos'}, ...veiculos.map(v=>({value:v.id,label:`${v.placa} (${v.tipo})`}))]} />
+              )}
+              {rTipo!=='veiculos' && (
+                <Select label="Máquina" value={rMachine} onChange={(v:string)=>{setRMachine(v); if(v)setRVeic('')}}
+                  options={[{value:'',label:'Todas as máquinas'}, ...machines.map(m=>({value:m.id,label:`${m.icon||'⚙️'} ${m.name}`}))]} />
+              )}
+              {(rFrom||rTo||rVeic||rMachine||rTipo!=='todos') && <Btn onClick={()=>{setRFrom('');setRTo('');setRVeic('');setRMachine('');setRTipo('todos')}} size="sm" variant="secondary">✕ Limpar filtros</Btn>}
             </div>
 
             <div className="grid grid-cols-3 gap-2 mb-3">
@@ -578,7 +607,7 @@ export default function FuelPage({ profile, can }: Props) {
             {veicRows.length===0 ? <Empty icon="📊" text="Nenhum dado no período." /> : (
               <div className="rounded-xl overflow-hidden" style={{border:'1px solid var(--bd)'}}>
                 <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 60px 80px 80px',background:'var(--s2)',fontSize:'9px',fontWeight:700,color:'var(--t3)',textTransform:'uppercase'}}>
-                  <span>Veículo</span><span style={{textAlign:'right'}}>Litros</span><span style={{textAlign:'right'}}>Comb.</span><span style={{textAlign:'right'}}>Desp.</span>
+                  <span>Veículo / Máquina</span><span style={{textAlign:'right'}}>Litros</span><span style={{textAlign:'right'}}>Comb.</span><span style={{textAlign:'right'}}>Desp.</span>
                 </div>
                 {veicRows.map((v,i) => (
                   <div key={i} className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 60px 80px 80px',background:'var(--s1)',borderTop:'1px solid var(--bd)',fontSize:'11px'}}>
