@@ -184,12 +184,27 @@ export default function FinancePage({ profile, can }: Props) {
     if (!editing.fornecedor_id) { toast.error('Selecione o fornecedor'); setSaving(false); return }
     if (!editing.valor)         { toast.error('Informe o valor'); setSaving(false); return }
     try {
-      const obj = { ...editing, created_by: profile?.display_name||profile?.email, created_at: new Date().toISOString() }
+      // Monta SÓ com as colunas reais de accounts_payable — evita vazar campos de
+      // outros formulários (centro de custo, etc.) que o estado 'editing' compartilha
+      // e que causavam falha no insert ("Load failed" no celular).
+      const obj: any = {
+        fornecedor_id:    editing.fornecedor_id,
+        centro_custo_id:  editing.centro_custo_id || null,
+        machine_id:       editing.machine_id || null,
+        numero_documento: editing.numero_documento || null,
+        valor:            parseFloat(String(editing.valor)) || 0,
+        data_emissao:     editing.data_emissao || td(),
+        due_date:         editing.due_date || null,
+        status:           editing.status || 'pending',
+        data_recebimento: editing.status === 'paid' ? (editing.data_recebimento || td()) : null,
+        observacao:       editing.observacao || null,
+        created_by:       profile?.display_name || profile?.email,
+      }
       if (editing.id) {
         const { error } = await supabase.from('accounts_payable').update(obj).eq('id', editing.id)
         if (error) throw error
       } else {
-        const { error } = await supabase.from('accounts_payable').insert(obj)
+        const { error } = await supabase.from('accounts_payable').insert({ ...obj, company_id: profile?.company_id||null, created_at: new Date().toISOString() })
         if (error) throw error
       }
       setSaving(false)
