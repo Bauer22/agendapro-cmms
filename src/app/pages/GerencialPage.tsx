@@ -120,6 +120,9 @@ export default function GerencialPage({ profile, can }: Props) {
   const margem     = fatTotal - custoTotal
 
   // ── Centros agrupados no período ──
+  // Inclui a MATÉRIA-PRIMA (madeira) como item do seletor, mesmo não sendo um
+  // centro de custo no banco — vem do fechamento de estoque (T.materiaPrima).
+  const MP_LABEL = 'MATÉRIA-PRIMA (MADEIRA)'
   const centrosAgg = (() => {
     const m: Record<string,{centro:string;valor:number}> = {}
     fCentros.forEach(x => {
@@ -127,6 +130,7 @@ export default function GerencialPage({ profile, can }: Props) {
       if (!m[k]) m[k] = {centro:k, valor:0}
       m[k].valor += +x.valor||0
     })
+    if (T.materiaPrima > 0) m[MP_LABEL] = { centro: MP_LABEL, valor: T.materiaPrima }
     return Object.values(m).map(x => ({...x, porM3: T.m3>0 ? x.valor/T.m3 : 0}))
       .sort((a,b)=>b.valor-a.valor)
   })()
