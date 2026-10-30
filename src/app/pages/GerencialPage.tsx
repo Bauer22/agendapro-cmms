@@ -21,6 +21,7 @@ export default function GerencialPage({ profile, can }: Props) {
   const [period, setPeriod] = useState<'mes'|'3m'|'ano'|'custom'>('mes')
   const [pFrom, setPFrom] = useState('')
   const [pTo, setPTo]     = useState('')
+  const [centrosSel, setCentrosSel] = useState<string[]>([])  // centros escolhidos p/ o relatório (vazio = todos)
 
   const [custos, setCustos]   = useState<any[]>([])
   const [estoque, setEstoque] = useState<any[]>([])  // m3_consumo (tanque) por mês
@@ -129,6 +130,13 @@ export default function GerencialPage({ profile, can }: Props) {
     return Object.values(m).map(x => ({...x, porM3: T.m3>0 ? x.valor/T.m3 : 0}))
       .sort((a,b)=>b.valor-a.valor)
   })()
+
+  // centros que o usuário escolheu ver (vazio = todos)
+  const centrosVisiveis = centrosSel.length ? centrosAgg.filter(c => centrosSel.includes(c.centro)) : centrosAgg
+  const totalCentrosVis = centrosVisiveis.reduce((s,c)=>s+c.valor,0)
+  function toggleCentro(nome:string) {
+    setCentrosSel(prev => prev.includes(nome) ? prev.filter(x=>x!==nome) : [...prev, nome])
+  }
 
   // ── Transportadora agregada ──
   const transpAgg = (() => {
@@ -246,13 +254,15 @@ export default function GerencialPage({ profile, can }: Props) {
       </table>`
 
     const secCentros = `
-      <h2>CENTROS DE CUSTO</h2>
+      <h2>CENTROS DE CUSTO${centrosSel.length? ' (selecionados)':''}</h2>
       <table>
         <thead><tr><th>Centro</th><th class="r">Valor</th><th class="r">Por m³</th></tr></thead>
-        <tbody>${centrosAgg.map((c:any)=>`
+        <tbody>${centrosVisiveis.map((c:any)=>`
           <tr><td>${c.centro}</td>
             <td class="r">${c.valor.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
-            <td class="r">${c.porM3.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td></tr>`).join('')}</tbody>
+            <td class="r">${c.porM3.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td></tr>`).join('')}
+          <tr style="font-weight:bold;border-top:2px solid #333"><td>TOTAL</td>
+            <td class="r">${totalCentrosVis.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td><td></td></tr></tbody>
       </table>`
 
     const secTransp = `
@@ -444,9 +454,37 @@ export default function GerencialPage({ profile, can }: Props) {
               <div style={{fontSize:'9px',color:'var(--t3)',marginBottom:'8px'}}>
                 Custo por m³ de cada centro · base {T.m3.toFixed(0)} m³ produzidos
               </div>
+
+              {/* Seletor: quais centros de custo aparecem no relatório */}
+              <div className="rounded-xl p-2.5 mb-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+                <div className="flex items-center justify-between mb-2">
+                  <span style={{fontSize:'10px',fontWeight:700,color:'var(--t2)',textTransform:'uppercase',letterSpacing:'.5px'}}>Mostrar centros</span>
+                  {centrosSel.length>0 && <span onClick={()=>setCentrosSel([])} style={{fontSize:'10px',color:'#f97316',cursor:'pointer',fontWeight:700}}>Todos</span>}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {centrosAgg.map((c,i)=>{
+                    const on = centrosSel.length===0 || centrosSel.includes(c.centro)
+                    return (
+                      <div key={i} onClick={()=>toggleCentro(c.centro)}
+                        style={{fontSize:'10px',fontWeight:700,padding:'4px 9px',borderRadius:'999px',cursor:'pointer',
+                          background: on?'rgba(249,115,22,.14)':'var(--s2)',
+                          border:`1px solid ${on?'rgba(249,115,22,.45)':'var(--bd)'}`,
+                          color: on?'#f97316':'var(--t3)'}}>
+                        {centrosSel.includes(c.centro)?'✓ ':''}{c.centro}
+                      </div>
+                    )
+                  })}
+                </div>
+                {centrosSel.length>0 && (
+                  <div style={{fontSize:'10px',color:'var(--t3)',marginTop:'8px'}}>
+                    Selecionados: <b style={{color:'var(--t1)'}}>{centrosSel.length}</b> · Total: <b style={{color:'#f97316'}}>{money(totalCentrosVis)}</b>
+                  </div>
+                )}
+              </div>
+
               <div className="flex flex-col gap-2">
-                {centrosAgg.map((c,i)=>{
-                  const totalCC = centrosAgg.reduce((s,x)=>s+x.valor,0)
+                {centrosVisiveis.map((c,i)=>{
+                  const totalCC = centrosVisiveis.reduce((s,x)=>s+x.valor,0)
                   const pct = totalCC>0 ? c.valor/totalCC*100 : 0
                   return (
                     <div key={i} className="rounded-xl p-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
