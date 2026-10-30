@@ -298,9 +298,17 @@ export default function GerencialPage({ profile, can }: Props) {
   .kpi b { display:block; font-size:14px; }
   .obs { font-size:10px; color:#333; }
 </style></head><body>
-  <h1>DASHBOARD GERENCIAL</h1>
+  <h1>${tab==='centros' ? 'RELATÓRIO DE CENTROS DE CUSTO' : 'DASHBOARD GERENCIAL'}</h1>
   <div class="sub">${periodoTxt} · Emitido em ${new Date().toLocaleString('pt-BR')}</div>
 
+  ${tab==='centros' ? `
+  <div class="kpi">
+    <div><b>${T.m3.toFixed(0)} m³</b>Produzido no período</div>
+    <div><b>${money(totalCentrosVis)}</b>Total selecionado</div>
+    <div><b>${money(T.m3>0?totalCentrosVis/T.m3:0)}</b>Por m³</div>
+  </div>
+  ${secCentros}
+  ` : `
   <div class="kpi">
     <div><b>${T.m3.toFixed(0)} m³</b>Produzido</div>
     <div><b>${money(custoTotal)}</b>Custo total</div>
@@ -321,6 +329,7 @@ export default function GerencialPage({ profile, can }: Props) {
   ${secTransp}
   ${secConta}
   ${secVendas}
+  `}
   <script>window.onload = function(){ window.print(); }</script>
 </body></html>`)
     w.document.close()
