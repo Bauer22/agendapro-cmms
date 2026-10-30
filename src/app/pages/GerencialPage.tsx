@@ -21,7 +21,7 @@ export default function GerencialPage({ profile, can }: Props) {
   const [period, setPeriod] = useState<'mes'|'3m'|'ano'|'custom'>('mes')
   const [pFrom, setPFrom] = useState('')
   const [pTo, setPTo]     = useState('')
-  const [centrosSel, setCentrosSel] = useState<string[]>([])  // centros escolhidos p/ o relatório (vazio = todos)
+  const [centrosOcultos, setCentrosOcultos] = useState<string[]>([])  // centros EXCLUÍDOS do relatório (desmarcados)
 
   const [custos, setCustos]   = useState<any[]>([])
   const [estoque, setEstoque] = useState<any[]>([])  // m3_consumo (tanque) por mês
@@ -131,11 +131,11 @@ export default function GerencialPage({ profile, can }: Props) {
       .sort((a,b)=>b.valor-a.valor)
   })()
 
-  // centros que o usuário escolheu ver (vazio = todos)
-  const centrosVisiveis = centrosSel.length ? centrosAgg.filter(c => centrosSel.includes(c.centro)) : centrosAgg
+  // centros visíveis = todos MENOS os que o usuário desmarcou (ocultos)
+  const centrosVisiveis = centrosAgg.filter(c => !centrosOcultos.includes(c.centro))
   const totalCentrosVis = centrosVisiveis.reduce((s,c)=>s+c.valor,0)
   function toggleCentro(nome:string) {
-    setCentrosSel(prev => prev.includes(nome) ? prev.filter(x=>x!==nome) : [...prev, nome])
+    setCentrosOcultos(prev => prev.includes(nome) ? prev.filter(x=>x!==nome) : [...prev, nome])
   }
 
   // ── Transportadora agregada ──
@@ -254,7 +254,7 @@ export default function GerencialPage({ profile, can }: Props) {
       </table>`
 
     const secCentros = `
-      <h2>CENTROS DE CUSTO${centrosSel.length? ' (selecionados)':''}</h2>
+      <h2>CENTROS DE CUSTO${centrosOcultos.length? ' (selecionados)':''}</h2>
       <table>
         <thead><tr><th>Centro</th><th class="r">Valor</th><th class="r">Por m³</th></tr></thead>
         <tbody>${centrosVisiveis.map((c:any)=>`
@@ -455,31 +455,31 @@ export default function GerencialPage({ profile, can }: Props) {
                 Custo por m³ de cada centro · base {T.m3.toFixed(0)} m³ produzidos
               </div>
 
-              {/* Seletor: quais centros de custo aparecem no relatório */}
+              {/* Seletor: desmarque os centros que NÃO quer no relatório (ex.: matéria-prima) */}
               <div className="rounded-xl p-2.5 mb-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
                 <div className="flex items-center justify-between mb-2">
-                  <span style={{fontSize:'10px',fontWeight:700,color:'var(--t2)',textTransform:'uppercase',letterSpacing:'.5px'}}>Mostrar centros</span>
-                  {centrosSel.length>0 && <span onClick={()=>setCentrosSel([])} style={{fontSize:'10px',color:'#f97316',cursor:'pointer',fontWeight:700}}>Todos</span>}
+                  <span style={{fontSize:'10px',fontWeight:700,color:'var(--t2)',textTransform:'uppercase',letterSpacing:'.5px'}}>Incluir no total — desmarque p/ excluir</span>
+                  {centrosOcultos.length>0 && <span onClick={()=>setCentrosOcultos([])} style={{fontSize:'10px',color:'#f97316',cursor:'pointer',fontWeight:700}}>Marcar todos</span>}
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {centrosAgg.map((c,i)=>{
-                    const on = centrosSel.length===0 || centrosSel.includes(c.centro)
+                    const on = !centrosOcultos.includes(c.centro)
                     return (
                       <div key={i} onClick={()=>toggleCentro(c.centro)}
                         style={{fontSize:'10px',fontWeight:700,padding:'4px 9px',borderRadius:'999px',cursor:'pointer',
                           background: on?'rgba(249,115,22,.14)':'var(--s2)',
                           border:`1px solid ${on?'rgba(249,115,22,.45)':'var(--bd)'}`,
-                          color: on?'#f97316':'var(--t3)'}}>
-                        {centrosSel.includes(c.centro)?'✓ ':''}{c.centro}
+                          color: on?'#f97316':'var(--t3)',
+                          textDecoration: on?'none':'line-through', opacity: on?1:.6}}>
+                        {on?'✓ ':''}{c.centro}
                       </div>
                     )
                   })}
                 </div>
-                {centrosSel.length>0 && (
-                  <div style={{fontSize:'10px',color:'var(--t3)',marginTop:'8px'}}>
-                    Selecionados: <b style={{color:'var(--t1)'}}>{centrosSel.length}</b> · Total: <b style={{color:'#f97316'}}>{money(totalCentrosVis)}</b>
-                  </div>
-                )}
+                <div style={{fontSize:'10px',color:'var(--t3)',marginTop:'8px'}}>
+                  Total ({centrosVisiveis.length} centro{centrosVisiveis.length!==1?'s':''}): <b style={{color:'#f97316'}}>{money(totalCentrosVis)}</b>
+                  {centrosOcultos.length>0 && <span> · {centrosOcultos.length} excluído(s)</span>}
+                </div>
               </div>
 
               <div className="flex flex-col gap-2">
