@@ -29,6 +29,7 @@ export default function CadastrosPage({ profile, can }: Props) {
   const [items, setItems]   = useState<any[]>([])
   const [veiculos, setVeiculos] = useState<any[]>([])
   const [transportadores, setTransportadores] = useState<any[]>([])
+  const [motoristas, setMotoristas] = useState<any[]>([])
   const [filter, setFilter] = useState<Filter>('all')
   const [search, setSearch] = useState('')
   const [modal, setModal]   = useState(false)
@@ -60,13 +61,15 @@ export default function CadastrosPage({ profile, can }: Props) {
 
   async function loadVeiculos() {
     setLoading(true)
-    const [v, t] = await Promise.all([
+    const [v, t, mot] = await Promise.all([
       supabase.from('veiculos').select('*').order('placa'),
       supabase.from('cadastros').select('id,nome_razao').eq('is_transportador', true).eq('status', true),
+      supabase.from('cadastros').select('id,nome_razao').eq('is_motorista', true).eq('status', true).order('nome_razao'),
     ])
     if (v.error) toast.error('Erro: ' + v.error.message)
     setVeiculos(v.data || [])
     setTransportadores(t.data || [])
+    setMotoristas(mot.data || [])
     setLoading(false)
   }
 
@@ -115,6 +118,7 @@ export default function CadastrosPage({ profile, can }: Props) {
     if (!editVeic.placa?.trim()) { toast.error('Informe a placa'); return }
     setSaving(true)
     const t = transportadores.find(x => x.id === editVeic.transportador_id)
+    const mv = motoristas.find(x => x.id === editVeic.motorista_id)
     const obj = {
       placa: editVeic.placa.trim().toUpperCase(),
       tipo: editVeic.tipo||'Caminhão',
@@ -124,6 +128,8 @@ export default function CadastrosPage({ profile, can }: Props) {
       capacidade_ton: editVeic.capacidade_ton ? parseFloat(editVeic.capacidade_ton) : null,
       transportador_id: editVeic.transportador_id||null,
       transportador_nome: t?.nome_razao||null,
+      motorista_id: editVeic.motorista_id||null,
+      motorista_nome: mv?.nome_razao||null,
       observacao: editVeic.observacao||null,
       status: editVeic.status !== false,
       created_by: profile?.display_name||'',
@@ -420,6 +426,10 @@ export default function CadastrosPage({ profile, can }: Props) {
         <Select label="Transportador vinculado" value={editVeic.transportador_id||''}
           onChange={(v:string) => setEditVeic((e:any) => ({...e, transportador_id:v}))}
           options={[{value:'',label:'Frota própria / Nenhum'}, ...transportadores.map(t => ({value:t.id, label:t.nome_razao}))]} />
+
+        <Select label="Motorista vinculado" value={editVeic.motorista_id||''}
+          onChange={(v:string) => setEditVeic((e:any) => ({...e, motorista_id:v}))}
+          options={[{value:'',label:'Nenhum'}, ...motoristas.map(m => ({value:m.id, label:m.nome_razao}))]} />
 
         <Textarea label="Observação" value={editVeic.observacao} onChange={(v:string) => setEditVeic((e:any) => ({...e, observacao:v}))} rows={2} placeholder="Opcional..." />
       </Modal>
