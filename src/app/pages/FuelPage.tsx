@@ -29,7 +29,8 @@ export default function FuelPage({ profile, can }: Props) {
   const [saving, setSaving] = useState(false)
   // filtros do relatório
   const [rFrom, setRFrom] = useState(''); const [rTo, setRTo] = useState('')
-  const [rVeic, setRVeic] = useState('')
+  const [rVeics, setRVeics] = useState<string[]>([])   // várias placas selecionadas
+  const [rTransp, setRTransp] = useState('')           // filtro por transportadora
   const [rMachine, setRMachine] = useState('')       // filtro por máquina
   const [rTipo, setRTipo] = useState<'todos'|'veiculos'|'maquinas'>('todos')  // tipo de frota no relatório
   const { confirm, dialog } = useConfirm()
@@ -38,7 +39,7 @@ export default function FuelPage({ profile, can }: Props) {
 
   async function loadMeta() {
     const [v, m, mot, forn] = await Promise.all([
-      supabase.from('veiculos').select('id,placa,tipo').eq('status',true).order('placa'),
+      supabase.from('veiculos').select('id,placa,tipo,transportador_nome').eq('status',true).order('placa'),
       supabase.from('machines').select('id,name,icon'),
       supabase.from('cadastros').select('id,nome_razao').eq('is_motorista',true).eq('status',true),
       supabase.from('cadastros').select('id,nome_razao').eq('is_fornecedor',true).eq('status',true),
@@ -161,20 +162,29 @@ export default function FuelPage({ profile, can }: Props) {
   }
 
   // ── Relatório filtrado ──
-  // rTipo: 'todos' | 'veiculos' | 'maquinas'  ·  rVeic: veículo específico  ·  rMachine: máquina específica
+  // rTipo: 'todos' | 'veiculos' | 'maquinas'  ·  rVeics: placas selecionadas (várias)
+  // rTransp: transportadora  ·  rMachine: máquina específica
+  // placas (ids) da transportadora escolhida
+  const placasDaTransp = rTransp
+    ? veiculos.filter(v => (v.transportador_nome||'') === rTransp).map(v => v.id)
+    : []
+  // conjunto de veiculo_ids permitidos: seleção manual ∪ placas da transportadora (vazio = todos)
+  const veicPermitidos = new Set<string>([...rVeics, ...placasDaTransp])
+  const filtraVeic = veicPermitidos.size > 0
+
   const repRecs = records.filter(r => {
     if (rFrom && r.record_date < rFrom) return false
     if (rTo && r.record_date > rTo) return false
     if (rTipo === 'veiculos' && !r.veiculo_id) return false
     if (rTipo === 'maquinas' && !r.machine_id) return false
-    if (rVeic && r.veiculo_id !== rVeic) return false
+    if (filtraVeic && !(r.veiculo_id && veicPermitidos.has(r.veiculo_id))) return false
     if (rMachine && r.machine_id !== rMachine) return false
     return true
   })
   // despesas só existem para veículos; some quando o filtro é de máquinas
   const repExps = (rTipo === 'maquinas' || rMachine) ? [] : expenses.filter(x =>
     (!rFrom || x.expense_date >= rFrom) && (!rTo || x.expense_date <= rTo) &&
-    (!rVeic || x.veiculo_id === rVeic))
+    (!filtraVeic || (x.veiculo_id && veicPermitidos.has(x.veiculo_id))))
   const repLiters = repRecs.reduce((s,r)=>s+(parseFloat(r.liters)||0),0)
   const repFuelVal = repRecs.reduce((s,r)=>s+(parseFloat(r.total_value)||0),0)
   const repExpVal = repExps.reduce((s,x)=>s+(parseFloat(x.value)||0),0)
@@ -313,14 +323,15 @@ export default function FuelPage({ profile, can }: Props) {
       if (rFrom||rTo) fi += `Período: ${rFrom?fmtD(rFrom):'início'} a ${rTo?fmtD(rTo):'hoje'} | `
       if (rTipo==='veiculos') fi += 'Frota: Veículos | '
       else if (rTipo==='maquinas') fi += 'Frota: Máquinas | '
-      if (rVeic) fi += `Veículo: ${veiculos.find(v=>v.id===rVeic)?.placa||''}`
+      if (rTransp) fi += `Transportadora: ${rTransp} | `
+      if (rVeics.length>0) fi += `Placas: ${veiculos.filter(v=>rVeics.includes(v.id)).map(v=>v.placa).join(', ')} | `
       if (rMachine) fi += `Máquina: ${machines.find(m=>m.id===rMachine)?.name||''}`
       doc.text(fi || `Gerado em ${now.toLocaleDateString('pt-BR')}`, 12, 18)
 
       autoTable(doc, {
-        startY: 30, head: [['Veículo/Máquina','Litros','Custo Combustível','Outras Despesas','Total']],
-        body: veicRows.map(v => [v.placa, v.liters.toFixed(2)+' L', money(v.fuel), money(v.exp), money(v.fuel+v.exp)]),
-        foot: [['TOTAL', repLiters.toFixed(2)+' L', money(repFuelVal), money(repExpVal), money(repFuelVal+repExpVal)]],
+        startY: 30, head: [['Veículo/Máquina','Litros','R$/L médio','Custo Combustível','Outras Despesas','Total']],
+        body: veicRows.map(v => [v.placa, v.liters.toFixed(2)+' L', v.liters>0?money(v.fuel/v.liters):'—', money(v.fuel), money(v.exp), money(v.fuel+v.exp)]),
+        foot: [['TOTAL', repLiters.toFixed(2)+' L', repLiters>0?money(repFuelVal/repLiters):'—', money(repFuelVal), money(repExpVal), money(repFuelVal+repExpVal)]],
         theme:'grid', headStyles:{fillColor:[249,115,22]}, footStyles:{fillColor:[30,58,110]}, styles:{fontSize:8},
       })
 
@@ -583,22 +594,49 @@ export default function FuelPage({ profile, can }: Props) {
               {/* Tipo de frota: todos / só veículos / só máquinas */}
               <div className="flex gap-1.5 mb-2">
                 {([['todos','Todos'],['veiculos','🚛 Veículos'],['maquinas','⚙️ Máquinas']] as [typeof rTipo,string][]).map(([t,l])=>(
-                  <div key={t} onClick={()=>{setRTipo(t); if(t!=='veiculos')setRVeic(''); if(t!=='maquinas')setRMachine('')}}
+                  <div key={t} onClick={()=>{setRTipo(t); if(t==='maquinas'){setRVeics([]);setRTransp('')} if(t==='veiculos')setRMachine('')}}
                     style={{flex:1,textAlign:'center',padding:'6px 8px',borderRadius:'8px',fontSize:'11px',fontWeight:700,cursor:'pointer',
                       background: rTipo===t?'rgba(249,115,22,.12)':'var(--s2)',
                       border:`1px solid ${rTipo===t?'rgba(249,115,22,.4)':'var(--bd)'}`,
                       color: rTipo===t?'#f97316':'var(--t2)'}}>{l}</div>
                 ))}
               </div>
-              {rTipo!=='maquinas' && (
-                <Select label="Veículo" value={rVeic} onChange={(v:string)=>{setRVeic(v); if(v)setRMachine('')}}
-                  options={[{value:'',label:'Todos os veículos'}, ...veiculos.map(v=>({value:v.id,label:`${v.placa} (${v.tipo})`}))]} />
-              )}
+              {rTipo!=='maquinas' && (() => {
+                const transps = Array.from(new Set(veiculos.map(v=>v.transportador_nome).filter(Boolean))).sort()
+                // placas a exibir nos chips: se escolheu transportadora, só as dela
+                const placasLista = rTransp ? veiculos.filter(v=>(v.transportador_nome||'')===rTransp) : veiculos
+                return (
+                  <>
+                    <Select label="Transportadora" value={rTransp} onChange={(v:string)=>{setRTransp(v); setRVeics([]); setRMachine('')}}
+                      options={[{value:'',label:'Todas as transportadoras'}, ...transps.map((t:string)=>({value:t,label:t}))]} />
+                    <div style={{marginTop:'6px'}}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span style={{fontSize:'10px',fontWeight:700,color:'var(--t2)',textTransform:'uppercase'}}>Placas {rVeics.length>0?`(${rVeics.length})`:'(todas)'}</span>
+                        {rVeics.length>0 && <span onClick={()=>setRVeics([])} style={{fontSize:'10px',color:'#f97316',cursor:'pointer',fontWeight:700}}>Limpar</span>}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {placasLista.map(v=>{
+                          const on = rVeics.includes(v.id)
+                          return (
+                            <div key={v.id} onClick={()=>{setRMachine(''); setRVeics(prev=>prev.includes(v.id)?prev.filter(x=>x!==v.id):[...prev,v.id])}}
+                              style={{fontSize:'10px',fontWeight:700,padding:'4px 9px',borderRadius:'999px',cursor:'pointer',
+                                background:on?'rgba(249,115,22,.14)':'var(--s2)',
+                                border:`1px solid ${on?'rgba(249,115,22,.45)':'var(--bd)'}`,
+                                color:on?'#f97316':'var(--t3)'}}>
+                              {on?'✓ ':''}{v.placa}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )
+              })()}
               {rTipo!=='veiculos' && (
-                <Select label="Máquina" value={rMachine} onChange={(v:string)=>{setRMachine(v); if(v)setRVeic('')}}
+                <Select label="Máquina" value={rMachine} onChange={(v:string)=>{setRMachine(v); if(v){setRVeics([]);setRTransp('')}}}
                   options={[{value:'',label:'Todas as máquinas'}, ...machines.map(m=>({value:m.id,label:`${m.icon||'⚙️'} ${m.name}`}))]} />
               )}
-              {(rFrom||rTo||rVeic||rMachine||rTipo!=='todos') && <Btn onClick={()=>{setRFrom('');setRTo('');setRVeic('');setRMachine('');setRTipo('todos')}} size="sm" variant="secondary">✕ Limpar filtros</Btn>}
+              {(rFrom||rTo||rVeics.length>0||rTransp||rMachine||rTipo!=='todos') && <Btn onClick={()=>{setRFrom('');setRTo('');setRVeics([]);setRTransp('');setRMachine('');setRTipo('todos')}} size="sm" variant="secondary">✕ Limpar filtros</Btn>}
             </div>
 
             <div className="grid grid-cols-3 gap-2 mb-3">
@@ -609,20 +647,22 @@ export default function FuelPage({ profile, can }: Props) {
 
             {veicRows.length===0 ? <Empty icon="📊" text="Nenhum dado no período." /> : (
               <div className="rounded-xl overflow-hidden" style={{border:'1px solid var(--bd)'}}>
-                <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 60px 80px 80px',background:'var(--s2)',fontSize:'9px',fontWeight:700,color:'var(--t3)',textTransform:'uppercase'}}>
-                  <span>Veículo / Máquina</span><span style={{textAlign:'right'}}>Litros</span><span style={{textAlign:'right'}}>Comb.</span><span style={{textAlign:'right'}}>Desp.</span>
+                <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 46px 60px 68px 64px',background:'var(--s2)',fontSize:'9px',fontWeight:700,color:'var(--t3)',textTransform:'uppercase'}}>
+                  <span>Veículo / Máquina</span><span style={{textAlign:'right'}}>Litros</span><span style={{textAlign:'right'}}>R$/L</span><span style={{textAlign:'right'}}>Comb.</span><span style={{textAlign:'right'}}>Desp.</span>
                 </div>
                 {veicRows.map((v,i) => (
-                  <div key={i} className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 60px 80px 80px',background:'var(--s1)',borderTop:'1px solid var(--bd)',fontSize:'11px'}}>
+                  <div key={i} className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 46px 60px 68px 64px',background:'var(--s1)',borderTop:'1px solid var(--bd)',fontSize:'11px'}}>
                     <span style={{fontWeight:700}}>{v.placa}</span>
                     <span style={{textAlign:'right',color:'var(--t2)'}}>{v.liters.toFixed(1)}</span>
+                    <span style={{textAlign:'right',color:'var(--am)'}}>{v.liters>0?money(v.fuel/v.liters).replace('R$ ',''):'—'}</span>
                     <span style={{textAlign:'right',color:'var(--cy)'}}>{money(v.fuel).replace('R$ ','')}</span>
                     <span style={{textAlign:'right',color:'var(--pp)'}}>{money(v.exp).replace('R$ ','')}</span>
                   </div>
                 ))}
-                <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 60px 80px 80px',background:'rgba(249,115,22,.1)',borderTop:'2px solid rgba(249,115,22,.3)',fontSize:'11px',fontWeight:700}}>
+                <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 46px 60px 68px 64px',background:'rgba(249,115,22,.1)',borderTop:'2px solid rgba(249,115,22,.3)',fontSize:'11px',fontWeight:700}}>
                   <span>TOTAL</span>
                   <span style={{textAlign:'right'}}>{repLiters.toFixed(1)}</span>
+                  <span style={{textAlign:'right',color:'var(--am)'}}>{repLiters>0?money(repFuelVal/repLiters).replace('R$ ',''):'—'}</span>
                   <span style={{textAlign:'right',color:'var(--cy)'}}>{money(repFuelVal).replace('R$ ','')}</span>
                   <span style={{textAlign:'right',color:'var(--pp)'}}>{money(repExpVal).replace('R$ ','')}</span>
                 </div>
