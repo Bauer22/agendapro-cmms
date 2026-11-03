@@ -159,6 +159,11 @@ export default function OSPage({ profile, can }: Props) {
     if (saving) return
     setSaving(true)
     if (!editing.title) { toast.error('Informe o título'); setSaving(false); return }
+    // Ao concluir, exige a descrição do que foi feito (guia do mecânico)
+    if (editing.status === 'done' && !editing.solution?.trim()) {
+      toast.error('Para concluir, descreva o que foi feito em "Solução / O que foi feito"')
+      setSaving(false); return
+    }
     const mach = machines.find(m => m.id === editing.machine_id)
     const usr  = users.find(u => u.id === editing.resp_id)
     const partsJson = JSON.stringify(partsUsedList)
@@ -362,11 +367,17 @@ export default function OSPage({ profile, can }: Props) {
         </div>
         <Select label="Máquina" value={editing.machine_id} onChange={(v:string)=>setEditing(e=>({...e,machine_id:v}))}
           options={[{value:'',label:'Selecione...'}, ...machines.map(m=>({value:m.id,label:`${m.icon||'⚙️'} ${m.name}`}))]} />
-        <Select label="Responsável pela Manutenção" value={editing.resp_id} onChange={(v:string)=>{
-            const u = users.find(x=>x.id===v)
-            setEditing(e=>({...e, resp_id:v, resp_name: u?.display_name||u?.email||''}))
-          }}
-          options={[{value:'',label:'Selecione o responsável...'}, ...users.map(u=>({value:u.id,label:`${u.display_name}${u.shift?' — Turno '+u.shift:''}`}))]} />
+        {(() => {
+          // Só operadores na lista; mantém o responsável já escolhido (OS antiga) mesmo que não seja operador
+          const operadores = users.filter(u => u.role === 'operator' || u.id === editing.resp_id)
+          return (
+            <Select label="Responsável pela Manutenção" value={editing.resp_id} onChange={(v:string)=>{
+                const u = users.find(x=>x.id===v)
+                setEditing(e=>({...e, resp_id:v, resp_name: u?.display_name||u?.email||''}))
+              }}
+              options={[{value:'',label:'Selecione o operador...'}, ...operadores.map(u=>({value:u.id,label:`${u.display_name}${u.shift?' — Turno '+u.shift:''}`}))]} />
+          )
+        })()}
         <div className="mb-2.5">
           <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{color:'var(--t2)'}}>Prioridade</label>
           <div className="flex gap-1.5">
@@ -414,7 +425,12 @@ export default function OSPage({ profile, can }: Props) {
           </div>
         </div>
 
-        {editing.status==='done' && <Textarea label="Solução / O que foi feito" value={editing.solution} onChange={(v:string)=>setEditing(e=>({...e,solution:v}))} placeholder="Descreva a solução..." />}
+        {editing.status==='done' && (
+          <div className="rounded-xl p-3 mt-1" style={{background:'rgba(16,185,129,.08)',border:'1px solid rgba(16,185,129,.35)'}}>
+            <div className="text-xs font-bold mb-2" style={{color:'var(--gn)'}}>🔧 Relato do serviço — obrigatório para concluir</div>
+            <Textarea label="Solução / O que foi feito *" value={editing.solution} onChange={(v:string)=>setEditing(e=>({...e,solution:v}))} rows={4} placeholder="O mecânico descreve aqui o que foi feito: peças trocadas, ajustes, causa do problema..." />
+          </div>
+        )}
       </Modal>
     </div>
   )
