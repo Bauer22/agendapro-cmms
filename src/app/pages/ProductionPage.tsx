@@ -152,10 +152,10 @@ export default function ProductionPage({ profile, can }: Props) {
 
   // ── Folha em branco para o conferente preencher à mão (modelo Faganello) ──
   // nPacotes: pacotes de capa/capinha (folhas). nRetalho: linhas por bloco de retalho.
-  function imprimirFolhaProducao(nPacotes = 60, nRetalho = 12) {
+  function imprimirFolhaProducao(nPacotes = 60, nRetalho = 30) {
     const bd = 'border:1px solid #444'
     const th = `${bd};padding:3px 4px;background:#eee;font-size:10px;text-align:center`
-    const cell = `${bd};height:22px`
+    const cell = `${bd};height:18px`
 
     // Duas colunas de pacotes lado a lado: [1..metade] e [metade+1..nPacotes]
     const metade = Math.ceil(nPacotes / 2)
