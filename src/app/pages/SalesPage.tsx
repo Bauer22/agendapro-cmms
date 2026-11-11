@@ -587,10 +587,7 @@ export default function SalesPage({ profile, can }: Props) {
       if (nomeCliVen) qRecVen = qRecVen.ilike('client_name', nomeCliVen);
       if (rFrom) qRecVen = qRecVen.gte('payment_date', rFrom);
       if (rTo)   qRecVen = qRecVen.lte('payment_date', rTo);
-      var qSaldoVen = supabase.from('v_saldo_conta_corrente').select('*');
-      if (nomeCliVen) qSaldoVen = qSaldoVen.ilike('parceiro', nomeCliVen);
-      var resCC = await Promise.all([qRecVen, qSaldoVen]);
-      var rRecVen = resCC[0]; var rSaldoVen = resCC[1];
+      var rRecVen = await qRecVen;
       var recebRowsVen = (rRecVen && rRecVen.data ? rRecVen.data : []).map(function(p){
         return [ p.payment_date ? new Date(p.payment_date+'T00:00:00').toLocaleDateString('pt-BR') : '-', p.client_name || '-', p.method || '-', money(Number(p.value)||0) ];
       });
@@ -602,19 +599,22 @@ export default function SalesPage({ profile, can }: Props) {
         y = (doc as any).lastAutoTable.finalY + 8;
       }
       var totalRecVen = (rRecVen && rRecVen.data ? rRecVen.data : []).reduce(function(s,p){return s + (Number(p.value)||0);}, 0);
-      var saldoVen = (rSaldoVen && rSaldoVen.data && rSaldoVen.data.length > 0) ? rSaldoVen.data : [];
       y = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 8 : y + 8;
       if (y > 250) { doc.addPage(); y = 20; }
       doc.setFontSize(11); doc.setTextColor(0,0,0); doc.setFont('helvetica','bold');
       doc.text('Resumo de Conta Corrente', 12, y);
       y += 6;
       doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(20,20,20);
-      doc.text('Total Vendido: ' + money(repVal||0), 12, y); y += 5;
+      // SOMA SIMPLES: saldo = total vendido - total recebido (valores lançados)
+      var totalVendidoVen = Number(repVal) || 0;
+      var saldoReceberVen = totalVendidoVen - totalRecVen;
+      doc.text('Total Vendido: ' + money(totalVendidoVen), 12, y); y += 5;
       doc.text('Total Recebido: ' + money(totalRecVen), 12, y); y += 5;
-      if (saldoVen.length > 0) {
-        var totReceber = saldoVen.reduce(function(s,x){return s + (Number(x.a_receber)||0);}, 0);
-        doc.setFont('helvetica','bold');
-        doc.text('SALDO A RECEBER: ' + money(totReceber), 12, y); y += 6;
+      doc.setFont('helvetica','bold');
+      if (saldoReceberVen >= 0) {
+        doc.text('SALDO A RECEBER: ' + money(saldoReceberVen), 12, y); y += 6;
+      } else {
+        doc.text('SALDO A PAGAR: ' + money(Math.abs(saldoReceberVen)), 12, y); y += 6;
       }
 
 
