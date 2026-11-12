@@ -19,6 +19,29 @@ const PLANS = [
   {value:'pro',       label:'🟡 Pro'},
   {value:'enterprise',label:'🟣 Enterprise'},
 ]
+// Abas reais do sistema (mesmos ids da navegação em app/page.tsx).
+// Usado nos chips de permissão por cargo — não depende da tabela 'modules'.
+const ABAS_SISTEMA: {id:string;label:string;icon:string}[] = [
+  {id:'dashboard', label:'Início',     icon:'🏠'},
+  {id:'os',        label:'OS',         icon:'🔧'},
+  {id:'machines',  label:'Máquinas',   icon:'⚙️'},
+  {id:'pm',        label:'MP',         icon:'✅'},
+  {id:'tasks',     label:'Tarefas',    icon:'📋'},
+  {id:'parts',     label:'Peças',      icon:'🔩'},
+  {id:'cadastros', label:'Cadastros',  icon:'👥'},
+  {id:'downtime',  label:'Paradas',    icon:'⏱️'},
+  {id:'finance',   label:'Financeiro', icon:'💰'},
+  {id:'reports',   label:'Relatórios', icon:'📄'},
+  {id:'qr',        label:'QR Codes',   icon:'🔳'},
+  {id:'epi',       label:'EPI/Seg.',   icon:'🦺'},
+  {id:'wood',      label:'Madeira',    icon:'🪵'},
+  {id:'production', label:'Produção',  icon:'🏭'},
+  {id:'fuel',      label:'Combustível', icon:'⛽'},
+  {id:'gerencial', label:'Gerencial',  icon:'📈'},
+  {id:'sales',     label:'Vendas',     icon:'🛒'},
+  {id:'frete',     label:'Frete',      icon:'🚚'},
+  {id:'users',     label:'Usuários',   icon:'👤'},
+]
 const PLAN_COLORS: Record<string,string> = {trial:'blue',basic:'green',pro:'amber',enterprise:'purple'}
 const PLAN_PRICES: Record<string,string> = {trial:'Gratuito',basic:'R$ 297/mês',pro:'R$ 550/mês',enterprise:'R$ 1.200/mês'}
 const PLAN_VALUES: Record<string,number> = {trial:0, basic:297, pro:550, enterprise:1200}
@@ -490,10 +513,14 @@ export default function SuperAdminPage({ profile }: Props) {
                     </div>
                   </div>
                   {tudo ? (
-                    <div style={{fontSize:'11px',color:'var(--gn)',fontWeight:600}}>✅ Vê todas as abas</div>
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <span style={{fontSize:'11px',color:'var(--gn)',fontWeight:600}}>✅ Vê todas as abas</span>
+                      <button onClick={()=>toggleRoleAll(c.role,false)}
+                        style={{fontSize:'10px',color:'var(--cy)',background:'none',border:'none',cursor:'pointer',fontWeight:700}}>✏️ Escolher abas específicas</button>
+                    </div>
                   ) : (
                     <div className="flex flex-wrap gap-1.5">
-                      {allModules.filter((m:any)=>m.id!=='superadmin').map((m:any)=>{
+                      {ABAS_SISTEMA.map((m)=>{
                         const on = sel.has(m.id)
                         return (
                           <div key={m.id} onClick={()=>toggleRoleMod(c.role,m.id)}
