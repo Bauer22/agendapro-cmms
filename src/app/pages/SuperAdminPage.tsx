@@ -36,12 +36,51 @@ export default function SuperAdminPage({ profile }: Props) {
   const [tab, setTab]             = useState('gerencial')
   const [allModules, setAllModules] = useState<any[]>([])
   const [companyMods, setCompanyMods] = useState<Set<string>>(new Set())
+  const [roleMods, setRoleMods]   = useState<Record<string,Set<string>>>({})  // perfil -> módulos liberados
+  const [savingRole, setSavingRole] = useState('')
   const { confirm, dialog }       = useConfirm()
+
+  // perfis configuráveis (superadmin não entra: vê tudo sempre)
+  const PERFIS = [
+    {role:'admin',      label:'Administrador'},
+    {role:'supervisor', label:'Supervisor'},
+    {role:'operator',   label:'Operador'},
+    {role:'producao',   label:'Produção'},
+    {role:'viewer',     label:'Consulta'},
+  ]
+
+  async function loadRoleMods() {
+    const { data } = await supabase.from('role_modules').select('role,modules')
+    const map: Record<string,Set<string>> = {}
+    ;(data||[]).forEach((r:any)=>{ map[r.role] = new Set(r.modules||[]) })
+    setRoleMods(map)
+  }
+  function toggleRoleMod(role:string, modId:string) {
+    setRoleMods(prev => {
+      const s = new Set(prev[role] || [])
+      if (s.has(modId)) s.delete(modId); else s.add(modId)
+      // se marcar um módulo específico, tira o '*' (tudo)
+      if (modId !== '*') s.delete('*')
+      return { ...prev, [role]: s }
+    })
+  }
+  function toggleRoleAll(role:string, marcarTudo:boolean) {
+    setRoleMods(prev => ({ ...prev, [role]: new Set(marcarTudo ? ['*'] : []) }))
+  }
+  async function salvarRoleMods(role:string) {
+    setSavingRole(role)
+    const modules = Array.from(roleMods[role] || [])
+    const { error } = await supabase.from('role_modules').upsert({ role, modules, updated_at:new Date().toISOString() }, { onConflict:'role' })
+    setSavingRole('')
+    if (error) { toast.error('Erro: '+error.message); return }
+    toast.success('Permissões salvas ✅ (o usuário vê na próxima vez que abrir)')
+  }
 
   // Carrega a lista global de módulos uma vez
   useEffect(() => {
     supabase.from('modules').select('id,label,icon,category,sort_order').order('sort_order')
       .then(({data}) => setAllModules(data || []))
+    loadRoleMods()
   }, [])
 
   // Ao abrir uma empresa para editar, carrega os módulos liberados dela
@@ -212,7 +251,7 @@ export default function SuperAdminPage({ profile }: Props) {
 
       {/* Tabs */}
       <div className="flex gap-1.5 mb-3">
-        {[{k:'gerencial',l:'📈 Gerencial'},{k:'companies',l:'🏭 Empresas'},{k:'users',l:'👥 Usuários'}].map(t=>(
+        {[{k:'gerencial',l:'📈 Gerencial'},{k:'companies',l:'🏭 Empresas'},{k:'users',l:'👥 Usuários'},{k:'permissoes',l:'🔐 Permissões'}].map(t=>(
           <button key={t.k} onClick={()=>setTab(t.k)} className="flex-1 py-1.5 rounded-xl text-xs font-semibold cursor-pointer border"
             style={{background:tab===t.k?'var(--cy)':'transparent',color:tab===t.k?'#000':'var(--t2)',borderColor:tab===t.k?'var(--cy)':'var(--bd)',fontFamily:'Sora,system-ui,sans-serif'}}>
             {t.l}
@@ -362,7 +401,10 @@ export default function SuperAdminPage({ profile }: Props) {
 
       {tab==='users' && (
         <>
-          <SH label={`Usuários (${users.length})`} action={<Btn onClick={()=>setUserModal(true)} size="sm" variant="primary">+ Convidar</Btn>} />
+          <SH label={`Administradores / Usuários (${users.length})`} action={<Btn onClick={()=>{setNewUser({role:'admin'});setUserModal(true)}} size="sm" variant="primary">+ Criar admin</Btn>} />
+          <div style={{fontSize:'10px',color:'var(--t3)',marginBottom:'10px',lineHeight:1.5}}>
+            Aqui você cria o <b style={{color:'var(--t2)'}}>administrador</b> de cada empresa (perfil Administrador). Depois, cada admin acessa o próprio sistema e cadastra os usuários da empresa dele.
+          </div>
           {users.length===0?<Empty icon="👤" text="Nenhum usuário"/>:(
             <div className="flex flex-col gap-2">
               {users.map((u:any)=>(
@@ -385,6 +427,57 @@ export default function SuperAdminPage({ profile }: Props) {
               ))}
             </div>
           )}
+        </>
+      )}
+
+      {/* ── PERMISSÕES POR PERFIL (quais abas cada tipo de usuário vê) ── */}
+      {tab==='permissoes' && (
+        <>
+          <div style={{fontSize:'11px',color:'var(--t3)',marginBottom:'12px'}}>
+            Defina quais abas cada tipo de usuário enxerga no sistema. Vale para todas as empresas.
+            Administrador normalmente vê tudo. A mudança aparece na próxima vez que o usuário abrir o sistema.
+          </div>
+          <div className="flex flex-col gap-3">
+            {PERFIS.map(p => {
+              const sel = roleMods[p.role] || new Set<string>()
+              const tudo = sel.has('*')
+              return (
+                <div key={p.role} className="rounded-2xl p-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs font-bold" style={{color:'var(--cy)'}}>{p.label}</span>
+                    <div className="flex gap-2 items-center">
+                      <button onClick={()=>toggleRoleAll(p.role,true)}
+                        style={{fontSize:'10px',color:tudo?'#f97316':'var(--t3)',background:'none',border:'none',cursor:'pointer',fontWeight:700}}>Todas</button>
+                      <span style={{color:'var(--t3)'}}>·</span>
+                      <button onClick={()=>toggleRoleAll(p.role,false)}
+                        style={{fontSize:'10px',color:'var(--rd)',background:'none',border:'none',cursor:'pointer',fontWeight:700}}>Nenhuma</button>
+                      <Btn onClick={()=>salvarRoleMods(p.role)} size="sm" variant="primary" disabled={savingRole===p.role}>
+                        {savingRole===p.role?'Salvando…':'Salvar'}
+                      </Btn>
+                    </div>
+                  </div>
+                  {tudo ? (
+                    <div style={{fontSize:'11px',color:'var(--gn)',fontWeight:600}}>✅ Vê todas as abas</div>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {allModules.filter((m:any)=>m.id!=='superadmin').map((m:any)=>{
+                        const on = sel.has(m.id)
+                        return (
+                          <div key={m.id} onClick={()=>toggleRoleMod(p.role,m.id)}
+                            style={{fontSize:'10px',fontWeight:700,padding:'4px 9px',borderRadius:'999px',cursor:'pointer',
+                              background:on?'rgba(249,115,22,.14)':'var(--s2)',
+                              border:`1px solid ${on?'rgba(249,115,22,.45)':'var(--bd)'}`,
+                              color:on?'#f97316':'var(--t3)'}}>
+                            {on?'✓ ':''}{m.icon} {m.label}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </>
       )}
 
@@ -439,11 +532,11 @@ export default function SuperAdminPage({ profile }: Props) {
       </Modal>
 
       {/* Invite User Modal */}
-      <Modal open={userModal} onClose={()=>setUserModal(false)} title="Convidar Usuário"
-        footer={<><Btn onClick={()=>setUserModal(false)} variant="secondary" size="md">Cancelar</Btn><Btn onClick={inviteUser} variant="primary" size="md">Enviar Convite</Btn></>}>
+      <Modal open={userModal} onClose={()=>setUserModal(false)} title="Criar administrador da empresa"
+        footer={<><Btn onClick={()=>setUserModal(false)} variant="secondary" size="md">Cancelar</Btn><Btn onClick={inviteUser} variant="primary" size="md">Criar acesso</Btn></>}>
         <div className="rounded-xl p-3 mb-3" style={{background:'rgba(0,212,255,.06)',border:'1px solid rgba(0,212,255,.2)'}}>
           <div className="text-xs font-bold mb-1" style={{color:'var(--cy)'}}>ℹ️ Como funciona</div>
-          <div className="text-xs" style={{color:'var(--t2)',lineHeight:1.6}}>Defina usuário e senha. O acesso já fica vinculado à empresa selecionada — sem necessidade de e-mail.</div>
+          <div className="text-xs" style={{color:'var(--t2)',lineHeight:1.6}}>Crie o <b>Administrador</b> da empresa com usuário e senha. Ele acessa o sistema e cadastra os próprios usuários. O acesso já fica vinculado à empresa escolhida — sem e-mail.</div>
         </div>
         <Input label="Nome de Usuário *" value={newUser.username} onChange={(v:string)=>setNewUser((e:any)=>({...e,username:v.toLowerCase().replace(/[^a-z0-9._-]/g,'')}))} placeholder="ex: joao.silva" />
         <Input label="Senha *" value={newUser.password} onChange={(v:string)=>setNewUser((e:any)=>({...e,password:v}))} type="password" placeholder="mínimo 6 caracteres" />
