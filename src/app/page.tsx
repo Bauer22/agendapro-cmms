@@ -352,29 +352,35 @@ export default function App() {
       </header>
 
       {/* NAV */}
-      <nav className="nav-scroll flex-shrink-0 flex overflow-x-auto" style={{background:'rgba(12,20,36,.98)',borderBottom:'1px solid rgba(249,115,22,.2)',scrollbarWidth:'thin',scrollbarColor:'rgba(249,115,22,.6) rgba(255,255,255,.06)',boxShadow:'0 4px 12px rgba(0,0,0,.4)'}}>
+      <nav className="nav-scroll flex-shrink-0 flex overflow-x-auto" style={{background:'var(--bg2)',borderBottom:'1px solid var(--bd)',scrollbarWidth:'thin',scrollbarColor:'rgba(249,115,22,.5) transparent',gap:'3px',padding:'7px 8px',boxShadow:'0 4px 16px -8px rgba(0,0,0,.6)'}}>
         <style>{`
-          .nav-scroll::-webkit-scrollbar{height:8px}
-          .nav-scroll::-webkit-scrollbar-track{background:rgba(255,255,255,.06)}
-          .nav-scroll::-webkit-scrollbar-thumb{background:rgba(249,115,22,.6);border-radius:4px}
-          .nav-scroll::-webkit-scrollbar-thumb:hover{background:rgba(249,115,22,.9)}
-          .nav-scroll .nav-ico{font-size:20px;line-height:1}
-          .nav-scroll .nav-ico svg{width:22px;height:22px}
+          .nav-scroll::-webkit-scrollbar{height:7px}
+          .nav-scroll::-webkit-scrollbar-track{background:transparent}
+          .nav-scroll::-webkit-scrollbar-thumb{background:rgba(249,115,22,.45);border-radius:4px}
+          .nav-scroll::-webkit-scrollbar-thumb:hover{background:rgba(249,115,22,.8)}
+          .nav-ico{font-size:18px;line-height:1}
+          .nav-ico svg{width:19px;height:19px}
         `}</style>
-        {NAV.map(n => (
-          <button key={n.id} onClick={() => setPage(n.id)}
-            className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-4 py-3 border-none cursor-pointer transition-all relative"
-            style={{
-              background:'transparent',
-              color: page===n.id ? 'var(--cy)' : 'var(--t3)',
-              fontFamily:'Sora,system-ui,sans-serif',fontSize:'10px',fontWeight:700,
-              textTransform:'uppercase',letterSpacing:'.4px',minWidth:'68px'
-            }}>
-            <span className="nav-ico">{n.icon}</span>
-            <span>{n.label}</span>
-            {page===n.id && <div className="absolute bottom-0 left-3 right-3 h-0.5 rounded-t-sm" style={{background:'linear-gradient(90deg,transparent,#f97316,transparent)',boxShadow:'0 0 8px rgba(249,115,22,.8)'}}/>}
-          </button>
-        ))}
+        {NAV.map(n => {
+          const on = page===n.id
+          return (
+            <button key={n.id} onClick={() => setPage(n.id)}
+              className="flex-shrink-0 flex flex-col items-center justify-center gap-1 cursor-pointer relative"
+              style={{
+                padding:'9px 15px', borderRadius:'11px',
+                background: on ? 'linear-gradient(135deg,#f97316,#c2410c)' : 'transparent',
+                border: `1px solid ${on ? 'rgba(249,115,22,.5)' : 'transparent'}`,
+                boxShadow: on ? '0 4px 12px -3px rgba(249,115,22,.5)' : 'none',
+                color: on ? '#fff' : 'var(--t3)',
+                fontFamily:'Sora,system-ui,sans-serif', fontSize:'10px', fontWeight:700,
+                textTransform:'uppercase', letterSpacing:'.3px', minWidth:'64px',
+                transition:'all .18s'
+              }}>
+              <span className="nav-ico">{n.icon}</span>
+              <span>{n.label}</span>
+            </button>
+          )
+        })}
       </nav>
 
       {/* CONTENT */}
