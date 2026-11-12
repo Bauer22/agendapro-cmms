@@ -95,6 +95,7 @@ export default function ReportsPage({ profile, can }: Props) {
       const { default: autoTable } = await import('jspdf-autotable')
 
       const doc = new jsPDF()
+      const { addReportLogo } = await import('@/lib/pdf'); await addReportLogo(doc)
       const now = new Date()
       const dateStr = `${now.getDate().toString().padStart(2,'0')}/${(now.getMonth()+1).toString().padStart(2,'0')}/${now.getFullYear()}`
 
