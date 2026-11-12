@@ -2,6 +2,53 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { fmtD, fmtDT } from './utils'
+import { supabase } from './supabase'
+
+// ─────────────────────────────────────────────────────────────
+// LOGO DA EMPRESA NOS RELATÓRIOS
+// A logo é salva como base64 (data URL) no system_config:
+//   categoria='empresa', chave='logo_base64'.
+// Carregada 1x e guardada em cache nesta sessão.
+// ─────────────────────────────────────────────────────────────
+let _logoCache: string | null | undefined = undefined  // undefined = não buscado; null = não existe
+
+export async function loadCompanyLogo(): Promise<string | null> {
+  if (_logoCache !== undefined) return _logoCache
+  try {
+    const { data } = await supabase.from('system_config')
+      .select('valor_texto,valor').eq('categoria','empresa').eq('chave','logo_base64').maybeSingle()
+    const v: any = data ? (data.valor_texto ?? data.valor) : null
+    _logoCache = (typeof v === 'string' && v.startsWith('data:image')) ? v : null
+  } catch { _logoCache = null }
+  return _logoCache
+}
+
+// invalida o cache (chamar após salvar/remover a logo nas Configurações)
+export function clearLogoCache() { _logoCache = undefined }
+
+// formato jsPDF a partir do data URL
+function logoFormat(dataUrl: string): 'PNG'|'JPEG' {
+  return /^data:image\/jpe?g/i.test(dataUrl) ? 'JPEG' : 'PNG'
+}
+
+/**
+ * Desenha a logo da empresa no CANTO SUPERIOR DIREITO do PDF (se houver).
+ * Não colide com o título/subtítulo (que ficam à esquerda).
+ * Chame com `await` logo após criar o doc:  await addReportLogo(doc)
+ */
+export async function addReportLogo(doc: jsPDF, opts: { y?:number; maxW?:number; maxH?:number; margin?:number } = {}): Promise<void> {
+  const logo = await loadCompanyLogo()
+  if (!logo) return
+  const y = opts.y ?? 6, maxH = opts.maxH ?? 16, maxW = opts.maxW ?? 40, margin = opts.margin ?? 10
+  try {
+    const pageW = doc.internal.pageSize.getWidth()
+    const props = (doc as any).getImageProperties(logo)
+    const ratio = props.width / props.height
+    let h = maxH, w = h * ratio
+    if (w > maxW) { w = maxW; h = w / ratio }
+    doc.addImage(logo, logoFormat(logo), pageW - margin - w, y, w, h)
+  } catch { /* ignora logo inválida */ }
+}
 
 interface PDFOptions { title: string; company?: string; logo?: string; user?: string }
 
