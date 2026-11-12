@@ -440,15 +440,18 @@ export default function SuperAdminPage({ profile }: Props) {
         </>
       )}
 
-      {tab==='users' && (
+      {tab==='users' && (() => {
+        // Mostra só os ADMINISTRADORES de cada empresa (não os usuários comuns nem o master)
+        const admins = users.filter((u:any)=> u.role==='admin')
+        return (
         <>
-          <SH label={`Administradores / Usuários (${users.length})`} action={<Btn onClick={()=>{setNewUser({role:'admin'});setUserModal(true)}} size="sm" variant="primary">+ Criar admin</Btn>} />
+          <SH label={`Administradores (${admins.length})`} action={<Btn onClick={()=>{setNewUser({role:'admin'});setUserModal(true)}} size="sm" variant="primary">+ Criar admin</Btn>} />
           <div style={{fontSize:'10px',color:'var(--t3)',marginBottom:'10px',lineHeight:1.5}}>
-            Aqui você cria o <b style={{color:'var(--t2)'}}>administrador</b> de cada empresa (perfil Administrador). Depois, cada admin acessa o próprio sistema e cadastra os usuários da empresa dele.
+            Aqui aparecem só os <b style={{color:'var(--t2)'}}>administradores</b> de cada empresa. Cada admin acessa o próprio sistema e cadastra os usuários da empresa dele.
           </div>
-          {users.length===0?<Empty icon="👤" text="Nenhum usuário"/>:(
+          {admins.length===0?<Empty icon="👤" text="Nenhum administrador. Use + Criar admin."/>:(
             <div className="flex flex-col gap-2">
-              {users.map((u:any)=>(
+              {admins.map((u:any)=>(
                 <div key={u.id} className="flex items-center gap-2 p-2.5 rounded-xl" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
                   <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold" style={{background:'rgba(0,212,255,.15)',color:'var(--cy)',flexShrink:0}}>
                     {(u.display_name||u.email||'?')[0].toUpperCase()}
@@ -469,7 +472,8 @@ export default function SuperAdminPage({ profile }: Props) {
             </div>
           )}
         </>
-      )}
+        )
+      })()}
 
       {/* ── CARGOS / SETORES: quais abas cada um libera ── */}
       {tab==='permissoes' && (
