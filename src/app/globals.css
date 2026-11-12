@@ -3,10 +3,11 @@
 @tailwind components;
 @tailwind utilities;
 :root {
-  --bg:#06101e;--bg2:#0c1a30;--s1:#102038;--s2:#162840;--s3:#1e3450;
-  --bd:rgba(249,115,22,.15);--bd2:rgba(249,115,22,.35);
+  --bg:#0a1322;--bg2:#0e1b30;--s1:#13223c;--s2:#182a46;--s3:#20365a;
+  --bd:rgba(148,163,184,.14);--bd2:rgba(249,115,22,.45);
   --cy:#f97316;--cy2:#fb923c;--am:#eab308;--gn:#22c55e;--rd:#ef4444;--pu:#a78bfa;
-  --t1:#e8edf5;--t2:#8fa3bf;--t3:#4a6380;
+  --t1:#eef2f8;--t2:#9fb0c8;--t3:#5f7694;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.5);
   --sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);
 }
 *,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -16,8 +17,9 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
   linear-gradient(rgba(249,115,22,.018) 1px,transparent 1px),
   linear-gradient(90deg,rgba(249,115,22,.018) 1px,transparent 1px);
   background-size:100%,48px 48px,48px 48px}
-::-webkit-scrollbar{width:4px;height:4px}
-::-webkit-scrollbar-thumb{background:rgba(249,115,22,.3);border-radius:2px}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-thumb{background:rgba(148,163,184,.25);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:rgba(249,115,22,.5)}
 .page-enter{animation:pageUp .16s ease}
 @keyframes pageUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 @keyframes spin{to{transform:rotate(360deg)}}
