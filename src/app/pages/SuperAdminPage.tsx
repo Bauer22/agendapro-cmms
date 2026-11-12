@@ -36,30 +36,27 @@ export default function SuperAdminPage({ profile }: Props) {
   const [tab, setTab]             = useState('gerencial')
   const [allModules, setAllModules] = useState<any[]>([])
   const [companyMods, setCompanyMods] = useState<Set<string>>(new Set())
-  const [roleMods, setRoleMods]   = useState<Record<string,Set<string>>>({})  // perfil -> módulos liberados
+  // cargos/setores dinâmicos: {role, label, modules:Set, protegido}
+  const [cargos, setCargos]       = useState<any[]>([])
+  const [roleMods, setRoleMods]   = useState<Record<string,Set<string>>>({})  // role -> módulos
   const [savingRole, setSavingRole] = useState('')
+  const [novoCargo, setNovoCargo] = useState('')  // nome do novo cargo a criar
   const { confirm, dialog }       = useConfirm()
 
-  // perfis configuráveis (superadmin não entra: vê tudo sempre)
-  const PERFIS = [
-    {role:'admin',      label:'Administrador'},
-    {role:'supervisor', label:'Supervisor'},
-    {role:'operator',   label:'Operador'},
-    {role:'producao',   label:'Produção'},
-    {role:'viewer',     label:'Consulta'},
-  ]
-
   async function loadRoleMods() {
-    const { data } = await supabase.from('role_modules').select('role,modules')
+    const { data } = await supabase.from('role_modules').select('role,label,modules,protegido').order('role')
+    setCargos(data || [])
     const map: Record<string,Set<string>> = {}
     ;(data||[]).forEach((r:any)=>{ map[r.role] = new Set(r.modules||[]) })
     setRoleMods(map)
+  }
+  function setLabel(role:string, label:string) {
+    setCargos(prev => prev.map(c => c.role===role ? {...c, label} : c))
   }
   function toggleRoleMod(role:string, modId:string) {
     setRoleMods(prev => {
       const s = new Set(prev[role] || [])
       if (s.has(modId)) s.delete(modId); else s.add(modId)
-      // se marcar um módulo específico, tira o '*' (tudo)
       if (modId !== '*') s.delete('*')
       return { ...prev, [role]: s }
     })
@@ -70,10 +67,31 @@ export default function SuperAdminPage({ profile }: Props) {
   async function salvarRoleMods(role:string) {
     setSavingRole(role)
     const modules = Array.from(roleMods[role] || [])
-    const { error } = await supabase.from('role_modules').upsert({ role, modules, updated_at:new Date().toISOString() }, { onConflict:'role' })
+    const label = cargos.find(c=>c.role===role)?.label || role
+    const { error } = await supabase.from('role_modules').upsert({ role, label, modules, updated_at:new Date().toISOString() }, { onConflict:'role' })
     setSavingRole('')
     if (error) { toast.error('Erro: '+error.message); return }
-    toast.success('Permissões salvas ✅ (o usuário vê na próxima vez que abrir)')
+    toast.success('Cargo salvo ✅ (o usuário vê na próxima vez que abrir)')
+  }
+  async function criarCargo() {
+    const nome = novoCargo.trim()
+    if (!nome) { toast.error('Digite o nome do cargo/setor'); return }
+    // código do cargo: minúsculo, sem acento/espaço
+    const role = nome.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')
+    if (!role) { toast.error('Nome inválido'); return }
+    if (cargos.some(c=>c.role===role)) { toast.error('Já existe um cargo com esse nome'); return }
+    const { error } = await supabase.from('role_modules').insert({ role, label:nome, modules:['dashboard'], protegido:false })
+    if (error) { toast.error('Erro: '+error.message); return }
+    setNovoCargo(''); await loadRoleMods()
+    toast.success(`Cargo "${nome}" criado ✅ — agora escolha as abas dele`)
+  }
+  async function excluirCargo(c:any) {
+    if (c.protegido) { toast.error('Este cargo é protegido e não pode ser excluído'); return }
+    if (!(await confirm(`Excluir o cargo "${c.label||c.role}"? Usuários com esse cargo ficarão sem abas definidas.`))) return
+    const { error } = await supabase.from('role_modules').delete().eq('role', c.role)
+    if (error) { toast.error('Erro: '+error.message); return }
+    await loadRoleMods()
+    toast.success('Cargo excluído')
   }
 
   // Carrega a lista global de módulos uma vez
@@ -430,30 +448,45 @@ export default function SuperAdminPage({ profile }: Props) {
         </>
       )}
 
-      {/* ── PERMISSÕES POR PERFIL (quais abas cada tipo de usuário vê) ── */}
+      {/* ── CARGOS / SETORES: quais abas cada um libera ── */}
       {tab==='permissoes' && (
         <>
           <div style={{fontSize:'11px',color:'var(--t3)',marginBottom:'12px'}}>
-            Defina quais abas cada tipo de usuário enxerga no sistema. Vale para todas as empresas.
-            Administrador normalmente vê tudo. A mudança aparece na próxima vez que o usuário abrir o sistema.
+            Crie cargos/setores e escolha quais abas cada um libera no sistema. Vale para todas as empresas.
+            A mudança aparece na próxima vez que o usuário abrir o sistema.
           </div>
+
+          {/* Criar novo cargo/setor */}
+          <div className="rounded-2xl p-3 mb-3" style={{background:'var(--s2)',border:'1px dashed var(--bd2)'}}>
+            <div className="text-xs font-bold mb-2" style={{color:'var(--cy)'}}>➕ Novo cargo / setor</div>
+            <div className="flex gap-2 items-center">
+              <input value={novoCargo} onChange={e=>setNovoCargo(e.target.value)} placeholder="Ex.: Mecânico, Conferente, Portaria…"
+                style={{flex:1,background:'var(--s1)',border:'1px solid var(--bd)',borderRadius:'10px',padding:'9px 12px',color:'var(--t1)',fontFamily:'Sora,system-ui',fontSize:'13px',outline:'none'}} />
+              <Btn onClick={criarCargo} size="md" variant="primary">Criar</Btn>
+            </div>
+          </div>
+
           <div className="flex flex-col gap-3">
-            {PERFIS.map(p => {
-              const sel = roleMods[p.role] || new Set<string>()
+            {cargos.map(c => {
+              const sel = roleMods[c.role] || new Set<string>()
               const tudo = sel.has('*')
               return (
-                <div key={p.role} className="rounded-2xl p-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-xs font-bold" style={{color:'var(--cy)'}}>{p.label}</span>
-                    <div className="flex gap-2 items-center">
-                      <button onClick={()=>toggleRoleAll(p.role,true)}
+                <div key={c.role} className="rounded-2xl p-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+                  <div className="flex justify-between items-center gap-2 mb-2">
+                    <input value={c.label||''} onChange={e=>setLabel(c.role,e.target.value)} placeholder={c.role}
+                      style={{flex:1,minWidth:0,background:'transparent',border:'none',borderBottom:'1px solid var(--bd)',color:'var(--cy)',fontFamily:'Sora,system-ui',fontSize:'13px',fontWeight:700,outline:'none',padding:'2px 0'}} />
+                    <div className="flex gap-2 items-center" style={{flexShrink:0}}>
+                      <button onClick={()=>toggleRoleAll(c.role,true)}
                         style={{fontSize:'10px',color:tudo?'#f97316':'var(--t3)',background:'none',border:'none',cursor:'pointer',fontWeight:700}}>Todas</button>
-                      <span style={{color:'var(--t3)'}}>·</span>
-                      <button onClick={()=>toggleRoleAll(p.role,false)}
+                      <button onClick={()=>toggleRoleAll(c.role,false)}
                         style={{fontSize:'10px',color:'var(--rd)',background:'none',border:'none',cursor:'pointer',fontWeight:700}}>Nenhuma</button>
-                      <Btn onClick={()=>salvarRoleMods(p.role)} size="sm" variant="primary" disabled={savingRole===p.role}>
-                        {savingRole===p.role?'Salvando…':'Salvar'}
+                      <Btn onClick={()=>salvarRoleMods(c.role)} size="sm" variant="primary" disabled={savingRole===c.role}>
+                        {savingRole===c.role?'…':'Salvar'}
                       </Btn>
+                      {!c.protegido && (
+                        <button onClick={()=>excluirCargo(c)} title="Excluir cargo"
+                          style={{fontSize:'14px',background:'none',border:'none',cursor:'pointer',color:'var(--rd)'}}>🗑️</button>
+                      )}
                     </div>
                   </div>
                   {tudo ? (
@@ -463,7 +496,7 @@ export default function SuperAdminPage({ profile }: Props) {
                       {allModules.filter((m:any)=>m.id!=='superadmin').map((m:any)=>{
                         const on = sel.has(m.id)
                         return (
-                          <div key={m.id} onClick={()=>toggleRoleMod(p.role,m.id)}
+                          <div key={m.id} onClick={()=>toggleRoleMod(c.role,m.id)}
                             style={{fontSize:'10px',fontWeight:700,padding:'4px 9px',borderRadius:'999px',cursor:'pointer',
                               background:on?'rgba(249,115,22,.14)':'var(--s2)',
                               border:`1px solid ${on?'rgba(249,115,22,.45)':'var(--bd)'}`,
@@ -477,6 +510,7 @@ export default function SuperAdminPage({ profile }: Props) {
                 </div>
               )
             })}
+            {cargos.length===0 && <Empty icon="🔐" text="Nenhum cargo ainda. Rode o SQL ou crie um acima." />}
           </div>
         </>
       )}
@@ -543,8 +577,8 @@ export default function SuperAdminPage({ profile }: Props) {
         <Input label="Nome Completo" value={newUser.display_name} onChange={(v:string)=>setNewUser((e:any)=>({...e,display_name:v}))} placeholder="Nome completo" />
         <Select label="Empresa *" value={newUser.company_id} onChange={(v:string)=>setNewUser((e:any)=>({...e,company_id:v}))}
           options={[{value:'',label:'Selecione...'}, ...companies.map(c=>({value:c.id,label:c.name}))]} />
-        <Select label="Perfil" value={newUser.role||'operator'} onChange={(v:string)=>setNewUser((e:any)=>({...e,role:v}))}
-          options={[{value:'admin',label:'Administrador'},{value:'supervisor',label:'Supervisor'},{value:'operator',label:'Operador'},{value:'viewer',label:'Consulta'}]} />
+        <Select label="Perfil / Cargo" value={newUser.role||'admin'} onChange={(v:string)=>setNewUser((e:any)=>({...e,role:v}))}
+          options={cargos.length>0 ? cargos.map((c:any)=>({value:c.role,label:c.label||c.role})) : [{value:'admin',label:'Administrador'},{value:'supervisor',label:'Supervisor'},{value:'operator',label:'Operador'},{value:'viewer',label:'Consulta'}]} />
       </Modal>
     </div>
   )
