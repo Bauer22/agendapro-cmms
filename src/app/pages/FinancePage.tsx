@@ -320,6 +320,7 @@ export default function FinancePage({ profile, can }: Props) {
       const { default: autoTable } = await import('jspdf-autotable')
       const r = await calcularRelatorio()
       const doc = new jsPDF()
+      const { addReportLogo } = await import('@/lib/pdf'); await addReportLogo(doc)
       doc.setFillColor(6,13,26); doc.rect(0,0,210,24,'F')
       doc.setTextColor(249,115,22); doc.setFontSize(15); doc.setFont('helvetica','bold')
       doc.text('Industrial8 — Relatorio Financeiro', 12, 11)
