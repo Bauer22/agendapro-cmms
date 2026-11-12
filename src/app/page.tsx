@@ -77,10 +77,12 @@ export default function App() {
   const [splashDone, setSplashDone] = useState(false)
   const [userModules, setUserModules] = useState<string[]>([])
   const [companyModules, setCompanyModules] = useState<string[]|null>(null)
+  const [roleModules, setRoleModules] = useState<Record<string,string[]>>({})  // abas por perfil (definido pelo master)
   const [userPerms, setUserPerms] = useState<Record<string,{edit:boolean;del:boolean}>>({})
 
   // Auth init
   useEffect(() => {
+    loadRoleModules()
     supabase.auth.getSession().then(({ data }) => {
       if (data.session?.user) {
         setUser(data.session.user)
@@ -102,6 +104,17 @@ export default function App() {
     })
     return () => subscription.unsubscribe()
   }, [])
+
+  async function loadRoleModules() {
+    try {
+      const { data } = await supabase.from('role_modules').select('role,modules')
+      if (data) {
+        const map: Record<string,string[]> = {}
+        data.forEach((r:any) => { map[r.role] = r.modules || [] })
+        setRoleModules(map)
+      }
+    } catch { /* tabela pode não existir ainda → usa fallback do código */ }
+  }
 
   async function loadUserModules(uid: string) {
     const { data } = await supabase.from('user_permissions')
@@ -261,10 +274,20 @@ export default function App() {
     // Enforcement por empresa: se a empresa tem módulos configurados,
     // o módulo precisa estar liberado (superadmin ignora essa regra).
     if (companyModules !== null && !companyModules.includes(n.id) && n.id !== 'dashboard') return false
+
+    // ── Permissões de abas por PERFIL, definidas pelo MASTER (tabela role_modules) ──
+    // Se o perfil do usuário tem config no banco, ela MANDA.
+    // '*' na lista = vê todas as abas. 'dashboard' é sempre liberado.
+    const dbMods = roleModules[profile?.role || '']
+    if (dbMods && dbMods.length > 0) {
+      if (dbMods.includes('*')) return true
+      if (n.id === 'dashboard') return true
+      return dbMods.includes(n.id)
+    }
+
+    // ── Fallback (sem config no banco): comportamento antigo ──
     if (profile?.role === 'admin') return true
     if (userModules.length === 0) {
-      // Fallback por perfil: perfis com módulos definidos (ex.: produção) usam essa lista;
-      // demais perfis mantêm o conjunto básico.
       const roleMods = ROLE_MODULES[profile?.role || '']
       if (roleMods) return roleMods.includes(n.id)
       return ['dashboard','os','pm','tasks'].includes(n.id)
