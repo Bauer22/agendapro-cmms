@@ -562,20 +562,21 @@ export default function SuperAdminPage({ profile }: Props) {
           </div>
         )}
 
-        {/* Módulos liberados para a empresa */}
+        {/* Funcionalidades/abas liberadas para a empresa */}
         <div className="mt-3">
           <div className="flex justify-between items-center mb-2">
-            <span className="text-xs font-bold" style={{color:'var(--t2)'}}>📦 Módulos liberados ({companyMods.size}/{allModules.length})</span>
+            <span className="text-xs font-bold" style={{color:'var(--t2)'}}>📦 Funcionalidades liberadas ({companyMods.size}/{ABAS_SISTEMA.length})</span>
             <div className="flex gap-1">
-              <button onClick={()=>setCompanyMods(new Set(allModules.map((m:any)=>m.id)))}
-                style={{fontSize:'10px',color:'var(--cy)',background:'none',border:'none',cursor:'pointer',fontWeight:700}}>Todos</button>
+              <button onClick={()=>setCompanyMods(new Set(ABAS_SISTEMA.map(m=>m.id)))}
+                style={{fontSize:'10px',color:'var(--cy)',background:'none',border:'none',cursor:'pointer',fontWeight:700}}>Todas</button>
               <span style={{color:'var(--t3)'}}>·</span>
               <button onClick={()=>setCompanyMods(new Set())}
-                style={{fontSize:'10px',color:'var(--rd)',background:'none',border:'none',cursor:'pointer',fontWeight:700}}>Nenhum</button>
+                style={{fontSize:'10px',color:'var(--rd)',background:'none',border:'none',cursor:'pointer',fontWeight:700}}>Nenhuma</button>
             </div>
           </div>
-          <div style={{maxHeight:'220px',overflowY:'auto',display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px'}}>
-            {allModules.map((m:any) => {
+          <div style={{fontSize:'10px',color:'var(--t3)',marginBottom:'6px'}}>Marque o que esta empresa pode usar. O que não estiver marcado não aparece para nenhum usuário dela.</div>
+          <div style={{maxHeight:'240px',overflowY:'auto',display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px'}}>
+            {ABAS_SISTEMA.map((m) => {
               const on = companyMods.has(m.id)
               return (
                 <div key={m.id} onClick={()=>toggleModulo(m.id)}
