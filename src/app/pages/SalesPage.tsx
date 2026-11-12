@@ -550,6 +550,7 @@ export default function SalesPage({ profile, can }: Props) {
       const { default: jsPDF } = await import('jspdf')
       const { default: autoTable } = await import('jspdf-autotable')
       const doc = new jsPDF()
+      const { addReportLogo } = await import('@/lib/pdf'); await addReportLogo(doc)
       doc.setFillColor(6,13,26); doc.rect(0,0,210,25,'F')
       doc.setTextColor(249,115,22); doc.setFontSize(14); doc.setFont('helvetica','bold')
       doc.text('Industrial8 — Relatório de Vendas', 12, 11)
