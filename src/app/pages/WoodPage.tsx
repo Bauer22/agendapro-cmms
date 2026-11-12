@@ -259,6 +259,7 @@ export default function WoodPage({ profile, can }: Props) {
       const { default: jsPDF } = await import('jspdf')
       const { default: autoTable } = await import('jspdf-autotable')
       const doc = new jsPDF()
+      const { addReportLogo } = await import('@/lib/pdf'); await addReportLogo(doc)
       const money = (v:number) => (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})
 
       doc.setFillColor(6,13,26); doc.rect(0,0,210,26,'F')
