@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Btn, Input, SH, Empty } from '@/components/ui'
+import { clearLogoCache } from '@/lib/pdf'
 import type { UserProfile } from '@/types'
 import toast from 'react-hot-toast'
 
@@ -14,6 +15,8 @@ export default function ConfigPage({ profile }: { profile: UserProfile }) {
   const [editPrecos, setEditPrecos] = useState<Record<string,string>>({})
   const [novoForn, setNovoForn]   = useState('')
   const [novoPreco, setNovoPreco] = useState('')
+  const [logo, setLogo]           = useState<string|null>(null)
+  const [savingLogo, setSavingLogo] = useState(false)
 
   const isSuper = profile?.role === 'superadmin'
 
@@ -21,13 +24,15 @@ export default function ConfigPage({ profile }: { profile: UserProfile }) {
 
   async function load() {
     setLoading(true)
-    const [c, p] = await Promise.all([
+    const [c, p, lg] = await Promise.all([
       supabase.from('system_config').select('*').order('categoria').order('chave'),
       supabase.from('precos').select('*').order('supplier_name'),
+      supabase.from('system_config').select('valor_texto').eq('categoria','empresa').eq('chave','logo_base64').maybeSingle(),
     ])
     if (c.error) { toast.error('Execute o SQL da tabela system_config'); setLoading(false); return }
-    setConfigs(c.data || [])
+    setConfigs((c.data || []).filter((x:any)=>!(x.categoria==='empresa' && x.chave==='logo_base64')))
     setPrecos(p.data || [])
+    setLogo((lg.data?.valor_texto && String(lg.data.valor_texto).startsWith('data:image')) ? lg.data.valor_texto : null)
     setLoading(false)
   }
 
@@ -88,6 +93,48 @@ export default function ConfigPage({ profile }: { profile: UserProfile }) {
     return <Empty icon="🔒" text="Acesso restrito ao Super Admin." />
   }
 
+  // ── Logo da empresa: upload (redimensiona p/ max 400px) → base64 → system_config ──
+  function onPickLogo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]; e.target.value = ''
+    if (!file) return
+    if (!file.type.startsWith('image/')) { toast.error('Selecione uma imagem (PNG ou JPG)'); return }
+    const reader = new FileReader()
+    reader.onload = () => {
+      const img = new Image()
+      img.onload = async () => {
+        const max = 400
+        let w = img.width, h = img.height
+        if (w > max || h > max) { const r = Math.min(max/w, max/h); w = Math.round(w*r); h = Math.round(h*r) }
+        const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h
+        const ctx = canvas.getContext('2d'); if (!ctx) return
+        ctx.drawImage(img, 0, 0, w, h)
+        const isPng = file.type.includes('png')
+        const dataUrl = canvas.toDataURL(isPng ? 'image/png' : 'image/jpeg', 0.9)
+        await salvarLogo(dataUrl)
+      }
+      img.src = reader.result as string
+    }
+    reader.readAsDataURL(file)
+  }
+
+  async function salvarLogo(dataUrl: string|null) {
+    setSavingLogo(true)
+    // upsert manual: tenta update; se não existir, insert
+    const { data: ex } = await supabase.from('system_config').select('id').eq('categoria','empresa').eq('chave','logo_base64').maybeSingle()
+    let error:any = null
+    if (ex) {
+      const r = await supabase.from('system_config').update({ valor_texto: dataUrl, atualizado_em: new Date().toISOString(), atualizado_por: profile?.display_name||'' }).eq('id', ex.id)
+      error = r.error
+    } else {
+      const r = await supabase.from('system_config').insert({ categoria:'empresa', chave:'logo_base64', valor: 0, valor_texto: dataUrl })
+      error = r.error
+    }
+    setSavingLogo(false)
+    if (error) { toast.error('Erro ao salvar logo: ' + error.message); return }
+    setLogo(dataUrl); clearLogoCache()
+    toast.success(dataUrl ? 'Logo salva ✅ (aparecerá nos relatórios)' : 'Logo removida')
+  }
+
   if (loading) return <Empty icon="⏳" text="Carregando configurações..." />
 
   // Agrupar configs por categoria
@@ -103,6 +150,28 @@ export default function ConfigPage({ profile }: { profile: UserProfile }) {
       <SH>⚙️ Configurações do Sistema</SH>
       <div style={{fontSize:'11px', color:'var(--t3)', marginBottom:'16px'}}>
         Parâmetros de cálculo usados em todo o sistema. Alterar aqui afeta os cálculos de produção, custo e combustível. Edite com cuidado.
+      </div>
+
+      {/* Logo da empresa (aparece nos relatórios/PDFs) */}
+      <div className="rounded-2xl p-4 mb-3" style={{background:'var(--s1)', border:'1px solid var(--bd)'}}>
+        <div style={{fontSize:'12px', fontWeight:700, color:'var(--cy)', marginBottom:'4px'}}>🖼️ Logo da Empresa</div>
+        <div style={{fontSize:'10px', color:'var(--t3)', marginBottom:'12px'}}>
+          Aparece no topo de todos os relatórios em PDF. Use PNG ou JPG — o ideal é fundo transparente (PNG).
+        </div>
+        <div className="flex items-center gap-4 flex-wrap">
+          <div style={{width:'120px', height:'70px', borderRadius:'12px', background:'var(--s2)', border:'1px dashed var(--bd2)', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', flexShrink:0}}>
+            {logo
+              ? <img src={logo} alt="Logo" style={{maxWidth:'100%', maxHeight:'100%', objectFit:'contain'}} />
+              : <span style={{fontSize:'10px', color:'var(--t3)'}}>Sem logo</span>}
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <label style={{display:'inline-flex', alignItems:'center', padding:'9px 16px', borderRadius:'11px', fontSize:'12px', fontWeight:700, cursor: savingLogo?'wait':'pointer', background:'linear-gradient(135deg,#f97316,#c2410c)', color:'#fff', opacity: savingLogo?.6:1}}>
+              {savingLogo ? 'Enviando...' : (logo ? 'Trocar logo' : 'Enviar logo')}
+              <input type="file" accept="image/png,image/jpeg" onChange={onPickLogo} disabled={savingLogo} style={{display:'none'}} />
+            </label>
+            {logo && <Btn onClick={()=>salvarLogo(null)} variant="danger" size="md" disabled={savingLogo}>Remover</Btn>}
+          </div>
+        </div>
       </div>
 
       {/* Parâmetros de cálculo */}
