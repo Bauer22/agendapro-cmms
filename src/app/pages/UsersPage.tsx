@@ -36,6 +36,7 @@ export default function UsersPage({ profile, can }: Props) {
   const [allModules, setAllModules] = useState<any[]>([])
   const [userMods, setUserMods] = useState<Record<string,{view:boolean;edit:boolean;del:boolean}>>({})
   const [presets, setPresets] = useState<any[]>([])
+  const [cargos, setCargos] = useState<{value:string,label:string}[]>([])  // cargos dinâmicos (role_modules)
   const [pwdModal, setPwdModal] = useState(false)
   const [pwdUser, setPwdUser]   = useState<any>(null)
   const [pwd1, setPwd1]         = useState('')
@@ -44,7 +45,16 @@ export default function UsersPage({ profile, can }: Props) {
   const [pwdSaving, setPwdSaving] = useState(false)
   const { confirm, dialog } = useConfirm()
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); loadCargos() }, [])
+
+  async function loadCargos() {
+    try {
+      const { data } = await supabase.from('role_modules').select('role,label').order('role')
+      if (data && data.length > 0) {
+        setCargos(data.filter((c:any)=>c.role!=='superadmin').map((c:any)=>({ value:c.role, label:ROLE_LABELS[c.role]||c.label||c.role })))
+      }
+    } catch { /* usa ROLE_OPTS fixo */ }
+  }
 
   async function load() {
     const { data } = await supabase.from('profiles').select('*').order('display_name')
@@ -403,7 +413,7 @@ export default function UsersPage({ profile, can }: Props) {
           <Input label="Senha *" value={editing.password} onChange={(v:string)=>setEdit((e:any)=>({...e,password:v}))} type="password" placeholder="mínimo 6 caracteres" />
         </>}
         <div className="grid grid-cols-2 gap-x-2">
-          <Select label="Perfil *" value={editing.role} onChange={(v:string)=>setEdit((e:any)=>({...e,role:v}))} options={ROLE_OPTS} />
+          <Select label="Perfil / Cargo *" value={editing.role} onChange={(v:string)=>setEdit((e:any)=>({...e,role:v}))} options={cargos.length>0?cargos:ROLE_OPTS} />
           <Select label="Turno" value={editing.shift} onChange={(v:string)=>setEdit((e:any)=>({...e,shift:v}))} options={SHIFTS} />
         </div>
         <Input label="Setor" value={editing.sector} onChange={(v:string)=>setEdit((e:any)=>({...e,sector:v}))} placeholder="Ex: Manutenção" />
