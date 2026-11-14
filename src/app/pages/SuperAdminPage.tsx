@@ -64,6 +64,9 @@ export default function SuperAdminPage({ profile }: Props) {
   const [roleMods, setRoleMods]   = useState<Record<string,Set<string>>>({})  // role -> módulos
   const [savingRole, setSavingRole] = useState('')
   const [novoCargo, setNovoCargo] = useState('')  // nome do novo cargo a criar
+  const [adminModal, setAdminModal] = useState(false)   // modal de editar admin
+  const [editAdmin, setEditAdmin]   = useState<any>({})
+  const [savingAdmin, setSavingAdmin] = useState(false)
   const { confirm, dialog }       = useConfirm()
 
   async function loadRoleMods() {
@@ -200,6 +203,50 @@ export default function SuperAdminPage({ profile }: Props) {
       .eq('id', u.id)
     if (error) { toast.error('Erro: ' + error.message); return }
     toast.success('Usuário desbloqueado ✅')
+    load()
+  }
+
+  async function bloquearUsuario(u: any) {
+    const ok = await confirm(`Bloquear o acesso de ${u.display_name || u.email}? Ele não conseguirá mais entrar até ser desbloqueado.`)
+    if (!ok) return
+    const { error } = await supabase.from('profiles')
+      .update({ blocked: true, blocked_at: new Date().toISOString() })
+      .eq('id', u.id)
+    if (error) { toast.error('Erro: ' + error.message); return }
+    toast.success('Acesso bloqueado 🔒')
+    load()
+  }
+
+  // ── Editar admin (nome + perfil + senha) ──
+  function abrirEdicaoAdmin(u: any) {
+    setEditAdmin({ id:u.id, display_name:u.display_name||'', role:u.role||'admin', empresa:(u as any).companies?.name||'—', nova_senha:'' })
+    setAdminModal(true)
+  }
+  async function salvarEdicaoAdmin() {
+    if (!editAdmin.display_name?.trim()) { toast.error('Informe o nome'); return }
+    setSavingAdmin(true)
+    // 1) atualiza nome e perfil
+    const { error } = await supabase.from('profiles')
+      .update({ display_name: editAdmin.display_name.trim(), role: editAdmin.role })
+      .eq('id', editAdmin.id)
+    if (error) { setSavingAdmin(false); toast.error('Erro: '+error.message); return }
+    // 2) se digitou senha nova, troca via API
+    if (editAdmin.nova_senha && editAdmin.nova_senha.length >= 6) {
+      try {
+        const { data: sess } = await supabase.auth.getSession()
+        const resp = await fetch('/api/reset-password', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${sess.session?.access_token||''}` },
+          body: JSON.stringify({ user_id: editAdmin.id, new_password: editAdmin.nova_senha }),
+        })
+        const j = await resp.json()
+        if (!resp.ok) { setSavingAdmin(false); toast.error('Dados salvos, mas a senha falhou: '+(j.error||'')); setAdminModal(false); load(); return }
+      } catch(e:any) { setSavingAdmin(false); toast.error('Dados salvos, mas a senha falhou: '+e.message); setAdminModal(false); load(); return }
+    } else if (editAdmin.nova_senha && editAdmin.nova_senha.length < 6) {
+      setSavingAdmin(false); toast.error('A senha nova precisa ter ao menos 6 caracteres'); return
+    }
+    setSavingAdmin(false); setAdminModal(false)
+    toast.success('Administrador atualizado ✅')
     load()
   }
 
@@ -461,11 +508,12 @@ export default function SuperAdminPage({ profile }: Props) {
                     <div className="text-xs" style={{color:'var(--t2)'}}>@{(u.email||"").split("@")[0]}</div>
                     <div className="text-xs mt-0.5" style={{color:'var(--t3)'}}>🏭 {(u as any).companies?.name||'—'} · {u.role}</div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5" style={{flexShrink:0}}>
                     <Badge color={u.blocked?'red':'green'}>{u.blocked?'Bloqueado':'Ativo'}</Badge>
-                    {u.blocked && (
-                      <Btn onClick={()=>desbloquearUsuario(u)} size="sm" variant="primary">🔓 Desbloquear</Btn>
-                    )}
+                    <Btn onClick={()=>abrirEdicaoAdmin(u)} size="sm" variant="secondary">✏️</Btn>
+                    {u.blocked
+                      ? <Btn onClick={()=>desbloquearUsuario(u)} size="sm" variant="primary">🔓</Btn>
+                      : <Btn onClick={()=>bloquearUsuario(u)} size="sm" variant="danger">🔒</Btn>}
                   </div>
                 </div>
               ))}
@@ -611,6 +659,16 @@ export default function SuperAdminPage({ profile }: Props) {
           options={[{value:'',label:'Selecione...'}, ...companies.map(c=>({value:c.id,label:c.name}))]} />
         <Select label="Perfil / Cargo" value={newUser.role||'admin'} onChange={(v:string)=>setNewUser((e:any)=>({...e,role:v}))}
           options={cargos.length>0 ? cargos.map((c:any)=>({value:c.role,label:c.label||c.role})) : [{value:'admin',label:'Administrador'},{value:'supervisor',label:'Supervisor'},{value:'operator',label:'Operador'},{value:'viewer',label:'Consulta'}]} />
+      </Modal>
+
+      {/* Editar admin */}
+      <Modal open={adminModal} onClose={()=>setAdminModal(false)} title="Editar administrador"
+        footer={<><Btn onClick={()=>setAdminModal(false)} variant="secondary" size="md">Cancelar</Btn><Btn onClick={salvarEdicaoAdmin} variant="primary" size="md" disabled={savingAdmin}>{savingAdmin?'Salvando…':'Salvar'}</Btn></>}>
+        <div style={{fontSize:'10px',color:'var(--t3)',marginBottom:'12px'}}>Empresa: <b style={{color:'var(--t2)'}}>{editAdmin.empresa}</b> (para mover de empresa, use o cadastro da empresa)</div>
+        <Input label="Nome *" value={editAdmin.display_name} onChange={(v:string)=>setEditAdmin((e:any)=>({...e,display_name:v}))} placeholder="Nome do administrador" />
+        <Select label="Perfil / Cargo" value={editAdmin.role||'admin'} onChange={(v:string)=>setEditAdmin((e:any)=>({...e,role:v}))}
+          options={cargos.length>0 ? cargos.map((c:any)=>({value:c.role,label:c.label||c.role})) : [{value:'admin',label:'Administrador'},{value:'supervisor',label:'Supervisor'},{value:'operator',label:'Operador'},{value:'viewer',label:'Consulta'}]} />
+        <Input label="Nova senha (deixe em branco para não alterar)" type="password" value={editAdmin.nova_senha} onChange={(v:string)=>setEditAdmin((e:any)=>({...e,nova_senha:v}))} placeholder="Mínimo 6 caracteres" />
       </Modal>
     </div>
   )
