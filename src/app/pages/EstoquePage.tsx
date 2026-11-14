@@ -1,16 +1,17 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Btn, Modal, Input, Select, Textarea, SH, Empty, Badge, KPI, useConfirm } from '@/components/ui'
+import { Btn, Modal, Input, Select, SelectComCadastro, Textarea, SH, Empty, Badge, KPI, useConfirm } from '@/components/ui'
+import PartsPage from '@/app/pages/PartsPage'
 
 type Props = { profile?: any; can?: any }
 
 const money = (v: any) => 'R$ ' + (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const qtd = (v: any) => (Number(v) || 0).toLocaleString('pt-BR', { maximumFractionDigits: 3 })
 
-export default function EstoquePage({ profile }: Props) {
+export default function EstoquePage({ profile, can }: Props) {
   const { confirm, dialog } = useConfirm()
-  const [tab, setTab] = useState<'produtos' | 'compras' | 'movimentos'>('produtos')
+  const [tab, setTab] = useState<'produtos' | 'compras' | 'movimentos' | 'pecas'>('produtos')
   const [loading, setLoading] = useState(false)
   const [busca, setBusca] = useState('')
 
@@ -144,6 +145,7 @@ export default function EstoquePage({ profile }: Props) {
     { k: 'produtos', l: '📦 Produtos' },
     { k: 'compras', l: '🛒 Compras' },
     { k: 'movimentos', l: '📊 Movimentos' },
+    { k: 'pecas', l: '🔧 Peças' },
   ] as const
 
   return (
@@ -180,7 +182,7 @@ export default function EstoquePage({ profile }: Props) {
         />
       )}
 
-      {loading && <div style={{ color: 'var(--t3)', fontSize: '12px', padding: '20px', textAlign: 'center' }}>Carregando...</div>}
+      {loading && tab !== 'pecas' && <div style={{ color: 'var(--t3)', fontSize: '12px', padding: '20px', textAlign: 'center' }}>Carregando...</div>}
 
       {/* ─── PRODUTOS ─── */}
       {!loading && tab === 'produtos' && (
@@ -258,6 +260,13 @@ export default function EstoquePage({ profile }: Props) {
           </div>
       )}
 
+      {/* ─── PEÇAS (estoque de manutenção — página separada embutida) ─── */}
+      {tab === 'pecas' && (
+        <div style={{ marginTop: '-4px' }}>
+          <PartsPage profile={profile} can={can} />
+        </div>
+      )}
+
       {/* ─── MODAL PRODUTO ─── */}
       <Modal open={prodModal} onClose={() => setProdModal(false)} title={editProd?.id ? 'Editar produto' : 'Novo produto'}
         footer={<><Btn onClick={() => setProdModal(false)}>Cancelar</Btn><Btn onClick={salvarProduto} variant="primary">Salvar</Btn></>}>
@@ -286,10 +295,14 @@ export default function EstoquePage({ profile }: Props) {
       {/* ─── MODAL COMPRA ─── */}
       <Modal open={compraModal} onClose={() => setCompraModal(false)} title="Registrar compra (entrada de estoque)"
         footer={<><Btn onClick={() => setCompraModal(false)}>Cancelar</Btn><Btn onClick={salvarCompra} variant="primary">Registrar</Btn></>}>
-        <Select label="Produto *" value={compra?.product_id || ''} onChange={(v: string) => setCompra({ ...compra, product_id: v })}
-          options={[{ value: '', label: '— selecione —' }, ...produtos.map(p => ({ value: p.id, label: `${p.name}${p.barcode ? ' · ' + p.barcode : ''}` }))]} />
-        <Select label="Fornecedor" value={compra?.fornecedor_id || ''} onChange={(v: string) => setCompra({ ...compra, fornecedor_id: v })}
-          options={[{ value: '', label: '— sem fornecedor —' }, ...fornecedores.map(f => ({ value: f.id, label: f.nome_razao }))]} />
+        <SelectComCadastro label="Produto *" tipo="produto" value={compra?.product_id || ''}
+          onChange={(v: string) => setCompra({ ...compra, product_id: v })}
+          options={produtos.map(p => ({ value: p.id, label: `${p.name}${p.barcode ? ' · ' + p.barcode : ''}` }))}
+          companyId={cid} createdBy={profile?.display_name} onCreatedRefresh={load} />
+        <SelectComCadastro label="Fornecedor" tipo="fornecedor" value={compra?.fornecedor_id || ''}
+          onChange={(v: string) => setCompra({ ...compra, fornecedor_id: v })}
+          options={fornecedores.map(f => ({ value: f.id, label: f.nome_razao }))}
+          companyId={cid} createdBy={profile?.display_name} onCreatedRefresh={load} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
           <Input label="Nº da NF" value={compra?.numero_nf || ''} onChange={(v: string) => setCompra({ ...compra, numero_nf: v })} />
           <Input label="Data da compra" type="date" value={compra?.data_compra || ''} onChange={(v: string) => setCompra({ ...compra, data_compra: v })} />
