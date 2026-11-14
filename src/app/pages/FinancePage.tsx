@@ -35,6 +35,12 @@ export default function FinancePage({ profile, can }: Props) {
   const [relCentro, setRelCentro] = useState('')
   const [relMaquina, setRelMaquina] = useState('')
   const [relResult, setRelResult] = useState<any>(null)
+  // Fase 1 — contas a receber + fluxo de caixa
+  const [recs, setRecs]         = useState<any[]>([])   // contas a receber
+  const [clientes, setClientes] = useState<any[]>([])
+  const [recModal, setRecModal] = useState(false)
+  const [editRec, setEditRec]   = useState<any>({})
+  const [fluxo, setFluxo]       = useState<any[]>([])   // linhas v_fluxo_caixa
   const { confirm, dialog }     = useConfirm()
 
   useEffect(() => { load() }, [tab])
@@ -48,6 +54,16 @@ export default function FinancePage({ profile, can }: Props) {
         supabase.from('machines').select('id,code,name').order('name'),
       ])
       setBills(b.data||[]); setCenters(c.data||[]); setSuppliers(s.data||[]); setMachines(m.data||[])
+    } else if (tab === 'receber') {
+      const [r, c, cli] = await Promise.all([
+        supabase.from('accounts_receivable').select('*').order('created_at',{ascending:false}),
+        supabase.from('cost_centers').select('*').eq('active', true),
+        supabase.from('cadastros').select('id,nome_razao,nome_fantasia').eq('is_cliente',true).eq('status',true),
+      ])
+      setRecs(r.data||[]); setCenters(c.data||[]); setClientes(cli.data||[])
+    } else if (tab === 'caixa') {
+      const { data } = await supabase.from('v_fluxo_caixa').select('*')
+      setFluxo(data||[])
     } else if (tab === 'fixed') {
       const [f, c2] = await Promise.all([
         supabase.from('fixed_expenses').select('*').order('description'),
@@ -243,11 +259,49 @@ export default function FinancePage({ profile, can }: Props) {
     toast.success('Excluído'); load()
   }
 
+  // ── Contas a RECEBER ──
+  async function saveRec() {
+    if (!editRec.valor) { toast.error('Informe o valor'); return }
+    const cli = clientes.find(c=>c.id===editRec.cliente_id)
+    const obj:any = {
+      cliente_id: editRec.cliente_id||null,
+      cliente_nome: cli?.nome_fantasia || cli?.nome_razao || editRec.cliente_nome || null,
+      centro_custo_id: editRec.centro_custo_id||null,
+      numero_documento: editRec.numero_documento||null,
+      descricao: editRec.descricao||null,
+      valor: parseFloat(String(editRec.valor))||0,
+      data_emissao: editRec.data_emissao||td(),
+      due_date: editRec.due_date||null,
+      status: editRec.status||'pending',
+      data_recebimento: editRec.status==='received' ? (editRec.data_recebimento||td()) : null,
+      forma: editRec.forma||null,
+      observacao: editRec.observacao||null,
+      created_by: profile?.display_name||profile?.email,
+    }
+    if (editRec.id) {
+      const { error } = await supabase.from('accounts_receivable').update(obj).eq('id', editRec.id)
+      if (error) { toast.error('Erro: '+error.message); return }
+    } else {
+      const { error } = await supabase.from('accounts_receivable').insert({ ...obj, company_id: profile?.company_id||null, created_at:new Date().toISOString() })
+      if (error) { toast.error('Erro: '+error.message); return }
+    }
+    toast.success('Salvo ✅'); setRecModal(false); setEditRec({}); load()
+  }
+  async function marcarRecebido(id: string) {
+    const { error } = await supabase.from('accounts_receivable').update({ status:'received', data_recebimento: td() }).eq('id', id)
+    if (error) { toast.error('Erro: '+error.message); return }
+    toast.success('Marcado como recebido ✅'); load()
+  }
+
   // Stats
   const today = td()
   const totalPending = bills.filter(b=>b.status==='pending').reduce((s,b)=>s+(b.valor||0),0)
   const totalOverdue = bills.filter(b=>b.status==='pending'&&b.due_date<today).reduce((s,b)=>s+(b.valor||0),0)
   const totalPaid    = bills.filter(b=>b.status==='paid').reduce((s,b)=>s+(b.valor||0),0)
+  // Stats contas a receber
+  const recPending = recs.filter(r=>r.status==='pending').reduce((s,r)=>s+(r.valor||0),0)
+  const recOverdue = recs.filter(r=>r.status==='pending'&&r.due_date&&r.due_date<today).reduce((s,r)=>s+(r.valor||0),0)
+  const recReceived = recs.filter(r=>r.status==='received').reduce((s,r)=>s+(r.valor||0),0)
 
   const filtered = bills.filter(b => {
     const sup = suppliers.find(s=>s.id===b.fornecedor_id)
@@ -384,14 +438,130 @@ export default function FinancePage({ profile, can }: Props) {
     <div>
       {dialog}
       {/* Tabs */}
-      <div className="flex gap-1.5 mb-3">
-        {[{k:'bills',l:'💰 Contas'},{k:'fixed',l:'🔁 Fixas'},{k:'centers',l:'📊 Centros'},{k:'relatorios',l:'📄 Relatórios'}].map(t=>(
-          <button key={t.k} onClick={()=>setTab(t.k)} className="px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer border"
+      <div className="flex gap-1.5 mb-3 overflow-x-auto" style={{scrollbarWidth:'none'}}>
+        {[{k:'bills',l:'🔴 A Pagar'},{k:'receber',l:'🟢 A Receber'},{k:'caixa',l:'📆 Caixa'},{k:'fixed',l:'🔁 Fixas'},{k:'centers',l:'📊 Centros'},{k:'relatorios',l:'📄 Relatórios'}].map(t=>(
+          <button key={t.k} onClick={()=>setTab(t.k)} className="px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer border whitespace-nowrap flex-shrink-0"
             style={{background:tab===t.k?'var(--cy)':'transparent',color:tab===t.k?'#000':'var(--t2)',borderColor:tab===t.k?'var(--cy)':'var(--bd)',fontFamily:'Sora,system-ui,sans-serif'}}>
             {t.l}
           </button>
         ))}
       </div>
+
+      {/* ───────── CONTAS A RECEBER ───────── */}
+      {tab==='receber' && (
+        <>
+          <div className="grid grid-cols-3 gap-1.5 mb-3">
+            {[
+              {label:'A Receber',value:`R$ ${recPending.toLocaleString('pt-BR',{minimumFractionDigits:2})}`,color:'var(--am)'},
+              {label:'Vencido',  value:`R$ ${recOverdue.toLocaleString('pt-BR',{minimumFractionDigits:2})}`,color:'var(--rd)'},
+              {label:'Recebido', value:`R$ ${recReceived.toLocaleString('pt-BR',{minimumFractionDigits:2})}`,color:'var(--gn)'},
+            ].map(k=>(
+              <div key={k.label} className="rounded-xl p-2.5 text-center relative overflow-hidden" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+                <div className="absolute top-0 inset-x-0 h-0.5" style={{background:k.color}}/>
+                <div className="text-sm font-bold" style={{color:k.color}}>{k.value}</div>
+                <div style={{fontSize:'8px',color:'var(--t3)',textTransform:'uppercase'}}>{k.label}</div>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end mb-2">
+            {can('admin')&&<Btn onClick={()=>{setEditRec({status:'pending',data_emissao:td()});setRecModal(true)}} size="sm" variant="primary">+ Nova a receber</Btn>}
+          </div>
+          {recs.length===0 ? <Empty icon="🟢" text="Nenhuma conta a receber. Clique em + Nova a receber." /> : (
+            <div className="flex flex-col gap-2">
+              {recs.map(r=>{
+                const venc = r.status==='pending' && r.due_date && r.due_date<today
+                return (
+                  <div key={r.id} className="rounded-xl p-3" style={{background:'var(--s1)',border:`1px solid ${venc?'rgba(239,68,68,.4)':'var(--bd)'}`}}>
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-bold">{r.cliente_nome||'—'}</div>
+                        <div className="text-xs" style={{color:'var(--t3)'}}>{r.descricao||r.numero_documento||'—'} · venc {r.due_date?fmtD(r.due_date):'—'}</div>
+                      </div>
+                      <div className="text-right" style={{flexShrink:0}}>
+                        <div className="text-sm font-bold" style={{color: r.status==='received'?'var(--gn)':(venc?'var(--rd)':'var(--am)')}}>R$ {(+r.valor).toLocaleString('pt-BR',{minimumFractionDigits:2})}</div>
+                        <div style={{fontSize:'9px',color:'var(--t3)'}}>{r.status==='received'?'✅ Recebido '+(r.data_recebimento?fmtD(r.data_recebimento):''):(venc?'🔴 Vencido':'⏳ A receber')}</div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-2 justify-end">
+                      {r.status!=='received' && can('admin') && <Btn onClick={()=>marcarRecebido(r.id)} size="sm" variant="primary">✓ Recebido</Btn>}
+                      {can('admin') && <Btn onClick={()=>{setEditRec(r);setRecModal(true)}} size="sm" variant="secondary">✏️</Btn>}
+                      {can('admin') && <button onClick={()=>del(r.id,'accounts_receivable')} className="text-xs px-2 py-1 rounded-lg cursor-pointer" style={{background:'transparent',color:'var(--rd)',border:'none'}}>🗑️</button>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          <Modal open={recModal} onClose={()=>setRecModal(false)} title={editRec.id?'Editar conta a receber':'Nova conta a receber'}
+            footer={<><Btn onClick={()=>setRecModal(false)} variant="secondary" size="md">Cancelar</Btn><Btn onClick={saveRec} variant="primary" size="md">Salvar</Btn></>}>
+            <Select label="Cliente" value={editRec.cliente_id||''} onChange={(v:string)=>setEditRec((e:any)=>({...e,cliente_id:v}))}
+              options={[{value:'',label:'Selecione...'}, ...clientes.map((c:any)=>({value:c.id,label:c.nome_fantasia||c.nome_razao}))]} />
+            <Input label="Descrição" value={editRec.descricao} onChange={(v:string)=>setEditRec((e:any)=>({...e,descricao:v}))} placeholder="Ex.: Venda NF 123" />
+            <div className="grid grid-cols-2 gap-x-3">
+              <Input label="Nº documento" value={editRec.numero_documento} onChange={(v:string)=>setEditRec((e:any)=>({...e,numero_documento:v}))} placeholder="NF-001" />
+              <Input label="Valor R$ *" value={editRec.valor} onChange={(v:string)=>setEditRec((e:any)=>({...e,valor:v}))} type="number" placeholder="0.00" />
+            </div>
+            <div className="grid grid-cols-2 gap-x-3">
+              <Input label="Emissão" value={editRec.data_emissao} onChange={(v:string)=>setEditRec((e:any)=>({...e,data_emissao:v}))} type="date" />
+              <Input label="Vencimento" value={editRec.due_date} onChange={(v:string)=>setEditRec((e:any)=>({...e,due_date:v}))} type="date" />
+            </div>
+            <Select label="Status" value={editRec.status||'pending'} onChange={(v:string)=>setEditRec((e:any)=>({...e,status:v}))}
+              options={[{value:'pending',label:'⏳ A receber'},{value:'received',label:'✅ Recebido'}]} />
+            {editRec.status==='received' && (
+              <div className="grid grid-cols-2 gap-x-3">
+                <Input label="Data recebimento" value={editRec.data_recebimento} onChange={(v:string)=>setEditRec((e:any)=>({...e,data_recebimento:v}))} type="date" />
+                <Select label="Forma" value={editRec.forma||''} onChange={(v:string)=>setEditRec((e:any)=>({...e,forma:v}))}
+                  options={[{value:'',label:'—'},{value:'Dinheiro',label:'Dinheiro'},{value:'PIX',label:'PIX'},{value:'Cartão',label:'Cartão'},{value:'Transferência',label:'Transferência'},{value:'Boleto',label:'Boleto'}]} />
+              </div>
+            )}
+          </Modal>
+        </>
+      )}
+
+      {/* ───────── FLUXO DE CAIXA ───────── */}
+      {tab==='caixa' && (() => {
+        const porDia: Record<string,{entrada:number;saida:number}> = {}
+        fluxo.forEach((f:any)=>{ const d=f.dia; if(!porDia[d]) porDia[d]={entrada:0,saida:0}; porDia[d][f.tipo as 'entrada'|'saida'] += (+f.valor||0) })
+        const dias = Object.keys(porDia).sort((a,b)=>b.localeCompare(a))
+        const totEnt = fluxo.filter((f:any)=>f.tipo==='entrada').reduce((s:number,f:any)=>s+(+f.valor||0),0)
+        const totSai = fluxo.filter((f:any)=>f.tipo==='saida').reduce((s:number,f:any)=>s+(+f.valor||0),0)
+        return (
+          <>
+            <div className="grid grid-cols-3 gap-1.5 mb-3">
+              {[
+                {label:'Entradas',value:`R$ ${totEnt.toLocaleString('pt-BR',{minimumFractionDigits:2})}`,color:'var(--gn)'},
+                {label:'Saídas',  value:`R$ ${totSai.toLocaleString('pt-BR',{minimumFractionDigits:2})}`,color:'var(--rd)'},
+                {label:'Saldo',   value:`R$ ${(totEnt-totSai).toLocaleString('pt-BR',{minimumFractionDigits:2})}`,color: totEnt-totSai>=0?'var(--gn)':'var(--rd)'},
+              ].map(k=>(
+                <div key={k.label} className="rounded-xl p-2.5 text-center relative overflow-hidden" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+                  <div className="absolute top-0 inset-x-0 h-0.5" style={{background:k.color}}/>
+                  <div className="text-sm font-bold" style={{color:k.color}}>{k.value}</div>
+                  <div style={{fontSize:'8px',color:'var(--t3)',textTransform:'uppercase'}}>{k.label}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{fontSize:'10px',color:'var(--t3)',marginBottom:'8px'}}>Entradas = contas a receber recebidas · Saídas = contas a pagar pagas.</div>
+            {dias.length===0 ? <Empty icon="📆" text="Sem movimento de caixa ainda." /> : (
+              <div className="rounded-xl overflow-hidden" style={{border:'1px solid var(--bd)'}}>
+                <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 90px 90px 90px',background:'var(--s2)',fontSize:'9px',fontWeight:700,color:'var(--t3)',textTransform:'uppercase'}}>
+                  <span>Dia</span><span style={{textAlign:'right'}}>Entrada</span><span style={{textAlign:'right'}}>Saída</span><span style={{textAlign:'right'}}>Saldo dia</span>
+                </div>
+                {dias.map(d=>{
+                  const ent=porDia[d].entrada, sai=porDia[d].saida
+                  return (
+                    <div key={d} className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 90px 90px 90px',background:'var(--s1)',borderTop:'1px solid var(--bd)',fontSize:'11px'}}>
+                      <span style={{fontWeight:700}}>{fmtD(d)}</span>
+                      <span style={{textAlign:'right',color:'var(--gn)'}}>{ent.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>
+                      <span style={{textAlign:'right',color:'var(--rd)'}}>{sai.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>
+                      <span style={{textAlign:'right',fontWeight:700,color: ent-sai>=0?'var(--gn)':'var(--rd)'}}>{(ent-sai).toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </>
+        )
+      })()}
 
       {tab==='fixed' && (
         <>
