@@ -245,7 +245,7 @@ export default function App() {
     {id:'machines' as Page,   label:'Máquinas',    icon:IC.mach},
     {id:'pm' as Page,         label:'MP',          icon:IC.pm},
     {id:'tasks' as Page,      label:'Tarefas',     icon:IC.task},
-    {id:'parts' as Page,      label:'Peças',       icon:IC.parts},
+    // {id:'parts' as Page,      label:'Peças',       icon:IC.parts},  // agora dentro de Estoque (sub-aba 🔧 Peças)
     {id:'cadastros' as Page,  label:'Cadastros',   icon:<span>👥</span>},
     {id:'downtime' as Page,   label:'Paradas',     icon:IC.down},
     {id:'finance' as Page,    label:'Financeiro',  icon:IC.fin},
