@@ -274,9 +274,11 @@ export default function SuperAdminPage({ profile }: Props) {
     if (!/^[a-z0-9._-]{3,}$/i.test(newUser.username)) { toast.error('Usuário inválido (mín. 3 caracteres, sem espaços)'); return }
     if (!newUser.password || newUser.password.length < 6) { toast.error('Senha deve ter ao menos 6 caracteres'); return }
     try {
+      const { data: sess } = await supabase.auth.getSession()
+      const token = sess.session?.access_token || ''
       const res = await fetch('/api/create-user', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           username: newUser.username,
           password: newUser.password,
