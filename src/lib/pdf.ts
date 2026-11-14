@@ -40,18 +40,49 @@ function logoFormat(dataUrl: string): 'PNG'|'JPEG' {
  * Não colide com o título/subtítulo (que ficam à esquerda).
  * Chame com `await` logo após criar o doc:  await addReportLogo(doc)
  */
+// mede a imagem (largura/altura) de forma confiável pelo navegador
+function medirImagem(dataUrl: string): Promise<{w:number;h:number}> {
+  return new Promise((resolve) => {
+    try {
+      const img = new Image()
+      img.onload = () => resolve({ w: img.naturalWidth || 200, h: img.naturalHeight || 100 })
+      img.onerror = () => resolve({ w: 200, h: 100 })
+      img.src = dataUrl
+    } catch { resolve({ w: 200, h: 100 }) }
+  })
+}
+
 export async function addReportLogo(doc: jsPDF, opts: { y?:number; maxW?:number; maxH?:number; margin?:number } = {}): Promise<void> {
   const logo = await loadCompanyLogo()
   if (!logo) return
   const y = opts.y ?? 6, maxH = opts.maxH ?? 16, maxW = opts.maxW ?? 40, margin = opts.margin ?? 10
+  const pageW = doc.internal.pageSize.getWidth()
+
+  // 1) tenta medir pela propriedade do jsPDF; se falhar, mede pelo navegador
+  let pw = 0, ph = 0
   try {
-    const pageW = doc.internal.pageSize.getWidth()
     const props = (doc as any).getImageProperties(logo)
-    const ratio = props.width / props.height
-    let h = maxH, w = h * ratio
-    if (w > maxW) { w = maxW; h = w / ratio }
+    pw = props?.width || 0; ph = props?.height || 0
+  } catch { /* segue para o fallback */ }
+  if (!pw || !ph) {
+    const m = await medirImagem(logo)
+    pw = m.w; ph = m.h
+  }
+
+  const ratio = (pw && ph) ? (pw / ph) : 2
+  let h = maxH, w = h * ratio
+  if (w > maxW) { w = maxW; h = w / ratio }
+
+  try {
     doc.addImage(logo, logoFormat(logo), pageW - margin - w, y, w, h)
-  } catch { /* ignora logo inválida */ }
+  } catch (e) {
+    // última tentativa: desenha com dimensões fixas
+    try {
+      doc.addImage(logo, logoFormat(logo), pageW - margin - maxW, y, maxW, maxH)
+    } catch (e2) {
+      if (typeof console !== 'undefined') console.error('Falha ao desenhar logo no PDF:', e2)
+    }
+  }
 }
 
 interface PDFOptions { title: string; company?: string; logo?: string; user?: string }
