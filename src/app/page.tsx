@@ -66,8 +66,10 @@ import ProductionPage  from '@/app/pages/ProductionPage'
 import GerencialPage   from '@/app/pages/GerencialPage'
 import SalesPage       from '@/app/pages/SalesPage'
 import EstoquePage     from '@/app/pages/EstoquePage'
+import TransportadoraPage from '@/app/pages/TransportadoraPage'
+import PDVPage         from '@/app/pages/PDVPage'
 
-type Page = 'dashboard'|'os'|'machines'|'pm'|'tasks'|'parts'|'suppliers'|'cadastros'|'fuel'|'production'|'gerencial'|'reports'|'users'|'settings'|'finance'|'qr'|'downtime'|'superadmin'|'chat'|'scheduling'|'documents'|'epi'|'oee'|'training'|'audit'|'energy'|'wood'|'sales'|'config'|'frete'|'estoque'
+type Page = 'dashboard'|'os'|'machines'|'pm'|'tasks'|'parts'|'suppliers'|'cadastros'|'fuel'|'production'|'gerencial'|'reports'|'users'|'settings'|'finance'|'qr'|'downtime'|'superadmin'|'chat'|'scheduling'|'documents'|'epi'|'oee'|'training'|'audit'|'energy'|'wood'|'sales'|'config'|'frete'|'estoque'|'transportadora'|'pdv'
 
 
 export default function App() {
@@ -263,6 +265,8 @@ export default function App() {
     {id:'gerencial' as Page,  label:'Gerencial',   icon:<span>📈</span>},
     {id:'sales' as Page,      label:'Vendas',      icon:<span>🛒</span>},
     {id:'estoque' as Page,    label:'Estoque',     icon:<span>📦</span>},
+    {id:'pdv' as Page,        label:'PDV',         icon:<span>🧾</span>},
+    {id:'transportadora' as Page, label:'Transportadora', icon:<span>🚚</span>},
     {id:'frete' as Page,      label:'Frete',       icon:<span>🚚</span>},
     {id:'users' as Page,      label:'Usuários',    icon:IC.users},
     {id:'superadmin' as Page, label:'Super Admin', icon:IC.sadm},
@@ -328,6 +332,8 @@ export default function App() {
     gerencial:   <GerencialPage   profile={profile} can={can} />,
     sales:       <SalesPage       profile={profile} can={can} />,
     estoque:     <EstoquePage     profile={profile} can={can} />,
+    pdv:         <PDVPage         profile={profile} can={can} />,
+    transportadora: <TransportadoraPage profile={profile} can={can} />,
     superadmin:  <SuperAdminPage profile={profile} />,
   }
 
