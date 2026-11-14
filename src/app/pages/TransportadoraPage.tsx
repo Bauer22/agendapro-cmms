@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Btn, Modal, Input, Select, Textarea, SH, Empty, Badge, KPI, useConfirm } from '@/components/ui'
+import { Btn, Modal, Input, Select, SelectComCadastro, Textarea, SH, Empty, Badge, KPI, useConfirm } from '@/components/ui'
 
 type Props = { profile?: any; can?: any }
 
@@ -240,8 +240,10 @@ export default function TransportadoraPage({ profile }: Props) {
       {/* ─── MODAL VIAGEM ─── */}
       <Modal open={viagemModal} onClose={() => setViagemModal(false)} title="Nova viagem"
         footer={<><Btn onClick={() => setViagemModal(false)}>Cancelar</Btn><Btn onClick={salvarViagem} variant="primary">Salvar</Btn></>}>
-        <Select label="Cliente *" value={viagem?.cliente_id || ''} onChange={(v: string) => setViagem({ ...viagem, cliente_id: v })}
-          options={[{ value: '', label: '— selecione —' }, ...clientes.map(c => ({ value: c.id, label: c.nome_razao }))]} />
+        <SelectComCadastro label="Cliente *" tipo="cliente" value={viagem?.cliente_id || ''}
+          onChange={(v: string) => setViagem({ ...viagem, cliente_id: v })}
+          options={clientes.map(c => ({ value: c.id, label: c.nome_razao }))}
+          companyId={cid} createdBy={profile?.display_name} onCreatedRefresh={load} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
           <Select label="Veículo" value={viagem?.veiculo_id || ''} onChange={(v: string) => setViagem({ ...viagem, veiculo_id: v })}
             options={[{ value: '', label: '— selecione —' }, ...veiculos.map(ve => ({ value: ve.id, label: `${ve.placa} (${ve.tipo || ''})` }))]} />
