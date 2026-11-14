@@ -15,9 +15,13 @@ let _logoCache: string | null | undefined = undefined  // undefined = não busca
 export async function loadCompanyLogo(): Promise<string | null> {
   if (_logoCache !== undefined) return _logoCache
   try {
+    // limit(1) em vez de maybeSingle(): maybeSingle() ERRA se houver linhas
+    // duplicadas da logo, deixando o PDF sem logo mesmo ela estando salva.
     const { data } = await supabase.from('system_config')
-      .select('valor_texto,valor').eq('categoria','empresa').eq('chave','logo_base64').maybeSingle()
-    const v: any = data ? (data.valor_texto ?? data.valor) : null
+      .select('valor_texto,valor').eq('categoria','empresa').eq('chave','logo_base64')
+      .order('atualizado_em', { ascending: false, nullsFirst: false }).limit(1)
+    const row: any = Array.isArray(data) ? data[0] : null
+    const v: any = row ? (row.valor_texto ?? row.valor) : null
     _logoCache = (typeof v === 'string' && v.startsWith('data:image')) ? v : null
   } catch { _logoCache = null }
   return _logoCache
