@@ -119,16 +119,29 @@ export default function ConfigPage({ profile }: { profile: UserProfile }) {
 
   async function salvarLogo(dataUrl: string|null) {
     setSavingLogo(true)
-    // upsert manual: tenta update; se não existir, insert
-    const { data: ex } = await supabase.from('system_config').select('id').eq('categoria','empresa').eq('chave','logo_base64').maybeSingle()
     let error:any = null
-    if (ex) {
-      const r = await supabase.from('system_config').update({ valor_texto: dataUrl, atualizado_em: new Date().toISOString(), atualizado_por: profile?.display_name||'' }).eq('id', ex.id)
+    // Busca TODAS as linhas dessa chave (pode haver duplicadas de SQL antigo)
+    const { data: existentes } = await supabase.from('system_config')
+      .select('id').eq('categoria','empresa').eq('chave','logo_base64')
+    const linhas = existentes || []
+
+    if (linhas.length > 0) {
+      // Atualiza a primeira e remove eventuais duplicadas
+      const [primeira, ...dupes] = linhas
+      const r = await supabase.from('system_config')
+        .update({ valor_texto: dataUrl, atualizado_em: new Date().toISOString(), atualizado_por: profile?.display_name||'' })
+        .eq('id', primeira.id)
       error = r.error
+      if (dupes.length > 0) {
+        await supabase.from('system_config').delete().in('id', dupes.map(d=>d.id))
+      }
     } else {
-      const r = await supabase.from('system_config').insert({ categoria:'empresa', chave:'logo_base64', valor: 0, valor_texto: dataUrl })
+      // Não existe: insere nova (sem forçar id — deixa o default gerar)
+      const r = await supabase.from('system_config')
+        .insert({ categoria:'empresa', chave:'logo_base64', valor: 0, valor_texto: dataUrl })
       error = r.error
     }
+
     setSavingLogo(false)
     if (error) { toast.error('Erro ao salvar logo: ' + error.message); return }
     setLogo(dataUrl); clearLogoCache()
