@@ -198,6 +198,8 @@ export default function MaintPage({ profile, can }: Props) {
               ['Data', fmtD(selected.date)],
               ['Duração', selected.duration?`${selected.duration}h`:null],
               ['Tipo', selected.type],
+              ['Hora-máquina', selected.hour_meter!=null?String(selected.hour_meter):null],
+              ['Próxima troca', selected.next_change!=null?String(selected.next_change):null],
               ['Abertura', fmtD(selected.date)],
               ['Fechamento', fmtD(selected.close_date)],
             ].filter(([,v])=>v).map(([k,v])=>(
@@ -222,6 +224,10 @@ export default function MaintPage({ profile, can }: Props) {
           <Input label="Data *" value={editing.date} onChange={(v:string)=>setEdit((e:any)=>({...e,date:v}))} type="date" />
           <Input label="Responsável *" value={editing.resp} onChange={(v:string)=>setEdit((e:any)=>({...e,resp:v}))} placeholder="Nome do técnico" />
           <Input label="Duração (h)" value={editing.duration} onChange={(v:string)=>setEdit((e:any)=>({...e,duration:parseFloat(v)||undefined}))} type="number" placeholder="0.5" />
+        </div>
+        <div className="grid grid-cols-2 gap-x-2">
+          <Input label="Hora-máquina" value={editing.hour_meter} onChange={(v:string)=>setEdit((e:any)=>({...e,hour_meter:v===''?undefined:(parseFloat(v)||0)}))} type="number" placeholder="Ex: 3256" />
+          <Input label="Próxima troca" value={editing.next_change} onChange={(v:string)=>setEdit((e:any)=>({...e,next_change:v===''?undefined:(parseFloat(v)||0)}))} type="number" placeholder="Ex: 4500" />
         </div>
         <Select label="Status" value={editing.status||'open'} onChange={(v:string)=>setEdit((e:any)=>({...e,status:v}))} options={STATUS_OPTS} />
         <Input label="Peças Utilizadas" value={editing.parts} onChange={(v:string)=>setEdit((e:any)=>({...e,parts:v}))} placeholder="Ex: Filtro AR-001..." />
