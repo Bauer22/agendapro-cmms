@@ -113,6 +113,18 @@ export default function FuelPage({ profile, can }: Props) {
         : await supabase.from('fuel_records').insert({...obj, company_id: profile?.company_id||null})
       error = res.error
 
+      // Atualiza o horímetro da MÁQUINA com a abastecida (p/ controle de próxima troca).
+      // Só sobe o current_hours se o horímetro informado for maior que o atual.
+      if (!error && editing.machine_id && obj.hour_meter != null) {
+        const atual = Number(ma?.current_hours) || 0
+        if (obj.hour_meter > atual) {
+          const { error: eHm } = await supabase.from('machines')
+            .update({ current_hours: obj.hour_meter })
+            .eq('id', editing.machine_id)
+          if (eHm) console.error('Falha ao atualizar horímetro da máquina:', eHm.message)
+        }
+      }
+
     } else if (tab === 'entradas') {
       if (!editing.liters || !editing.total_value) { toast.error('Informe litros e valor total'); setSaving(false); return }
       const lt = parseFloat(editing.liters), tv = parseFloat(editing.total_value)
