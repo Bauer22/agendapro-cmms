@@ -25,6 +25,7 @@ const ABAS_SISTEMA: {id:string;label:string;icon:string}[] = [
   {id:'dashboard', label:'Início',     icon:'🏠'},
   {id:'os',        label:'OS',         icon:'🔧'},
   {id:'machines',  label:'Máquinas',   icon:'⚙️'},
+  {id:'maint',     label:'Manutenção', icon:'🔧'},
   {id:'pm',        label:'MP',         icon:'✅'},
   {id:'tasks',     label:'Tarefas',    icon:'📋'},
   {id:'parts',     label:'Peças',      icon:'🔩'},
