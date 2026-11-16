@@ -201,9 +201,9 @@ export default function SalesPage({ profile, can }: Props) {
 
   async function loadExtrato() {
     const [s, e, l] = await Promise.all([
-      supabase.from('v_saldo_conta_corrente').select('*'),
+      supabase.from('v_saldo_unificado').select('*'),      // saldo compensado (vendas + frete)
       supabase.from('v_extrato_parceiro').select('*'),
-      supabase.from('v_extrato_lancamentos').select('*'),
+      supabase.from('v_extrato_unificado').select('*'),    // extrato linha a linha (vendas + frete)
     ])
     if (s.error) { toast.error('Execute o SQL da conta corrente unificada'); return }
     setSaldos(s.data || [])
