@@ -37,6 +37,7 @@ const IC = {
 import DashPage    from '@/app/pages/DashPage'
 import OSPage      from '@/app/pages/OSPage'
 import MachPage    from '@/app/pages/MachPage'
+import MaintPage   from '@/app/pages/MaintPage'
 import PMPage      from '@/app/pages/PMPage'
 import TasksPage   from '@/app/pages/TasksPage'
 import PartsPage   from '@/app/pages/PartsPage'
@@ -69,7 +70,7 @@ import EstoquePage     from '@/app/pages/EstoquePage'
 import TransportadoraPage from '@/app/pages/TransportadoraPage'
 import PDVPage         from '@/app/pages/PDVPage'
 
-type Page = 'dashboard'|'os'|'machines'|'pm'|'tasks'|'parts'|'suppliers'|'cadastros'|'fuel'|'production'|'gerencial'|'reports'|'users'|'settings'|'finance'|'qr'|'downtime'|'superadmin'|'chat'|'scheduling'|'documents'|'epi'|'oee'|'training'|'audit'|'energy'|'wood'|'sales'|'config'|'frete'|'estoque'|'transportadora'|'pdv'
+type Page = 'dashboard'|'os'|'machines'|'pm'|'tasks'|'parts'|'suppliers'|'cadastros'|'fuel'|'production'|'gerencial'|'reports'|'users'|'settings'|'finance'|'qr'|'downtime'|'superadmin'|'chat'|'scheduling'|'documents'|'epi'|'oee'|'training'|'audit'|'energy'|'wood'|'sales'|'config'|'frete'|'estoque'|'transportadora'|'pdv'|'maint'
 
 
 export default function App() {
@@ -243,6 +244,7 @@ export default function App() {
     {id:'dashboard' as Page,  label:'Início',      icon:IC.home},
     {id:'os' as Page,         label:'OS',          icon:IC.os},
     {id:'machines' as Page,   label:'Máquinas',    icon:IC.mach},
+    {id:'maint' as Page,      label:'Manutenção',  icon:IC.maint},
     {id:'pm' as Page,         label:'MP',          icon:IC.pm},
     {id:'tasks' as Page,      label:'Tarefas',     icon:IC.task},
     // {id:'parts' as Page,      label:'Peças',       icon:IC.parts},  // agora dentro de Estoque (sub-aba 🔧 Peças)
@@ -305,6 +307,7 @@ export default function App() {
     dashboard:   <DashPage    profile={profile} can={can} onNavigate={setPage} />,
     os:          <OSPage      profile={profile} can={can} />,
     machines:    <MachPage    profile={profile} can={can} />,
+    maint:       <MaintPage   profile={profile} can={can} />,
     pm:          <PMPage      profile={profile} can={can} />,
     tasks:       <TasksPage   profile={profile} can={can} />,
     parts:       <PartsPage   profile={profile} can={can} />,
