@@ -107,6 +107,52 @@ export default function MaintPage({ profile, can }: Props) {
   const open     = recs.filter(r=>r.status==='open'||!r.status).length
   const progress = recs.filter(r=>r.status==='progress').length
   const done     = recs.filter(r=>r.status==='done').length
+  const custoTotal = filtered.reduce((s,r)=> s + (Number(r.cost)||0), 0)
+
+  async function gerarRelatorioPDF() {
+    try {
+      const { default: jsPDF } = await import('jspdf')
+      const { default: autoTable } = await import('jspdf-autotable')
+      const { addReportLogo } = await import('@/lib/pdf')
+      const doc = new jsPDF()
+      await addReportLogo(doc)
+      doc.setFontSize(15); doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0)
+      doc.text('Relatório de Manutenção', 12, 18)
+      doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80)
+      let sub = 'Emitido em ' + new Date().toLocaleString('pt-BR')
+      if (fMach) { const mm = machines.find(m=>m.id===fMach); if (mm) sub += ' · Máquina: ' + mm.name }
+      doc.text(sub, 12, 24)
+
+      const rows = [...filtered].sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))).map(r=>{
+        const mm = machines.find(m=>m.id===r.machine_id)
+        return [
+          r.date ? new Date(r.date+'T00:00:00').toLocaleDateString('pt-BR') : '-',
+          mm?.name || r.machine_name || '-',
+          r.type || '-',
+          r.description || r.parts || '-',
+          r.hour_meter!=null ? String(r.hour_meter) : '-',
+          r.next_change!=null ? String(r.next_change) : '-',
+          r.cost!=null ? ('R$ '+Number(r.cost).toLocaleString('pt-BR',{minimumFractionDigits:2})) : '-',
+        ]
+      })
+      autoTable(doc, {
+        startY: 30,
+        head: [['Data','Máquina','Tipo','Serviço','Hora-máq','Próx. troca','Custo']],
+        body: rows,
+        theme:'grid',
+        headStyles:{fillColor:[249,115,22]},
+        bodyStyles:{textColor:[20,20,20]},
+        styles:{fontSize:8},
+        columnStyles:{4:{halign:'right'},5:{halign:'right'},6:{halign:'right'}}
+      })
+      let y = (doc as any).lastAutoTable.finalY + 8
+      doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0)
+      doc.text('Total de registros: ' + filtered.length, 12, y); y += 6
+      doc.text('Custo total (informativo): R$ ' + custoTotal.toLocaleString('pt-BR',{minimumFractionDigits:2}), 12, y)
+      doc.save(`manutencao_${td()}.pdf`)
+      toast.success('Relatório gerado ✅')
+    } catch(e:any){ toast.error('Erro ao gerar PDF: '+e.message) }
+  }
 
   return (
     <div>
@@ -144,7 +190,13 @@ export default function MaintPage({ profile, can }: Props) {
         </select>
       </div>
 
-      <SH label={`Registros (${filtered.length})`} action={can('maint')&&<Btn onClick={()=>openNew()} size="sm" variant="primary">+ Registrar</Btn>} />
+      <SH label={`Registros (${filtered.length})`} action={
+        <div className="flex gap-1 items-center flex-wrap">
+          {custoTotal>0 && <span style={{fontSize:'10px',color:'var(--t3)',marginRight:'4px'}}>💰 Custo: <b style={{color:'var(--am)'}}>R$ {custoTotal.toLocaleString('pt-BR',{minimumFractionDigits:2})}</b></span>}
+          <Btn onClick={gerarRelatorioPDF} size="sm" variant="secondary">🖨️ Relatório</Btn>
+          {can('maint')&&<Btn onClick={()=>openNew()} size="sm" variant="primary">+ Registrar</Btn>}
+        </div>
+      } />
 
       {loading ? <div className="text-center py-8" style={{color:'var(--t3)'}}>Carregando...</div> : filtered.length===0 ? <Empty icon="🔧" text="Nenhum registro" /> : (
         <div className="flex flex-col gap-2">
@@ -200,6 +252,7 @@ export default function MaintPage({ profile, can }: Props) {
               ['Tipo', selected.type],
               ['Hora-máquina', selected.hour_meter!=null?String(selected.hour_meter):null],
               ['Próxima troca', selected.next_change!=null?String(selected.next_change):null],
+              ['Custo', selected.cost!=null?('R$ '+Number(selected.cost).toLocaleString('pt-BR',{minimumFractionDigits:2})):null],
               ['Abertura', fmtD(selected.date)],
               ['Fechamento', fmtD(selected.close_date)],
             ].filter(([,v])=>v).map(([k,v])=>(
@@ -247,6 +300,10 @@ export default function MaintPage({ profile, can }: Props) {
             </div>
           )
         })()}
+        <Input label="Custo (R$) — informativo" value={editing.cost} onChange={(v:string)=>setEdit((e:any)=>({...e,cost:v===''?undefined:(parseFloat(v)||0)}))} type="number" placeholder="Ex: 850.00" />
+        <div style={{fontSize:'9px',color:'var(--t3)',marginTop:'-4px',marginBottom:'6px'}}>
+          ℹ️ Este custo é só para controle/relatório da manutenção. Não entra no custo de produção do Gerencial.
+        </div>
         <Select label="Status" value={editing.status||'open'} onChange={(v:string)=>setEdit((e:any)=>({...e,status:v}))} options={STATUS_OPTS} />
         <Input label="Peças Utilizadas" value={editing.parts} onChange={(v:string)=>setEdit((e:any)=>({...e,parts:v}))} placeholder="Ex: Filtro AR-001..." />
         <Textarea label="Descrição do serviço" value={editing.description} onChange={(v:string)=>setEdit((e:any)=>({...e,description:v}))} rows={3} placeholder="Descreva o serviço..." />
