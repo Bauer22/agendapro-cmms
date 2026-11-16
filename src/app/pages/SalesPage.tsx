@@ -600,37 +600,24 @@ export default function SalesPage({ profile, can }: Props) {
         y = (doc as any).lastAutoTable.finalY + 8;
       }
       var totalRecVen = (rRecVen && rRecVen.data ? rRecVen.data : []).reduce(function(s,p){return s + (Number(p.value)||0);}, 0);
-      y = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 8 : y + 8;
-      if (y > 250) { doc.addPage(); y = 20; }
-      doc.setFontSize(11); doc.setTextColor(0,0,0); doc.setFont('helvetica','bold');
-      doc.text('Resumo de Conta Corrente', 12, y);
-      y += 6;
-      doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(20,20,20);
-      // SOMA SIMPLES: saldo = total vendido - total recebido (valores lançados)
-      var totalVendidoVen = Number(repVal) || 0;
-      var saldoReceberVen = totalVendidoVen - totalRecVen;
-      doc.text('Total Vendido: ' + money(totalVendidoVen), 12, y); y += 5;
-      doc.text('Total Recebido: ' + money(totalRecVen), 12, y); y += 5;
-      doc.setFont('helvetica','bold');
-      if (saldoReceberVen >= 0) {
-        doc.text('SALDO A RECEBER: ' + money(saldoReceberVen), 12, y); y += 6;
-      } else {
-        doc.text('SALDO A PAGAR: ' + money(Math.abs(saldoReceberVen)), 12, y); y += 6;
-      }
 
       // ── CONTA CORRENTE POR PARCEIRO (saldo unificado: vendas + frete) ──
+      // Começa SEMPRE a partir do fim da última tabela (evita sobreposição).
+      y = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 10 : y + 10;
+      if (y > 240) { doc.addPage(); y = 20; }
       try {
+        // se o relatório foi filtrado por um cliente, mostra só esse parceiro
+        var nomeFiltro = nomeCliVen ? String(nomeCliVen).trim().toUpperCase() : null;
         var saldosCC = (saldos || []).filter(function(s:any){
+          if (nomeFiltro && String(s.parceiro||'').toUpperCase() !== nomeFiltro) return false;
           return (Number(s.total_vendas)||0) !== 0
               || (Number(s.total_compras)||0) !== 0
               || (Number(s.frete_devido)||0) !== 0
               || (Number(s.saldo_final)||0) !== 0;
         });
+        doc.setFontSize(11); doc.setTextColor(0,0,0); doc.setFont('helvetica','bold');
+        doc.text('Conta Corrente por Parceiro (vendas + frete)', 12, y);
         if (saldosCC.length > 0) {
-          y = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 10 : y + 10;
-          if (y > 240) { doc.addPage(); y = 20; }
-          doc.setFontSize(11); doc.setTextColor(0,0,0); doc.setFont('helvetica','bold');
-          doc.text('Conta Corrente por Parceiro (vendas + frete)', 12, y);
           var ccRows = saldosCC.map(function(s:any){
             return [
               s.parceiro || '-',
@@ -652,6 +639,9 @@ export default function SalesPage({ profile, can }: Props) {
             columnStyles:{1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'}}
           });
           y = (doc as any).lastAutoTable.finalY + 8;
+        } else {
+          doc.setFontSize(9); doc.setFont('helvetica','normal');
+          doc.text('Sem movimentacao de conta corrente.', 12, y + 6); y += 12;
         }
       } catch(e){ /* conta corrente é opcional no relatório */ }
 
