@@ -34,7 +34,7 @@ export default function MaintPage({ profile, can }: Props) {
   async function load() {
     const [r, m] = await Promise.all([
       supabase.from('maintenance').select('*').order('date',{ascending:false}).order('created_at',{ascending:false}).limit(100),
-      supabase.from('machines').select('id,name,icon,code'),
+      supabase.from('machines').select('id,name,icon,code,current_hours'),
     ])
     setRecs(r.data||[]); setMach(m.data||[]); setLoad(false)
   }
@@ -217,7 +217,12 @@ export default function MaintPage({ profile, can }: Props) {
       {/* Edit/Create Modal */}
       <Modal open={modal} onClose={()=>setModal(false)} title={editing.id?'Editar Manutenção':'Registrar Manutenção'}
         footer={<><Btn onClick={()=>setModal(false)} variant="secondary" size="md">Cancelar</Btn><Btn onClick={save} variant="primary" size="md" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Btn></>}>
-        <Select label="Máquina *" value={editing.machine_id} onChange={(v:string)=>setEdit((e:any)=>({...e,machine_id:v}))}
+        <Select label="Máquina *" value={editing.machine_id} onChange={(v:string)=>{
+            const mm = machines.find(x=>x.id===v)
+            // pré-preenche a hora-máquina com o horímetro atual (vindo das abastecidas),
+            // só se o usuário ainda não digitou nada
+            setEdit((e:any)=>({...e, machine_id:v, hour_meter: (e.hour_meter==null||e.hour_meter==='') ? (mm?.current_hours ?? e.hour_meter) : e.hour_meter}))
+          }}
           options={[{value:'',label:'Selecione...'}, ...machines.map(m=>({value:m.id,label:`${m.icon||'⚙️'} ${m.name}`}))]} />
         <div className="grid grid-cols-2 gap-x-2">
           <Select label="Tipo *" value={editing.type} onChange={(v:string)=>setEdit((e:any)=>({...e,type:v}))} options={TYPES} />
@@ -229,6 +234,19 @@ export default function MaintPage({ profile, can }: Props) {
           <Input label="Hora-máquina" value={editing.hour_meter} onChange={(v:string)=>setEdit((e:any)=>({...e,hour_meter:v===''?undefined:(parseFloat(v)||0)}))} type="number" placeholder="Ex: 3256" />
           <Input label="Próxima troca" value={editing.next_change} onChange={(v:string)=>setEdit((e:any)=>({...e,next_change:v===''?undefined:(parseFloat(v)||0)}))} type="number" placeholder="Ex: 4500" />
         </div>
+        {(() => {
+          const mm = machines.find((x:any)=>x.id===editing.machine_id)
+          const atual = Number(mm?.current_hours)||0
+          const prox = Number(editing.next_change)||0
+          if (!mm || prox<=0) return null
+          const falta = prox - atual
+          return (
+            <div style={{fontSize:'10px',color: falta<=0?'var(--rd)':falta<=50?'var(--am)':'var(--t3)',marginTop:'-4px',marginBottom:'6px'}}>
+              ⛽ Horímetro atual da máquina (abastecidas): <b>{atual}</b> ·
+              {falta>0 ? ` faltam ${falta.toFixed(0)}h para a próxima troca` : ` troca VENCIDA há ${Math.abs(falta).toFixed(0)}h`}
+            </div>
+          )
+        })()}
         <Select label="Status" value={editing.status||'open'} onChange={(v:string)=>setEdit((e:any)=>({...e,status:v}))} options={STATUS_OPTS} />
         <Input label="Peças Utilizadas" value={editing.parts} onChange={(v:string)=>setEdit((e:any)=>({...e,parts:v}))} placeholder="Ex: Filtro AR-001..." />
         <Textarea label="Descrição do serviço" value={editing.description} onChange={(v:string)=>setEdit((e:any)=>({...e,description:v}))} rows={3} placeholder="Descreva o serviço..." />
