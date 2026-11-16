@@ -118,6 +118,7 @@ export default function WoodPage({ profile, can }: Props) {
       observation:   editing.observation || null,
       created_by:    profile?.display_name || profile?.email || '',
       created_by_id: profile?.id || null,
+      company_id:    profile?.company_id || null,
     }
 
     const { error } = editing.id
