@@ -31,11 +31,12 @@ export default function FretePage({ profile }: { profile: UserProfile }) {
 
   async function load() {
     setLoading(true)
-    const [s, p, fv, fm] = await Promise.all([
+    const [s, p, fv, fm, fa] = await Promise.all([
       supabase.from('v_saldo_frete').select('*'),
       supabase.from('frete_pagamentos').select('*').order('payment_date', { ascending: false }),
       supabase.from('sales_orders').select('sale_date,transportadora_nome,weight_tons,frete_ton,frete_total,client_name,product_name').eq('status','active').gt('frete_total',0),
       supabase.from('wood_entries').select('data_entrada,transportadora_nome,weight_tons,frete_ton,frete_total,supplier_name').gt('frete_total',0),
+      supabase.from('fretes_avulsos').select('data,transportadora_nome,weight_tons,frete_total,descricao').gt('frete_total',0),
     ])
     if (s.error) { toast.error('Execute o SQL da conta corrente de frete'); setLoading(false); return }
     setSaldos(s.data || [])
@@ -44,6 +45,7 @@ export default function FretePage({ profile }: { profile: UserProfile }) {
     const cargas = [
       ...(fv.data||[]).map((x:any)=>({ data:x.sale_date, transportadora:(x.transportadora_nome||'').toUpperCase().trim(), tons:x.weight_tons, frete_ton:x.frete_ton, total:x.frete_total, ref:'Venda '+(x.client_name||''), cliente:(x.client_name||'').toUpperCase().trim(), origem:'venda' })),
       ...(fm.data||[]).map((x:any)=>({ data:x.data_entrada, transportadora:(x.transportadora_nome||'').toUpperCase().trim(), tons:x.weight_tons, frete_ton:x.frete_ton, total:x.frete_total, ref:'Madeira '+(x.supplier_name||''), cliente:(x.supplier_name||'').toUpperCase().trim(), origem:'madeira' })),
+      ...(fa.data||[]).map((x:any)=>({ data:x.data, transportadora:(x.transportadora_nome||'').toUpperCase().trim(), tons:x.weight_tons||0, frete_ton:0, total:x.frete_total, ref:'Avulso'+(x.descricao?' · '+x.descricao:''), cliente:'', origem:'avulso' })),
     ]
     setFretes(cargas)
     setLoading(false)
@@ -109,7 +111,7 @@ export default function FretePage({ profile }: { profile: UserProfile }) {
   const histTransp = detalhe ? (() => {
     const nome = (detalhe.transportadora||'').toUpperCase().trim()
     const cargasT = fretes.filter((f:any)=>f.transportadora===nome)
-    const debitos = cargasT.map((f:any)=>({data:f.data, tipo:'Frete', valor:f.total, desc:`${f.ref} · ${f.tons}t × ${money(f.frete_ton)}`}))
+    const debitos = cargasT.map((f:any)=>({data:f.data, tipo:'Frete', valor:f.total, desc: f.origem==='avulso' ? f.ref : `${f.ref} · ${f.tons}t × ${money(f.frete_ton)}`}))
     // guia do freteiro: uma linha por carga, só p/ transportadoras listadas
     const guias = TRANSP_COM_GUIA.includes(nome)
       ? cargasT.map((f:any)=>({data:f.data, tipo:'Frete', valor:GUIA_FRETEIRO, desc:`Guia do freteiro · ${f.ref}`}))
