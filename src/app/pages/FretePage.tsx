@@ -18,6 +18,8 @@ export default function FretePage({ profile }: { profile: UserProfile }) {
   const [busca, setBusca]         = useState('')
   const [payModal, setPayModal]   = useState(false)
   const [pay, setPay]             = useState<any>({})
+  const [avulsoModal, setAvulsoModal] = useState(false)
+  const [avulso, setAvulso]       = useState<any>({})
   const [detalhe, setDetalhe]     = useState<any>(null)   // transportadora selecionada para ver histórico
   const [aba, setAba]             = useState<'conta'|'relatorio'>('conta')
   const [relTransp, setRelTransp] = useState('')
@@ -66,6 +68,31 @@ export default function FretePage({ profile }: { profile: UserProfile }) {
       if (error) throw error
       toast.success('Pagamento de frete lançado ✅')
       setPayModal(false); setPay({}); load()
+    } catch(e:any) { toast.error('Erro: ' + e.message) }
+    finally { setSaving(false) }
+  }
+
+  async function salvarAvulso() {
+    if (saving) return
+    const nome = (avulso.transportadora||'').trim()
+    if (!nome) { toast.error('Informe a transportadora'); return }
+    if (!avulso.frete_total || parseFloat(String(avulso.frete_total)) <= 0) { toast.error('Informe o valor do frete'); return }
+    if (!avulso.data) { toast.error('Informe a data'); return }
+    setSaving(true)
+    try {
+      const { error } = await supabase.from('fretes_avulsos').insert({
+        transportadora_nome: nome.toUpperCase(),
+        data: avulso.data,
+        descricao: avulso.descricao || null,
+        weight_tons: avulso.weight_tons ? parseFloat(String(avulso.weight_tons)) : 0,
+        frete_total: parseFloat(String(avulso.frete_total)),
+        observacao: avulso.observacao || null,
+        company_id: profile?.company_id || null,
+        created_by: profile?.display_name || profile?.email || '',
+      })
+      if (error) throw error
+      toast.success('Frete avulso lançado ✅')
+      setAvulsoModal(false); setAvulso({}); load()
     } catch(e:any) { toast.error('Erro: ' + e.message) }
     finally { setSaving(false) }
   }
@@ -159,7 +186,12 @@ export default function FretePage({ profile }: { profile: UserProfile }) {
     <div>
       <div className="flex items-center justify-between mb-3">
         <SH>🚚 Frete</SH>
-        {aba==='conta' && <Btn onClick={()=>{setPay({payment_date:new Date().toISOString().slice(0,10)});setPayModal(true)}} variant="primary" size="sm">+ Lançar Pagamento</Btn>}
+        {aba==='conta' && (
+          <div className="flex gap-1.5">
+            <Btn onClick={()=>{setAvulso({data:new Date().toISOString().slice(0,10)});setAvulsoModal(true)}} variant="secondary" size="sm">+ Frete Avulso</Btn>
+            <Btn onClick={()=>{setPay({payment_date:new Date().toISOString().slice(0,10)});setPayModal(true)}} variant="primary" size="sm">+ Lançar Pagamento</Btn>
+          </div>
+        )}
       </div>
 
       {/* Abas */}
@@ -289,6 +321,27 @@ export default function FretePage({ profile }: { profile: UserProfile }) {
         <Select label="Forma" value={pay.method||''} onChange={(v:string)=>setPay((e:any)=>({...e,method:v}))}
           options={[{value:'',label:'—'},{value:'PIX',label:'PIX'},{value:'Transferência',label:'Transferência'},{value:'Dinheiro',label:'Dinheiro'},{value:'Boleto',label:'Boleto'},{value:'Cheque',label:'Cheque'}]} />
         <Input label="Observações" value={pay.notes||''} onChange={(v:string)=>setPay((e:any)=>({...e,notes:v}))} placeholder="Opcional" />
+      </Modal>
+
+      {/* Modal lançar frete avulso (frete devido sem venda/madeira) */}
+      <Modal open={avulsoModal} onClose={()=>setAvulsoModal(false)} title="🚚 Lançar Frete Avulso"
+        footer={<><Btn onClick={()=>setAvulsoModal(false)}>Cancelar</Btn><Btn onClick={salvarAvulso} variant="primary" size="md" disabled={saving}>{saving?'Salvando...':'Salvar'}</Btn></>}>
+        <div style={{fontSize:'10px',color:'var(--t3)',marginBottom:'8px'}}>
+          Frete que vocês devem a uma transportadora, sem ligação com venda ou entrada de madeira. Entra no "frete devido" dela.
+        </div>
+        {saldos.length>0 && (
+          <Select label="Transportadora existente" value={avulso.transportadora||''} onChange={(v:string)=>setAvulso((e:any)=>({...e,transportadora:v}))}
+            options={[{value:'',label:'— ou digite uma nova abaixo —'}, ...saldos.map((s:any)=>({value:s.transportadora,label:s.transportadora}))]} />
+        )}
+        <Input label="Transportadora *" value={avulso.transportadora||''} onChange={(v:string)=>setAvulso((e:any)=>({...e,transportadora:v}))}
+          placeholder="Nome da transportadora" />
+        <div className="grid grid-cols-2 gap-x-3">
+          <Input label="Valor do frete R$ *" type="number" value={avulso.frete_total||''} onChange={(v:string)=>setAvulso((e:any)=>({...e,frete_total:v}))} placeholder="0.00" />
+          <Input label="Data *" type="date" value={avulso.data||''} onChange={(v:string)=>setAvulso((e:any)=>({...e,data:v}))} />
+        </div>
+        <Input label="Toneladas (opcional)" type="number" value={avulso.weight_tons||''} onChange={(v:string)=>setAvulso((e:any)=>({...e,weight_tons:v}))} placeholder="0" />
+        <Input label="Descrição" value={avulso.descricao||''} onChange={(v:string)=>setAvulso((e:any)=>({...e,descricao:v}))} placeholder="Ex: transporte extra, carga pontual..." />
+        <Input label="Observações" value={avulso.observacao||''} onChange={(v:string)=>setAvulso((e:any)=>({...e,observacao:v}))} placeholder="Opcional" />
       </Modal>
 
       {/* Modal histórico da transportadora */}
