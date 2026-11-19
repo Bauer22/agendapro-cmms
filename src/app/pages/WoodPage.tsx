@@ -260,10 +260,11 @@ export default function WoodPage({ profile, can }: Props) {
       const { default: jsPDF } = await import('jspdf')
       const { default: autoTable } = await import('jspdf-autotable')
       const doc = new jsPDF()
-      const { addReportLogo } = await import('@/lib/pdf'); await addReportLogo(doc)
+      const { addLogoOnBand } = await import('@/lib/pdf')
       const money = (v:number) => (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})
 
       doc.setFillColor(6,13,26); doc.rect(0,0,210,26,'F')
+      await addLogoOnBand(doc, 26)
       doc.setTextColor(249,115,22); doc.setFontSize(14); doc.setFont('helvetica','bold')
       doc.text('Industrial8 — Relatório de Entrada de Madeira', 12, 11)
       doc.setTextColor(148,163,184); doc.setFontSize(7); doc.setFont('helvetica','normal')
