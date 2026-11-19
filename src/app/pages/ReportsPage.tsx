@@ -95,13 +95,14 @@ export default function ReportsPage({ profile, can }: Props) {
       const { default: autoTable } = await import('jspdf-autotable')
 
       const doc = new jsPDF()
-      const { addReportLogo } = await import('@/lib/pdf'); await addReportLogo(doc)
+      const { addLogoOnBand } = await import('@/lib/pdf')
       const now = new Date()
       const dateStr = `${now.getDate().toString().padStart(2,'0')}/${(now.getMonth()+1).toString().padStart(2,'0')}/${now.getFullYear()}`
 
       // Header
       doc.setFillColor(6,13,26)
       doc.rect(0,0,210,25,'F')
+      await addLogoOnBand(doc, 25)
       doc.setTextColor(0,212,255); doc.setFontSize(14); doc.setFont('helvetica','bold')
       doc.text('Industrial8', 12, 11)
       doc.setTextColor(148,163,184); doc.setFontSize(8); doc.setFont('helvetica','normal')
