@@ -35,11 +35,35 @@ export default function MaintPage({ profile, can }: Props) {
   useEffect(() => { load() }, [])
 
   async function load() {
-    const [r, m] = await Promise.all([
-      supabase.from('maintenance').select('*').order('date',{ascending:false}).order('created_at',{ascending:false}).limit(100),
+    const [r, m, os] = await Promise.all([
+      supabase.from('maintenance').select('*').order('date',{ascending:false}).order('created_at',{ascending:false}).limit(300),
       supabase.from('machines').select('id,name,icon,code,current_hours'),
+      supabase.from('work_orders').select('*').order('open_date',{ascending:false}).limit(300),
     ])
-    setRecs(r.data||[]); setMach(m.data||[]); setLoad(false)
+    // normaliza as OS para o mesmo formato dos registros de manutenção
+    const statusOS = (s:string) => s==='done'||s==='closed'||s==='finalizado' ? 'done'
+                      : s==='progress'||s==='in_progress'||s==='andamento' ? 'progress' : 'open'
+    const osMapeadas = (os.data||[]).map((o:any)=>({
+      id: 'os_'+o.id,
+      origem: 'OS',
+      os_number: o.number,
+      machine_id: o.machine_id,
+      machine_name: o.machine_name,
+      type: o.type || 'OS',
+      date: o.open_date,
+      close_date: o.close_date,
+      resp: o.resp_name,
+      status: statusOS(o.status),
+      result: o.status==='done'||o.status==='closed' ? 'ok' : 'monitoring',
+      description: (o.title ? o.title+(o.description?' · '+o.description:'') : o.description) || '',
+      cost: o.cost ?? null,
+      duration: o.duration ?? null,
+      hour_meter: null, next_change: null,
+    }))
+    const manut = (r.data||[]).map((x:any)=>({...x, origem: x.origem||'Manutenção'}))
+    // junta e ordena por data desc
+    const todos = [...manut, ...osMapeadas].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))
+    setRecs(todos); setMach(m.data||[]); setLoad(false)
   }
 
   function openNew(machineId?: string) {
@@ -48,10 +72,14 @@ export default function MaintPage({ profile, can }: Props) {
   }
 
   function openEdit(rec: any) {
+    if (rec && typeof rec.id==='string' && rec.id.startsWith('os_')) { toast.error('Esta é uma OS. Edite pela aba OS.'); return }
     setEdit({...rec}); setViewModal(false); setModal(true)
   }
 
+  function isOS(rec:any){ return rec && typeof rec.id==='string' && rec.id.startsWith('os_') }
+
   async function finalize(rec: any) {
+    if (isOS(rec)) { toast.error('Esta é uma OS. Finalize pela aba OS.'); return }
     if (!await confirm(`Finalizar este registro de manutenção?`)) return
     const { error } = await supabase.from('maintenance').update({ status:'done', close_date: td() }).eq('id', rec.id)
     if (error) { toast.error('Erro: '+error.message); return }
@@ -90,6 +118,7 @@ export default function MaintPage({ profile, can }: Props) {
   }
 
   async function del(id: string) {
+    if (typeof id==='string' && id.startsWith('os_')) { toast.error('Esta é uma OS. Exclua pela aba OS.'); return }
     if (!await confirm('Excluir este registro?')) return
     const { error: eDel } = await supabase.from('maintenance').delete().eq('id', id)
     if (eDel) { toast.error('Erro: '+eDel.message); return }
@@ -148,23 +177,23 @@ export default function MaintPage({ profile, can }: Props) {
         const mm = machines.find(m=>m.id===r.machine_id)
         return [
           r.date ? new Date(r.date+'T00:00:00').toLocaleDateString('pt-BR') : '-',
+          r.origem==='OS' ? ('OS'+(r.os_number?' #'+r.os_number:'')) : 'Manut.',
           mm?.name || r.machine_name || '-',
           r.type || '-',
           r.description || r.parts || '-',
           r.hour_meter!=null ? String(r.hour_meter) : '-',
-          r.next_change!=null ? String(r.next_change) : '-',
           r.cost!=null ? ('R$ '+Number(r.cost).toLocaleString('pt-BR',{minimumFractionDigits:2})) : '-',
         ]
       })
       autoTable(doc, {
         startY: 30,
-        head: [['Data','Máquina','Tipo','Serviço','Hora-máq','Próx. troca','Custo']],
+        head: [['Data','Origem','Máquina','Tipo','Serviço','Hora-máq','Custo']],
         body: rows,
         theme:'grid',
         headStyles:{fillColor:[249,115,22]},
         bodyStyles:{textColor:[20,20,20]},
         styles:{fontSize:8},
-        columnStyles:{4:{halign:'right'},5:{halign:'right'},6:{halign:'right'}}
+        columnStyles:{5:{halign:'right'},6:{halign:'right'}}
       })
       let y = (doc as any).lastAutoTable.finalY + 8
       doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0)
@@ -290,6 +319,7 @@ export default function MaintPage({ profile, can }: Props) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <div className="text-xs font-semibold">{mach?.name||'Máquina'} — {r.type}</div>
+                      {r.origem==='OS' && <Badge color="gray">OS{r.os_number?' #'+r.os_number:''}</Badge>}
                       <Badge color={isDone?'green':isProgress?'amber':'blue'}>{isDone?'Finalizado':isProgress?'Andamento':'Em aberto'}</Badge>
                     </div>
                     <div className="text-xs mt-0.5" style={{color:'var(--t2)'}}>👤 {r.resp} · 📅 {fmtD(r.date)}{r.duration&&` · ⏱️ ${r.duration}h`}</div>
