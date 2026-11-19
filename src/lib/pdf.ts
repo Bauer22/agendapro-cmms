@@ -87,7 +87,7 @@ export async function addReportLogo(doc: jsPDF, opts: { y?:number; maxW?:number;
 
 interface PDFOptions { title: string; company?: string; logo?: string; user?: string }
 
-function header(doc: jsPDF, opts: PDFOptions) {
+async function header(doc: jsPDF, opts: PDFOptions) {
   const { title, company = 'Industrial8', user = '' } = opts
   doc.setFillColor(6,13,26)
   doc.rect(0,0,210,28,'F')
@@ -97,7 +97,23 @@ function header(doc: jsPDF, opts: PDFOptions) {
   doc.setTextColor(148,163,184); doc.setFontSize(9); doc.setFont('helvetica','normal')
   doc.text(company, 12, 19)
   const now = new Date()
-  doc.text(`${fmtDT(now.toISOString())} · ${user}`, 210-12, 19, {align:'right'})
+  // data/usuário recuam para a esquerda se houver logo no canto
+  const logo = await loadCompanyLogo()
+  doc.text(`${fmtDT(now.toISOString())} · ${user}`, logo ? 210-44 : 210-12, 24, {align:'right'})
+  // logo da empresa dentro da faixa escura, no canto direito
+  if (logo) {
+    try {
+      let pw = 0, ph = 0
+      try { const pr = (doc as any).getImageProperties(logo); pw = pr?.width||0; ph = pr?.height||0 } catch {}
+      if (!pw || !ph) { const m = await medirImagem(logo); pw = m.w; ph = m.h }
+      const ratio = (pw && ph) ? pw/ph : 2
+      const maxH = 18, maxW = 36
+      let h = maxH, w = h*ratio
+      if (w > maxW) { w = maxW; h = w/ratio }
+      const yImg = (28 - h)/2  // centraliza verticalmente na faixa de 28mm
+      doc.addImage(logo, logoFormat(logo), 210 - 12 - w, yImg, w, h)
+    } catch (e) { if (typeof console!=='undefined') console.error('Falha logo header PDF:', e) }
+  }
   doc.setTextColor(30,58,95); doc.setFontSize(13); doc.setFont('helvetica','bold')
   doc.setTextColor(226,232,240)
   doc.text(title, 12, 40)
@@ -107,7 +123,7 @@ function header(doc: jsPDF, opts: PDFOptions) {
 
 export async function pdfOS(orders: any[], opts: PDFOptions) {
   const doc = new jsPDF()
-  header(doc, opts)
+  await header(doc, opts)
   autoTable(doc, {
     startY: 48,
     head: [['Nº OS','Título','Máquina','Responsável','Status','Abertura','Prazo','Prioridade']],
@@ -121,7 +137,7 @@ export async function pdfOS(orders: any[], opts: PDFOptions) {
 
 export async function pdfMaint(recs: any[], opts: PDFOptions) {
   const doc = new jsPDF()
-  header(doc, opts)
+  await header(doc, opts)
   autoTable(doc, {
     startY: 48,
     head: [['Data','Máquina','Tipo','Responsável','Duração','Resultado']],
@@ -135,7 +151,7 @@ export async function pdfMaint(recs: any[], opts: PDFOptions) {
 
 export async function pdfParts(parts: any[], opts: PDFOptions) {
   const doc = new jsPDF()
-  header(doc, opts)
+  await header(doc, opts)
   autoTable(doc, {
     startY: 48,
     head: [['Código','Nome','Categoria','Estoque','Mínimo','Valor Unit.','Localização']],
