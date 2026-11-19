@@ -85,6 +85,36 @@ export async function addReportLogo(doc: jsPDF, opts: { y?:number; maxW?:number;
   }
 }
 
+/**
+ * Desenha a logo DENTRO da faixa escura do topo (canto direito), com um
+ * retângulo branco atrás para garantir contraste. Chame DEPOIS de desenhar
+ * a faixa (doc.rect(...)), senão a faixa cobre a logo.
+ *   bandH = altura da faixa escura (default 25mm)
+ */
+export async function addLogoOnBand(doc: jsPDF, bandH = 25): Promise<void> {
+  const logo = await loadCompanyLogo()
+  if (!logo) return
+  const pageW = doc.internal.pageSize.getWidth()
+  let pw = 0, ph = 0
+  try { const pr = (doc as any).getImageProperties(logo); pw = pr?.width||0; ph = pr?.height||0 } catch {}
+  if (!pw || !ph) { const m = await medirImagem(logo); pw = m.w; ph = m.h }
+  const ratio = (pw && ph) ? pw/ph : 2
+  const maxH = bandH - 8, maxW = 40
+  let h = maxH, w = h*ratio
+  if (w > maxW) { w = maxW; h = w/ratio }
+  const x = pageW - 12 - w
+  const yImg = (bandH - h)/2
+  try {
+    // quadrinho branco atrás (contraste sobre faixa escura)
+    doc.setFillColor(255,255,255)
+    ;(doc as any).roundedRect(x-2, yImg-2, w+4, h+4, 1.5, 1.5, 'F')
+    doc.addImage(logo, logoFormat(logo), x, yImg, w, h)
+  } catch (e) {
+    try { doc.addImage(logo, logoFormat(logo), x, yImg, w, h) }
+    catch (e2) { if (typeof console!=='undefined') console.error('Falha logo faixa PDF:', e2) }
+  }
+}
+
 interface PDFOptions { title: string; company?: string; logo?: string; user?: string }
 
 async function header(doc: jsPDF, opts: PDFOptions) {
