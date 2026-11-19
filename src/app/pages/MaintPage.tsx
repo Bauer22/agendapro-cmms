@@ -27,6 +27,9 @@ export default function MaintPage({ profile, can }: Props) {
   const [fMach, setFMach]   = useState('')
   const [fType, setFType]   = useState('')
   const [fStatus, setFStatus] = useState('')
+  const [fFrom, setFFrom]   = useState('')
+  const [fTo, setFTo]       = useState('')
+  const [aba, setAba]       = useState<'registros'|'dashboard'>('registros')
   const { confirm, dialog } = useConfirm()
 
   useEffect(() => { load() }, [])
@@ -97,17 +100,34 @@ export default function MaintPage({ profile, can }: Props) {
     if (fMach && r.machine_id!==fMach) return false
     if (fType && r.type!==fType) return false
     if (fStatus && r.status!==fStatus) return false
+    if (fFrom && String(r.date||'') < fFrom) return false
+    if (fTo && String(r.date||'') > fTo) return false
     const q = buscaMaint.trim().toLowerCase()
     if (!q) return true
     const campos = [r.machine_name, r.type, r.resp, r.result, r.status, r.date, r.duration, r.description].map(x => (x===null||x===undefined)?'':String(x).toLowerCase())
     return campos.some(c => c.includes(q))
   })
 
-  // Stats
-  const open     = recs.filter(r=>r.status==='open'||!r.status).length
-  const progress = recs.filter(r=>r.status==='progress').length
-  const done     = recs.filter(r=>r.status==='done').length
+  // Stats (respeitam os filtros aplicados)
+  const open     = filtered.filter(r=>r.status==='open'||!r.status).length
+  const progress = filtered.filter(r=>r.status==='progress').length
+  const done     = filtered.filter(r=>r.status==='done').length
   const custoTotal = filtered.reduce((s,r)=> s + (Number(r.cost)||0), 0)
+
+  // ── Agregações para o DASHBOARD (sobre os registros filtrados) ──
+  function agrupar(keyFn:(r:any)=>string, valFn:(r:any)=>number) {
+    const m = new Map<string,number>()
+    filtered.forEach(r=>{ const k=keyFn(r); if(!k) return; m.set(k,(m.get(k)||0)+valFn(r)) })
+    return Array.from(m.entries()).sort((a,b)=>b[1]-a[1])
+  }
+  const porMaquina = agrupar(r=>{const mm=machines.find(x=>x.id===r.machine_id);return mm?.name||r.machine_name||'—'}, ()=>1)
+  const porTipo    = agrupar(r=>r.type||'—', ()=>1)
+  const custoPorMaquina = agrupar(r=>{const mm=machines.find(x=>x.id===r.machine_id);return mm?.name||r.machine_name||'—'}, r=>Number(r.cost)||0).filter(x=>x[1]>0)
+  const porMes = (()=>{
+    const m = new Map<string,number>()
+    filtered.forEach(r=>{ const d=String(r.date||''); if(d.length<7) return; const k=d.slice(0,7); m.set(k,(m.get(k)||0)+1) })
+    return Array.from(m.entries()).sort((a,b)=>a[0].localeCompare(b[0])).slice(-12)
+  })()
 
   async function gerarRelatorioPDF() {
     try {
@@ -121,6 +141,7 @@ export default function MaintPage({ profile, can }: Props) {
       doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80)
       let sub = 'Emitido em ' + new Date().toLocaleString('pt-BR')
       if (fMach) { const mm = machines.find(m=>m.id===fMach); if (mm) sub += ' · Máquina: ' + mm.name }
+      if (fFrom || fTo) sub += ' · Período: ' + (fFrom?fFrom.split('-').reverse().join('/'):'início') + ' a ' + (fTo?fTo.split('-').reverse().join('/'):'hoje')
       doc.text(sub, 12, 24)
 
       const rows = [...filtered].sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))).map(r=>{
@@ -148,7 +169,36 @@ export default function MaintPage({ profile, can }: Props) {
       let y = (doc as any).lastAutoTable.finalY + 8
       doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0)
       doc.text('Total de registros: ' + filtered.length, 12, y); y += 6
-      doc.text('Custo total (informativo): R$ ' + custoTotal.toLocaleString('pt-BR',{minimumFractionDigits:2}), 12, y)
+      doc.text('Custo total (informativo): R$ ' + custoTotal.toLocaleString('pt-BR',{minimumFractionDigits:2}), 12, y); y += 10
+
+      // ── Resumo por máquina ──
+      if (porMaquina.length > 0) {
+        if (y > 230) { doc.addPage(); y = 20 }
+        doc.setFontSize(11); doc.text('Resumo por Máquina', 12, y)
+        autoTable(doc, {
+          startY: y+3,
+          head: [['Máquina','Manutenções','Custo']],
+          body: porMaquina.map(([nome,qtd])=>{
+            const c = custoPorMaquina.find(x=>x[0]===nome)
+            return [nome, String(qtd), c?('R$ '+c[1].toLocaleString('pt-BR',{minimumFractionDigits:2})):'-']
+          }),
+          theme:'grid', headStyles:{fillColor:[249,115,22]}, styles:{fontSize:8},
+          columnStyles:{1:{halign:'right'},2:{halign:'right'}}
+        })
+        y = (doc as any).lastAutoTable.finalY + 8
+      }
+      // ── Resumo por tipo ──
+      if (porTipo.length > 0) {
+        if (y > 240) { doc.addPage(); y = 20 }
+        doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.text('Resumo por Tipo', 12, y)
+        autoTable(doc, {
+          startY: y+3,
+          head: [['Tipo','Quantidade']],
+          body: porTipo.map(([tipo,qtd])=>[tipo, String(qtd)]),
+          theme:'grid', headStyles:{fillColor:[249,115,22]}, styles:{fontSize:8},
+          columnStyles:{1:{halign:'right'}}
+        })
+      }
       doc.save(`manutencao_${td()}.pdf`)
       toast.success('Relatório gerado ✅')
     } catch(e:any){ toast.error('Erro ao gerar PDF: '+e.message) }
@@ -173,12 +223,16 @@ export default function MaintPage({ profile, can }: Props) {
         ))}
       </div>
 
-      {/* Busca */}
-      <input value={buscaMaint} onChange={e=>setBuscaMaint(e.target.value)}
-        placeholder="🔍 Buscar por máquina, tipo, responsável, resultado, data..."
-        className="w-full rounded-xl px-3 py-2 text-xs outline-none mb-2"
-        style={{background:'var(--s1)',border:'1px solid var(--bd)',color:'var(--t1)',fontFamily:'Sora,system-ui,sans-serif'}} />
-      {/* Filters */}
+      {/* Abas */}
+      <div className="flex gap-1.5 mb-3">
+        {[{k:'registros',l:'📋 Registros'},{k:'dashboard',l:'📊 Dashboard'}].map(t=>(
+          <button key={t.k} onClick={()=>setAba(t.k as any)}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+            style={{background: aba===t.k?'var(--cy)':'var(--s1)', color: aba===t.k?'#061018':'var(--t2)', border:'1px solid var(--bd)'}}>{t.l}</button>
+        ))}
+      </div>
+
+      {/* Filtros (valem para as duas abas) */}
       <div className="grid grid-cols-2 gap-2 mb-2">
         <select value={fMach} onChange={e=>setFMach(e.target.value)} className="rounded-xl px-3 py-2 text-xs outline-none" style={{background:'var(--s1)',border:'1px solid var(--bd)',color:'var(--t1)',fontFamily:'Sora,system-ui,sans-serif',WebkitAppearance:'none'}}>
           <option value="">Todas as máquinas</option>
@@ -189,6 +243,27 @@ export default function MaintPage({ profile, can }: Props) {
           {STATUS_OPTS.map(s=><option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
       </div>
+      <div className="grid grid-cols-2 gap-2 mb-2">
+        <div>
+          <label style={{fontSize:'8px',color:'var(--t3)',textTransform:'uppercase',fontWeight:700}}>De</label>
+          <input type="date" value={fFrom} onChange={e=>setFFrom(e.target.value)} className="w-full rounded-xl px-3 py-2 text-xs outline-none" style={{background:'var(--s1)',border:'1px solid var(--bd)',color:'var(--t1)'}} />
+        </div>
+        <div>
+          <label style={{fontSize:'8px',color:'var(--t3)',textTransform:'uppercase',fontWeight:700}}>Até</label>
+          <input type="date" value={fTo} onChange={e=>setFTo(e.target.value)} className="w-full rounded-xl px-3 py-2 text-xs outline-none" style={{background:'var(--s1)',border:'1px solid var(--bd)',color:'var(--t1)'}} />
+        </div>
+      </div>
+      {(fFrom||fTo||fMach||fStatus) && (
+        <button onClick={()=>{setFFrom('');setFTo('');setFMach('');setFStatus('')}} style={{fontSize:'10px',color:'var(--cy)',marginBottom:'8px'}}>✕ limpar filtros</button>
+      )}
+
+      {/* Busca (só na aba registros) */}
+      {aba==='registros' && (
+      <input value={buscaMaint} onChange={e=>setBuscaMaint(e.target.value)}
+        placeholder="🔍 Buscar por máquina, tipo, responsável, resultado, data..."
+        className="w-full rounded-xl px-3 py-2 text-xs outline-none mb-2"
+        style={{background:'var(--s1)',border:'1px solid var(--bd)',color:'var(--t1)',fontFamily:'Sora,system-ui,sans-serif'}} />
+      )}
 
       <SH label={`Registros (${filtered.length})`} action={
         <div className="flex gap-1 items-center flex-wrap">
@@ -198,7 +273,10 @@ export default function MaintPage({ profile, can }: Props) {
         </div>
       } />
 
-      {loading ? <div className="text-center py-8" style={{color:'var(--t3)'}}>Carregando...</div> : filtered.length===0 ? <Empty icon="🔧" text="Nenhum registro" /> : (
+      {aba==='dashboard' ? (
+        <MaintDashboard filtered={filtered} porMes={porMes} porMaquina={porMaquina} porTipo={porTipo} custoPorMaquina={custoPorMaquina} custoTotal={custoTotal} open={open} progress={progress} done={done} />
+      ) : (
+      loading ? <div className="text-center py-8" style={{color:'var(--t3)'}}>Carregando...</div> : filtered.length===0 ? <Empty icon="🔧" text="Nenhum registro" /> : (
         <div className="flex flex-col gap-2">
           {filtered.map(r => {
             const mach = machines.find(m=>m.id===r.machine_id)
@@ -225,7 +303,7 @@ export default function MaintPage({ profile, can }: Props) {
             )
           })}
         </div>
-      )}
+      ))}
 
       {/* View Modal */}
       {selected && (
@@ -310,6 +388,106 @@ export default function MaintPage({ profile, can }: Props) {
         <Select label="Situação após" value={editing.result} onChange={(v:string)=>setEdit((e:any)=>({...e,result:v}))} options={RESULTS} />
         {editing.status==='done'&&<Input label="Data Fechamento" value={editing.close_date} onChange={(v:string)=>setEdit((e:any)=>({...e,close_date:v}))} type="date" />}
       </Modal>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DASHBOARD DE MANUTENÇÃO (gráficos SVG, sem dependência externa)
+// ═══════════════════════════════════════════════════════════════
+function MaintDashboard({ filtered, porMes, porMaquina, porTipo, custoPorMaquina, custoTotal, open, progress, done }: any) {
+  const money = (v:number)=> 'R$ '+(Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2})
+  const mesLabel = (ym:string)=>{ const [a,m]=ym.split('-'); return ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][(+m)-1]+'/'+a.slice(2) }
+
+  if (filtered.length===0) return <Empty icon="📊" text="Sem dados no período/filtro selecionado" />
+
+  // Barras horizontais reutilizáveis
+  const Barras = ({dados, fmt, cor}:{dados:[string,number][], fmt?:(n:number)=>string, cor:string}) => {
+    const max = Math.max(...dados.map(d=>d[1]), 1)
+    return (
+      <div className="flex flex-col gap-1.5">
+        {dados.map(([nome,val])=>(
+          <div key={nome}>
+            <div className="flex justify-between" style={{fontSize:'10px',color:'var(--t2)',marginBottom:'2px'}}>
+              <span className="truncate" style={{maxWidth:'70%'}}>{nome}</span>
+              <b style={{color:'var(--t1)'}}>{fmt?fmt(val):val}</b>
+            </div>
+            <div style={{height:'7px',background:'var(--bd)',borderRadius:'4px',overflow:'hidden'}}>
+              <div style={{width:`${(val/max)*100}%`,height:'100%',background:cor,borderRadius:'4px'}} />
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  const Card = ({titulo, children}:{titulo:string, children:any}) => (
+    <div className="rounded-xl p-3 mb-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+      <div style={{fontSize:'11px',fontWeight:700,color:'var(--cy)',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:'10px'}}>{titulo}</div>
+      {children}
+    </div>
+  )
+
+  // gráfico de linha (manutenções por mês)
+  const maxMes = Math.max(...porMes.map((d:any)=>d[1]), 1)
+  const W=300, H=90, pad=4
+  const pts = porMes.map((d:any,i:number)=>{
+    const x = pad + (porMes.length<=1?W/2:(i/(porMes.length-1))*(W-pad*2))
+    const y = H-pad - (d[1]/maxMes)*(H-pad*2)
+    return `${x},${y}`
+  }).join(' ')
+
+  return (
+    <div>
+      {/* KPIs */}
+      <div className="grid grid-cols-2 gap-1.5 mb-3">
+        <div className="rounded-xl p-2.5 text-center" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+          <div className="font-bebas text-2xl" style={{color:'var(--cy)'}}>{filtered.length}</div>
+          <div style={{fontSize:'8px',color:'var(--t3)',textTransform:'uppercase'}}>Manutenções</div>
+        </div>
+        <div className="rounded-xl p-2.5 text-center" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+          <div className="font-bebas text-2xl" style={{color:'var(--am)'}}>{money(custoTotal)}</div>
+          <div style={{fontSize:'8px',color:'var(--t3)',textTransform:'uppercase'}}>Custo total</div>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-1.5 mb-3">
+        {[{l:'Em aberto',v:open,c:'var(--cy)'},{l:'Andamento',v:progress,c:'var(--am)'},{l:'Finalizadas',v:done,c:'var(--gn)'}].map(k=>(
+          <div key={k.l} className="rounded-xl p-2 text-center" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+            <div className="font-bebas text-xl" style={{color:k.c}}>{k.v}</div>
+            <div style={{fontSize:'7px',color:'var(--t3)',textTransform:'uppercase'}}>{k.l}</div>
+          </div>
+        ))}
+      </div>
+
+      {porMes.length>0 && (
+        <Card titulo="📈 Manutenções por mês">
+          <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="90" preserveAspectRatio="none">
+            <polyline points={pts} fill="none" stroke="var(--cy)" strokeWidth="2" />
+            {porMes.map((d:any,i:number)=>{
+              const x = pad + (porMes.length<=1?W/2:(i/(porMes.length-1))*(W-pad*2))
+              const y = H-pad - (d[1]/maxMes)*(H-pad*2)
+              return <circle key={i} cx={x} cy={y} r="2.5" fill="var(--cy)" />
+            })}
+          </svg>
+          <div className="flex justify-between" style={{fontSize:'8px',color:'var(--t3)',marginTop:'2px'}}>
+            {porMes.map((d:any)=><span key={d[0]}>{mesLabel(d[0])}</span>)}
+          </div>
+        </Card>
+      )}
+
+      <Card titulo="🔧 Manutenções por máquina">
+        <Barras dados={porMaquina.slice(0,10)} cor="var(--cy)" />
+      </Card>
+
+      <Card titulo="🏷️ Manutenções por tipo">
+        <Barras dados={porTipo} cor="var(--am)" />
+      </Card>
+
+      {custoPorMaquina.length>0 && (
+        <Card titulo="💰 Custo por máquina">
+          <Barras dados={custoPorMaquina.slice(0,10)} fmt={money} cor="var(--gn)" />
+        </Card>
+      )}
     </div>
   )
 }
