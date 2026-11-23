@@ -139,6 +139,38 @@ export default function PMPage({ profile, can }: Props) {
       doc.setFontSize(8); doc.setTextColor(60,60,60); doc.setFont('helvetica','normal')
       doc.text('Legenda:  ✓ = OK    ✗ = Não conforme    — = Não aplicável', 12, y); y += 10
       doc.text('Responsável: ____________________________        Assinatura: ____________________________        Data: ____/____/______', 12, y)
+
+      // ── 2ª PÁGINA: Registro de ocorrências / problemas ──
+      doc.addPage()
+      doc.setFillColor(6,13,26); doc.rect(0,0,pageW,24,'F')
+      await addLogoOnBand(doc, 24)
+      doc.setTextColor(249,115,22); doc.setFontSize(14); doc.setFont('helvetica','bold')
+      doc.text('Registro de Ocorrências', 12, 11)
+      doc.setTextColor(226,232,240); doc.setFontSize(10); doc.setFont('helvetica','normal')
+      doc.text(`Máquina: ${mach.name}  ·  Período: ${dias} dias  ·  Mês: ____/______`, 12, 18)
+
+      // linhas em branco para preencher à mão (uma por possível ocorrência)
+      const linhasOcorrencia = Array.from({length: 18}, ()=>['','','','',''])
+      autoTable(doc, {
+        startY: 28,
+        head: [['Data','Relato do problema','Responsável','Data resolução','Observação']],
+        body: linhasOcorrencia,
+        theme:'grid',
+        headStyles:{fillColor:[249,115,22],fontSize:8,halign:'center'},
+        bodyStyles:{fontSize:8,minCellHeight:9,textColor:[20,20,20]},
+        columnStyles:{
+          0:{cellWidth: 24, halign:'center'},
+          1:{cellWidth: pageW-24-24-30-30-24},
+          2:{cellWidth: 30},
+          3:{cellWidth: 24, halign:'center'},
+          4:{cellWidth: 30},
+        },
+        styles:{lineColor:[180,180,180],lineWidth:0.1},
+      })
+      let y2 = (doc as any).lastAutoTable.finalY + 10
+      doc.setFontSize(8); doc.setTextColor(60,60,60)
+      doc.text('Responsável pelo período: ____________________________        Assinatura: ____________________________        Data: ____/____/______', 12, y2)
+
       doc.save(`checklist_${(mach.name||'maquina').replace(/\s+/g,'_')}_${dias}dias.pdf`)
       toast.success('Folha gerada ✅')
     } catch(e:any){ toast.error('Erro ao gerar PDF: '+e.message) }
