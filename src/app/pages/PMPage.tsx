@@ -45,6 +45,10 @@ export default function PMPage({ profile, can }: Props) {
   const [fMach, setFMach]       = useState('')
   const [fPeriod, setFPeriod]   = useState('')
   const [fStatus, setFStatus]   = useState('')
+  // Checklist por máquina
+  const [chkItens, setChkItens] = useState<any[]>([])
+  const [chkMachine, setChkMachine] = useState('')
+  const [novoItem, setNovoItem] = useState('')
   const { confirm, dialog }     = useConfirm()
 
   useEffect(() => { load() }, [tab])
@@ -67,11 +71,77 @@ export default function PMPage({ profile, can }: Props) {
     if (tab==='pm') {
       const { data } = await supabase.from('pm_reports').select('*').order('date',{ascending:false}).limit(100)
       setRecs(data||[])
+    } else if (tab==='checklist') {
+      const { data } = await supabase.from('checklist_itens').select('*').eq('ativo',true).order('machine_id').order('ordem')
+      setChkItens(data||[])
     } else {
       const { data } = await supabase.from('repair_orders').select('*').order('created_at',{ascending:false}).limit(100)
       setRepairs(data||[])
     }
     setLoad(false)
+  }
+
+  // ── CHECKLIST: adicionar/remover item ──
+  async function addChkItem() {
+    if (!chkMachine) { toast.error('Selecione a máquina'); return }
+    if (!novoItem.trim()) { toast.error('Digite o item'); return }
+    const ordem = chkItens.filter(i=>i.machine_id===chkMachine).length
+    const { error } = await supabase.from('checklist_itens').insert({
+      machine_id: chkMachine, item: novoItem.trim(), ordem,
+      company_id: profile?.company_id||null, created_by: profile?.display_name||'',
+    })
+    if (error) { toast.error('Erro: '+error.message); return }
+    setNovoItem(''); load()
+  }
+  async function delChkItem(id:string) {
+    if (!await confirm('Remover este item do checklist?')) return
+    const { error } = await supabase.from('checklist_itens').update({ativo:false}).eq('id', id)
+    if (error) { toast.error('Erro: '+error.message); return }
+    load()
+  }
+
+  // ── CHECKLIST: imprimir folha (15 ou 30 dias) ──
+  async function imprimirChecklist(machineId:string, dias:number) {
+    const mach = machines.find(m=>m.id===machineId)
+    const itens = chkItens.filter(i=>i.machine_id===machineId).sort((a,b)=>(a.ordem||0)-(b.ordem||0))
+    if (!mach) { toast.error('Selecione a máquina'); return }
+    if (itens.length===0) { toast.error('Cadastre itens de checklist para esta máquina'); return }
+    try {
+      const { default: jsPDF } = await import('jspdf')
+      const { default: autoTable } = await import('jspdf-autotable')
+      const { addLogoOnBand } = await import('@/lib/pdf')
+      // paisagem p/ caber os dias
+      const doc = new jsPDF({ orientation:'landscape' })
+      const pageW = doc.internal.pageSize.getWidth()
+      doc.setFillColor(6,13,26); doc.rect(0,0,pageW,24,'F')
+      await addLogoOnBand(doc, 24)
+      doc.setTextColor(249,115,22); doc.setFontSize(14); doc.setFont('helvetica','bold')
+      doc.text('Checklist de Manutenção Preventiva', 12, 11)
+      doc.setTextColor(226,232,240); doc.setFontSize(10); doc.setFont('helvetica','normal')
+      doc.text(`Máquina: ${mach.name}  ·  Período: ${dias} dias  ·  Mês: ____/______`, 12, 18)
+
+      // cabeçalho: Item + dias (1..dias) + Obs
+      const head = ['Item de verificação', ...Array.from({length:dias},(_,i)=>String(i+1)), 'Obs.']
+      const body = itens.map((it:any)=>[it.item, ...Array.from({length:dias},()=>''), ''])
+      // larguras: item fixo, dias estreitos, obs largo
+      const colStyles:any = { 0:{cellWidth: dias>15?42:55, halign:'left'}, [dias+1]:{cellWidth: dias>15?20:34} }
+      autoTable(doc, {
+        startY: 28,
+        head: [head],
+        body,
+        theme:'grid',
+        headStyles:{fillColor:[249,115,22],fontSize:7,halign:'center',valign:'middle'},
+        bodyStyles:{fontSize:7,minCellHeight:7,textColor:[20,20,20]},
+        columnStyles: colStyles,
+        styles:{lineColor:[180,180,180],lineWidth:0.1},
+      })
+      let y = (doc as any).lastAutoTable.finalY + 8
+      doc.setFontSize(8); doc.setTextColor(60,60,60); doc.setFont('helvetica','normal')
+      doc.text('Legenda:  ✓ = OK    ✗ = Não conforme    — = Não aplicável', 12, y); y += 10
+      doc.text('Responsável: ____________________________        Assinatura: ____________________________        Data: ____/____/______', 12, y)
+      doc.save(`checklist_${(mach.name||'maquina').replace(/\s+/g,'_')}_${dias}dias.pdf`)
+      toast.success('Folha gerada ✅')
+    } catch(e:any){ toast.error('Erro ao gerar PDF: '+e.message) }
   }
 
   function openNew() {
@@ -265,6 +335,7 @@ export default function PMPage({ profile, can }: Props) {
       <div className="flex gap-1.5 mb-3">
         {[
           {k:'pm',     l:`📝 Preventivas`},
+          {k:'checklist', l:`📋 Checklist`},
           {k:'repair', l:`🔩 Consertos${repOpen>0?` (${repOpen})`:''}` },
         ].map(t=>(
           <button key={t.k} onClick={()=>setTab(t.k)} className="flex-1 py-1.5 rounded-xl text-xs font-semibold cursor-pointer border"
@@ -369,6 +440,62 @@ export default function PMPage({ profile, can }: Props) {
       )}
 
       {/* ── REPAIR TAB ── */}
+      {tab==='checklist' && (
+        <div>
+          <div style={{fontSize:'11px',color:'var(--t3)',marginBottom:'10px'}}>
+            Cadastre os itens que o operador verifica em cada máquina e imprima a folha (15 ou 30 dias) para preenchimento manual.
+          </div>
+          {/* seletor de máquina */}
+          <Select label="Máquina" value={chkMachine} onChange={(v:string)=>setChkMachine(v)}
+            options={[{value:'',label:'Selecione a máquina...'}, ...machines.map(m=>({value:m.id,label:`${m.icon||'⚙️'} ${m.name}`}))]} />
+
+          {chkMachine && (()=>{
+            const itens = chkItens.filter(i=>i.machine_id===chkMachine).sort((a,b)=>(a.ordem||0)-(b.ordem||0))
+            const mach = machines.find(m=>m.id===chkMachine)
+            return (
+              <div className="mt-3">
+                {/* adicionar item */}
+                {can('pm') && (
+                  <div className="flex gap-2 mb-3">
+                    <input value={novoItem} onChange={e=>setNovoItem(e.target.value)}
+                      onKeyDown={e=>{if(e.key==='Enter')addChkItem()}}
+                      placeholder="Novo item de verificação (ex.: Nível de óleo hidráulico)"
+                      className="flex-1 rounded-xl px-3 py-2 text-xs outline-none"
+                      style={{background:'var(--s1)',border:'1px solid var(--bd)',color:'var(--t1)'}} />
+                    <Btn onClick={addChkItem} size="sm" variant="primary">+ Add</Btn>
+                  </div>
+                )}
+
+                {/* lista de itens */}
+                {itens.length===0 ? <Empty icon="📋" text="Nenhum item cadastrado para esta máquina" /> : (
+                  <div className="flex flex-col gap-1.5 mb-4">
+                    {itens.map((it:any,idx:number)=>(
+                      <div key={it.id} className="flex items-center gap-2 p-2.5 rounded-xl" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+                        <span style={{fontSize:'10px',color:'var(--t3)',width:'18px'}}>{idx+1}.</span>
+                        <span className="flex-1 text-xs" style={{color:'var(--t1)'}}>{it.item}</span>
+                        {can('pm') && <button onClick={()=>delChkItem(it.id)} style={{color:'var(--rd)',fontSize:'14px'}}>✕</button>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* botões de impressão */}
+                {itens.length>0 && (
+                  <div className="rounded-xl p-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+                    <div style={{fontSize:'11px',fontWeight:700,color:'var(--cy)',marginBottom:'8px'}}>🖨️ Imprimir folha de {mach?.name}</div>
+                    <div className="flex gap-2 flex-wrap">
+                      <Btn onClick={()=>imprimirChecklist(chkMachine,15)} variant="secondary" size="sm">📄 Folha 15 dias</Btn>
+                      <Btn onClick={()=>imprimirChecklist(chkMachine,30)} variant="secondary" size="sm">📄 Folha 1 mês (30 dias)</Btn>
+                    </div>
+                    <div style={{fontSize:'9px',color:'var(--t3)',marginTop:'6px'}}>A folha sai com os itens nas linhas, um quadradinho para cada dia, coluna de observação e campo de assinatura.</div>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+        </div>
+      )}
+
       {tab==='repair' && (
         <>
           <div className="grid grid-cols-2 gap-1.5 mb-3">
