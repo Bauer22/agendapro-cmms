@@ -40,6 +40,8 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
   const [saving, setSaving] = useState(false)
   const [modal, setModal] = useState(false)
   const [novo, setNovo] = useState<any>({ categoria:'capa' })
+  // grade de várias linhas (cada linha = 1 pacote)
+  const [linhas, setLinhas] = useState<any[]>([])
   const { confirm, dialog } = useConfirm()
 
   useEffect(() => { loadMeta() }, [])
@@ -80,52 +82,62 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
     toast.success('Cabeçalho do dia salvo ✅')
   }
 
+  // linha vazia da grade (dimensões em branco; categoria vem do botão)
+  const linhaVazia = ()=>({ espessura:'', comprimento:'', largura:'', folhas:'', altura:'' })
+
   function abrirNovo(cat:string) {
-    setNovo({ categoria:cat, tipoId:'', folhas:'', altura:'', larguraManual:'', comprimentoManual:'', espessuraManual:'' })
+    setNovo({ categoria:cat })
+    setLinhas([ linhaVazia() ])
     setModal(true)
   }
 
-  const tipo = tipos.find(t => t.id === novo.tipoId)
-  // dimensões: se tem tipo selecionado usa dele; senão usa os campos manuais
-  const dLarg = tipo ? +tipo.largura : parseFloat(novo.larguraManual)||0
-  const dComp = tipo ? +tipo.comprimento : parseFloat(novo.comprimentoManual)||0
-  const dEsp  = tipo ? +(tipo.espessura||0) : parseFloat(novo.espessuraManual)||0
-  const previa = calcVol(novo.categoria, dLarg, dComp, dEsp, parseFloat(novo.folhas)||0, parseFloat(novo.altura)||0)
+  // volume de uma linha da grade conforme a categoria
+  function volLinha(cat:string, l:any) {
+    const larg = parseFloat(l.largura)||0, comp = parseFloat(l.comprimento)||0
+    if (usaFolhas(cat)) return (parseFloat(l.folhas)||0) * larg * comp * (parseFloat(l.espessura)||0)
+    return (parseFloat(l.altura)||0) * larg * comp
+  }
+  const totalGrade = linhas.reduce((s,l)=> s + volLinha(novo.categoria, l), 0)
+
+  const setLin = (i:number, campo:string, v:string)=> setLinhas(p=>p.map((l,idx)=> idx===i?{...l,[campo]:v}:l))
+  // + Linha herda comprimento/largura/espessura da última (folhas/altura NÃO)
+  const addLinha = ()=> setLinhas(p=>{
+    const u = p[p.length-1] || {}
+    return [...p, { espessura: u.espessura||'', comprimento: u.comprimento||'', largura: u.largura||'', folhas:'', altura:'' }]
+  })
+  const delLinha = (i:number)=> setLinhas(p=> p.length>1 ? p.filter((_,idx)=>idx!==i) : p)
 
   async function salvarPacote(imprimir:boolean) {
-    if (usaFolhas(novo.categoria)) {
-      if (!(parseFloat(novo.folhas) > 0)) { toast.error('Informe o número de folhas'); return }
-      if (!(dLarg>0 && dComp>0 && dEsp>0)) { toast.error('Selecione um tipo ou preencha largura, comprimento e espessura'); return }
-    } else {
-      if (!(parseFloat(novo.altura) > 0)) { toast.error('Informe a altura'); return }
-      if (!(dLarg>0 && dComp>0)) { toast.error('Selecione um tipo ou preencha largura e comprimento'); return }
-    }
+    const cat = novo.categoria
+    const validas = linhas.filter(l=> volLinha(cat, l) > 0)
+    if (validas.length===0) { toast.error('Preencha ao menos uma linha completa'); return }
     setSaving(true)
-    // número sequencial
-    const { data: num, error: eNum } = await supabase.rpc('fn_proximo_numero_pacote', { p_company_id: profile?.company_id||null })
-    if (eNum) { toast.error('Erro ao gerar número: '+eNum.message); setSaving(false); return }
-    const vol = previa
-    const obj:any = {
-      company_id: profile?.company_id||null,
-      dia,
-      numero: num,
-      categoria: novo.categoria,
-      tipo_lamina_id: tipo?.id||null,
-      tipo_nome: tipo?.nome||null,
-      espessura: usaFolhas(novo.categoria) ? dEsp : null,
-      largura: dLarg,
-      comprimento: dComp,
-      altura: usaFolhas(novo.categoria) ? null : (parseFloat(novo.altura)||0),
-      folhas: usaFolhas(novo.categoria) ? (parseFloat(novo.folhas)||0) : null,
-      volume_m3: vol,
-      created_by: profile?.display_name||'',
-    }
-    const { data, error } = await supabase.from('producao_pacotes').insert(obj).select().single()
-    if (error) { toast.error('Erro: '+error.message); setSaving(false); return }
-    toast.success(`Pacote #${num} lançado ✅`)
-    setSaving(false); setModal(false)
-    await loadDia()
-    if (imprimir && data) imprimirEtiqueta(data)
+    const salvos:any[] = []
+    try {
+      for (const l of validas) {
+        const { data: num, error: eNum } = await supabase.rpc('fn_proximo_numero_pacote', { p_company_id: profile?.company_id||null })
+        if (eNum) throw eNum
+        const obj:any = {
+          company_id: profile?.company_id||null, dia, numero: num, categoria: cat,
+          tipo_lamina_id: null, tipo_nome: null,
+          espessura: usaFolhas(cat) ? (parseFloat(l.espessura)||0) : null,
+          largura: parseFloat(l.largura)||0,
+          comprimento: parseFloat(l.comprimento)||0,
+          altura: usaFolhas(cat) ? null : (parseFloat(l.altura)||0),
+          folhas: usaFolhas(cat) ? (parseFloat(l.folhas)||0) : null,
+          volume_m3: volLinha(cat, l),
+          created_by: profile?.display_name||'',
+        }
+        const { data, error } = await supabase.from('producao_pacotes').insert(obj).select().single()
+        if (error) throw error
+        if (data) salvos.push(data)
+      }
+      toast.success(`${salvos.length} pacote(s) lançado(s) ✅`)
+      setModal(false); setLinhas([])
+      await loadDia()
+      if (imprimir) salvos.forEach(p=>imprimirEtiqueta(p))
+    } catch(e:any){ toast.error('Erro: '+e.message) }
+    finally { setSaving(false) }
   }
 
   async function del(id:string, numero:number) {
@@ -228,46 +240,60 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
         </div>
       )}
 
-      {/* Modal de lançamento do pacote */}
+      {/* Modal de lançamento — GRADE de várias linhas (cada linha = 1 pacote) */}
       <Modal open={modal} onClose={()=>setModal(false)}
-        title={`Lançar pacote — ${novo.categoria||''}`}
+        title={`Lançar ${novo.categoria||''} — várias linhas`}
         footer={<>
           <Btn onClick={()=>setModal(false)}>Cancelar</Btn>
           <Btn onClick={()=>salvarPacote(false)} size="md" disabled={saving}>Salvar</Btn>
-          <Btn onClick={()=>salvarPacote(true)} variant="primary" size="md" disabled={saving}>{saving?'...':'Salvar + Etiqueta'}</Btn>
+          <Btn onClick={()=>salvarPacote(true)} variant="primary" size="md" disabled={saving}>{saving?'...':'Salvar + Etiquetas'}</Btn>
         </>}>
 
-        <Select label="Tipo cadastrado (opcional)" value={novo.tipoId||''}
-          onChange={(v:string)=>setNovo((e:any)=>({...e,tipoId:v}))}
-          options={[
-            {value:'',label:'— sem tipo / dimensões manuais —'},
-            ...tipos.filter(t=>t.categoria===novo.categoria).map(t=>({value:t.id,label:`${t.nome}${t.espessura?` · ${(t.espessura*1000).toLocaleString('pt-BR')}mm`:''}`})),
-          ]} />
+        <div style={{fontSize:'10px',color:'var(--t3)',marginBottom:'8px'}}>
+          Cada linha vira um pacote. Em "+ Linha" as medidas da anterior são copiadas ({usaFolhas(novo.categoria)?'folhas':'altura'} fica em branco).
+        </div>
 
-        {!tipo && (
-          <>
-            <div className="grid grid-cols-2 gap-x-3">
-              <Input label="Largura (m)" value={novo.larguraManual} onChange={(v:string)=>setNovo((e:any)=>({...e,larguraManual:v}))} type="number" placeholder="Ex: 1.30" />
-              <Input label="Comprimento (m)" value={novo.comprimentoManual} onChange={(v:string)=>setNovo((e:any)=>({...e,comprimentoManual:v}))} type="number" placeholder="Ex: 2.60" />
-            </div>
-            {usaFolhas(novo.categoria) && (
-              <Select label="Espessura" value={novo.espessuraManual||''}
-                onChange={(v:string)=>setNovo((e:any)=>({...e,espessuraManual:v}))}
-                options={[{value:'',label:'Selecione...'}, ...espessuras.map(e=>({value:String(e.valor_m),label:`${(e.valor_m*1000).toLocaleString('pt-BR')} mm`}))]} />
-            )}
-          </>
-        )}
-
-        {usaFolhas(novo.categoria)
-          ? <Input label="Número de folhas *" value={novo.folhas} onChange={(v:string)=>setNovo((e:any)=>({...e,folhas:v}))} type="number" placeholder="Ex: 500" />
-          : <Input label="Altura (m) *" value={novo.altura} onChange={(v:string)=>setNovo((e:any)=>({...e,altura:v}))} type="number" placeholder="Ex: 1.20" />}
-
-        {previa > 0 && (
-          <div style={{fontSize:'14px',fontWeight:800,color:'var(--gn)',marginTop:'4px'}}>
-            📦 Volume: {m3fmt(previa)} m³
+        {/* cabeçalho da grade */}
+        {usaFolhas(novo.categoria) ? (
+          <div className="grid gap-1" style={{gridTemplateColumns:'18px 1fr 1fr 1fr 1fr 60px 20px'}}>
+            <div style={hdr}>#</div><div style={hdr}>Esp(mm)</div><div style={hdr}>Comp</div><div style={hdr}>Larg</div><div style={hdr}>Folhas</div><div style={{...hdr,textAlign:'right'}}>m³</div><div></div>
+            {linhas.map((l,i)=>(
+              <div key={i} style={{display:'contents'}}>
+                <div style={cel}>{i+1}</div>
+                <input style={inG} type="number" value={l.espessura} onChange={e=>setLin(i,'espessura',e.target.value)} placeholder="2.6" />
+                <input style={inG} type="number" value={l.comprimento} onChange={e=>setLin(i,'comprimento',e.target.value)} />
+                <input style={inG} type="number" value={l.largura} onChange={e=>setLin(i,'largura',e.target.value)} />
+                <input style={inG} type="number" value={l.folhas} onChange={e=>setLin(i,'folhas',e.target.value)} />
+                <div style={{...cel,textAlign:'right',color:'var(--gn)',fontWeight:700}}>{m3fmt(volLinha(novo.categoria,l))}</div>
+                <button onClick={()=>delLinha(i)} style={{color:'var(--rd)',fontSize:'13px'}}>✕</button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid gap-1" style={{gridTemplateColumns:'18px 1fr 1fr 1fr 60px 20px'}}>
+            <div style={hdr}>#</div><div style={hdr}>Altura</div><div style={hdr}>Comp</div><div style={hdr}>Larg</div><div style={{...hdr,textAlign:'right'}}>m³</div><div></div>
+            {linhas.map((l,i)=>(
+              <div key={i} style={{display:'contents'}}>
+                <div style={cel}>{i+1}</div>
+                <input style={inG} type="number" value={l.altura} onChange={e=>setLin(i,'altura',e.target.value)} />
+                <input style={inG} type="number" value={l.comprimento} onChange={e=>setLin(i,'comprimento',e.target.value)} />
+                <input style={inG} type="number" value={l.largura} onChange={e=>setLin(i,'largura',e.target.value)} />
+                <div style={{...cel,textAlign:'right',color:'var(--gn)',fontWeight:700}}>{m3fmt(volLinha(novo.categoria,l))}</div>
+                <button onClick={()=>delLinha(i)} style={{color:'var(--rd)',fontSize:'13px'}}>✕</button>
+              </div>
+            ))}
           </div>
         )}
+
+        <div className="flex justify-between items-center mt-2">
+          <Btn onClick={addLinha} size="sm" variant="secondary">+ Linha</Btn>
+          <div style={{fontSize:'13px',fontWeight:800,color:'var(--gn)'}}>Total: {m3fmt(totalGrade)} m³</div>
+        </div>
       </Modal>
     </div>
   )
 }
+
+const hdr: React.CSSProperties = { fontSize:'8px', color:'var(--t3)', textTransform:'uppercase', fontWeight:700, padding:'2px' }
+const cel: React.CSSProperties = { fontSize:'11px', color:'var(--t2)', display:'flex', alignItems:'center', justifyContent:'center' }
+const inG: React.CSSProperties = { width:'100%', background:'#16284a', border:'1px solid var(--bd)', borderRadius:'6px', padding:'5px 6px', color:'#fff', fontSize:'11px', outline:'none' }
