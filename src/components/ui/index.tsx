@@ -81,11 +81,12 @@ export function Empty({ icon, text }: any) {
 }
 
 // ── Input
-export function Input({ label, value, onChange, type='text', placeholder, className }: any) {
+export function Input({ label, value, onChange, type='text', placeholder, className, inputMode, pattern }: any) {
   return (
     <div style={{marginBottom:'10px'}} className={className}>
       {label&&<label style={{display:'block',fontSize:'9px',fontWeight:700,letterSpacing:'1.2px',color:'rgba(249,115,22,.65)',textTransform:'uppercase',marginBottom:'4px'}}>{label}</label>}
       <input value={value||''} onChange={e=>onChange(e.target.value)} type={type} placeholder={placeholder}
+        inputMode={inputMode} pattern={pattern}
         style={{width:'100%',background:'var(--s2)',border:'1px solid var(--bd)',borderRadius:'10px',padding:'9px 12px',color:'var(--t1)',fontFamily:"'Sora',system-ui",fontSize:'12px',outline:'none',transition:'border-color .15s'}}
         onFocus={e=>{e.target.style.borderColor='rgba(249,115,22,.55)';e.target.style.boxShadow='0 0 10px rgba(249,115,22,.12)'}}
         onBlur={e=>{e.target.style.borderColor='var(--bd)';e.target.style.boxShadow='none'}} />
@@ -297,4 +298,3 @@ export function SelectComCadastro({
     </>
   )
 }
-
