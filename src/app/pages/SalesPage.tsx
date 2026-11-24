@@ -624,6 +624,8 @@ export default function SalesPage({ profile, can }: Props) {
               s.parceiro || '-',
               money(Number(s.total_vendas)||0),
               money(Number(s.total_recebido)||0),
+              money(Number(s.total_compras)||0),
+              money(Number(s.total_pago)||0),
               money(Number(s.frete_devido)||0),
               money(Number(s.saldo_final)||0),
               s.situacao || '-'
@@ -631,13 +633,13 @@ export default function SalesPage({ profile, can }: Props) {
           });
           autoTable(doc, {
             startY: y + 3,
-            head: [['Parceiro','Vendas','Recebido','Frete devido','Saldo','Situacao']],
+            head: [['Parceiro','Vendas','Recebido','Compras','Pago','Frete devido','Saldo','Situacao']],
             body: ccRows,
             theme:'grid',
-            headStyles:{fillColor:[249,115,22]},
+            headStyles:{fillColor:[249,115,22],fontSize:7},
             bodyStyles:{textColor:[20,20,20]},
-            styles:{fontSize:8},
-            columnStyles:{1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'}}
+            styles:{fontSize:7},
+            columnStyles:{1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'}}
           });
           y = (doc as any).lastAutoTable.finalY + 8;
         } else {
