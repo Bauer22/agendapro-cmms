@@ -97,6 +97,17 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
     toast('Dia carregado nas grades. Ao salvar, exclua os pacotes antigos se for refazer.', { icon:'ℹ️' })
   }
 
+  // exclui um dia inteiro do histórico (pacotes + cabeçalho)
+  async function excluirDia(h:any) {
+    if (!await confirm(`Excluir TODA a produção do dia ${new Date(h.dia+'T00:00:00').toLocaleDateString('pt-BR')}? (${h._qtd} pacote(s)) Esta ação não pode ser desfeita.`)) return
+    const q1 = await supabase.from('producao_pacotes').delete().eq('dia', h.dia)
+    if (q1.error) { toast.error('Erro ao excluir pacotes: '+q1.error.message); return }
+    await supabase.from('producao_dia').delete().eq('dia', h.dia)
+    toast.success('Dia excluído')
+    loadHistorico()
+    if (dia===h.dia) loadDia()
+  }
+
   async function salvarEdicaoPacote() {
     if (!editPacote) return
     const cat = editPacote.categoria
@@ -342,6 +353,7 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
                 <div className="flex gap-1.5">
                   <Btn onClick={()=>{ setDia(h.dia); setAba('lancamento') }} size="sm" variant="secondary">👁️ Abrir / Imprimir</Btn>
                   <Btn onClick={()=>reabrirDiaNasGrades(h.dia)} size="sm" variant="secondary">✏️ Reabrir</Btn>
+                  <Btn onClick={()=>excluirDia(h)} size="sm" variant="danger">🗑️</Btn>
                 </div>
               </div>
             ))}
