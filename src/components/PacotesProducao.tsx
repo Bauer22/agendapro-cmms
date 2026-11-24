@@ -71,7 +71,7 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
     if (!await confirm('Fechar a produção deste dia? Ele vai para o histórico (você ainda pode editar por lá).')) return
     const { error } = await supabase.from('producao_dia').upsert({
       company_id: profile?.company_id||null, dia,
-      madeira: cab.madeira||null, tanque_m3: cab.tanque_m3?parseFloat(cab.tanque_m3):0, sobra_m3: cab.sobra_m3?parseFloat(cab.sobra_m3):0,
+      madeira: cab.madeira||null, tanque_m3: cab.tanque_m3?num(cab.tanque_m3):0, sobra_m3: cab.sobra_m3?num(cab.sobra_m3):0,
       fechado: true, fechado_em: new Date().toISOString(), fechado_por: profile?.display_name||'',
     }, { onConflict:'company_id,dia' })
     if (error) { toast.error('Erro: '+error.message); return }
@@ -142,8 +142,8 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
     const obj:any = {
       company_id: profile?.company_id||null, dia,
       madeira: cab.madeira||null,
-      tanque_m3: cab.tanque_m3 ? parseFloat(cab.tanque_m3) : 0,
-      sobra_m3: cab.sobra_m3 ? parseFloat(cab.sobra_m3) : 0,
+      tanque_m3: cab.tanque_m3 ? num(cab.tanque_m3) : 0,
+      sobra_m3: cab.sobra_m3 ? num(cab.sobra_m3) : 0,
       created_by: profile?.display_name||'',
     }
     const { error } = await supabase.from('producao_dia').upsert(obj, { onConflict:'company_id,dia' })
@@ -247,7 +247,7 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
   }
 
   const totalM3 = pacotes.reduce((s,p)=>s+(+p.volume_m3||0),0)
-  const tanqueLiq = (parseFloat(cab.tanque_m3)||0) - (parseFloat(cab.sobra_m3)||0)
+  const tanqueLiq = (num(cab.tanque_m3)||0) - (num(cab.sobra_m3)||0)
 
   // ── Imprimir produção do dia (1 folha, colunas por tipo, estilo romaneio) ──
   async function imprimirProducaoDia() {
@@ -263,7 +263,7 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
       doc.setTextColor(249,115,22); doc.setFontSize(13); doc.setFont('helvetica','bold')
       doc.text('PRODUÇÃO DIÁRIA', 12, 10)
       doc.setTextColor(226,232,240); doc.setFontSize(8); doc.setFont('helvetica','normal')
-      doc.text(`Data: ${new Date(dia+'T00:00:00').toLocaleDateString('pt-BR')}   Madeira: ${cab.madeira||'—'}   Tanque: ${m3fmt(parseFloat(cab.tanque_m3)||0)}   Sobra: ${m3fmt(parseFloat(cab.sobra_m3)||0)}   Laminado: ${m3fmt(tanqueLiq)} m³`, 12, 17)
+      doc.text(`Data: ${new Date(dia+'T00:00:00').toLocaleDateString('pt-BR')}   Madeira: ${cab.madeira||'—'}   Tanque: ${m3fmt(num(cab.tanque_m3)||0)}   Sobra: ${m3fmt(num(cab.sobra_m3)||0)}   Laminado: ${m3fmt(tanqueLiq)} m³`, 12, 17)
 
       const marginL = 8, gap = 4
       const colW = (pageW - marginL*2 - gap) / 2
@@ -373,8 +373,8 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
           <Input label="Madeira do dia" value={cab.madeira} onChange={(v:string)=>setCab((e:any)=>({...e,madeira:v}))} placeholder="Ex: 18 a 24" />
         </div>
         <div className="grid grid-cols-2 gap-x-3">
-          <Input label="m³ do tanque" value={cab.tanque_m3} onChange={(v:string)=>setCab((e:any)=>({...e,tanque_m3:v}))} type="number" placeholder="0.000" />
-          <Input label="Sobra do tanque (m³)" value={cab.sobra_m3} onChange={(v:string)=>setCab((e:any)=>({...e,sobra_m3:v}))} type="number" placeholder="0.000" />
+          <Input label="m³ do tanque" value={cab.tanque_m3} onChange={(v:string)=>setCab((e:any)=>({...e,tanque_m3:v}))} type="text" inputMode="decimal" pattern="[0-9.,]*" placeholder="0.000" />
+          <Input label="Sobra do tanque (m³)" value={cab.sobra_m3} onChange={(v:string)=>setCab((e:any)=>({...e,sobra_m3:v}))} type="text" inputMode="decimal" pattern="[0-9.,]*" placeholder="0.000" />
         </div>
         <div style={{fontSize:'11px',color:'var(--cy)',fontWeight:700,marginBottom:'8px'}}>Tanque laminado: {m3fmt(tanqueLiq)} m³</div>
         <div className="flex gap-2 flex-wrap">
@@ -432,20 +432,20 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
         {editPacote && (usaFolhas(editPacote.categoria) ? (
           <>
             <div className="grid grid-cols-2 gap-x-3">
-              <Input label="Espessura (mm)" value={editPacote._esp} onChange={(v:string)=>setEditPacote((e:any)=>({...e,_esp:v}))} type="text" />
-              <Input label="Nº folhas" value={editPacote._folhas} onChange={(v:string)=>setEditPacote((e:any)=>({...e,_folhas:v}))} type="text" />
+              <Input label="Espessura (mm)" value={editPacote._esp} onChange={(v:string)=>setEditPacote((e:any)=>({...e,_esp:v}))} type="text" inputMode="decimal" pattern="[0-9.,]*" />
+              <Input label="Nº folhas" value={editPacote._folhas} onChange={(v:string)=>setEditPacote((e:any)=>({...e,_folhas:v}))} type="text" inputMode="numeric" pattern="[0-9]*" />
             </div>
             <div className="grid grid-cols-2 gap-x-3">
-              <Input label="Comprimento" value={editPacote._comp} onChange={(v:string)=>setEditPacote((e:any)=>({...e,_comp:v}))} type="text" />
-              <Input label="Largura" value={editPacote._larg} onChange={(v:string)=>setEditPacote((e:any)=>({...e,_larg:v}))} type="text" />
+              <Input label="Comprimento" value={editPacote._comp} onChange={(v:string)=>setEditPacote((e:any)=>({...e,_comp:v}))} type="text" inputMode="decimal" pattern="[0-9.,]*" />
+              <Input label="Largura" value={editPacote._larg} onChange={(v:string)=>setEditPacote((e:any)=>({...e,_larg:v}))} type="text" inputMode="decimal" pattern="[0-9.,]*" />
             </div>
           </>
         ) : (
           <>
-            <Input label="Altura" value={editPacote._altura} onChange={(v:string)=>setEditPacote((e:any)=>({...e,_altura:v}))} type="text" />
+            <Input label="Altura" value={editPacote._altura} onChange={(v:string)=>setEditPacote((e:any)=>({...e,_altura:v}))} type="text" inputMode="decimal" pattern="[0-9.,]*" />
             <div className="grid grid-cols-2 gap-x-3">
-              <Input label="Comprimento" value={editPacote._comp} onChange={(v:string)=>setEditPacote((e:any)=>({...e,_comp:v}))} type="text" />
-              <Input label="Largura" value={editPacote._larg} onChange={(v:string)=>setEditPacote((e:any)=>({...e,_larg:v}))} type="text" />
+              <Input label="Comprimento" value={editPacote._comp} onChange={(v:string)=>setEditPacote((e:any)=>({...e,_comp:v}))} type="text" inputMode="decimal" pattern="[0-9.,]*" />
+              <Input label="Largura" value={editPacote._larg} onChange={(v:string)=>setEditPacote((e:any)=>({...e,_larg:v}))} type="text" inputMode="decimal" pattern="[0-9.,]*" />
             </div>
           </>
         ))}
@@ -479,10 +479,10 @@ function Secao({ cat, label, cor, arr, saving, setLin, addLinha, delLinha, salva
             {arr.map((l,i)=>(
               <div key={i} style={{display:'contents'}}>
                 <div style={cel}>{i+1}</div>
-                <input style={inG} type="text" inputMode="decimal" value={l.espessura} onChange={e=>setLin(cat,i,'espessura',e.target.value)} placeholder="2,6" />
-                <input style={inG} type="text" inputMode="decimal" value={l.comprimento} onChange={e=>setLin(cat,i,'comprimento',e.target.value)} />
-                <input style={inG} type="text" inputMode="decimal" value={l.largura} onChange={e=>setLin(cat,i,'largura',e.target.value)} />
-                <input style={inG} type="text" inputMode="numeric" value={l.folhas} onChange={e=>setLin(cat,i,'folhas',e.target.value)} />
+                <input style={inG} type="text" inputMode="decimal" pattern="[0-9.,]*" value={l.espessura} onChange={e=>setLin(cat,i,'espessura',e.target.value)} placeholder="2,6" />
+                <input style={inG} type="text" inputMode="decimal" pattern="[0-9.,]*" value={l.comprimento} onChange={e=>setLin(cat,i,'comprimento',e.target.value)} />
+                <input style={inG} type="text" inputMode="decimal" pattern="[0-9.,]*" value={l.largura} onChange={e=>setLin(cat,i,'largura',e.target.value)} />
+                <input style={inG} type="text" inputMode="numeric" pattern="[0-9]*" value={l.folhas} onChange={e=>setLin(cat,i,'folhas',e.target.value)} />
                 <div style={{...cel,textAlign:'right',color:'var(--gn)',fontWeight:700}}>{m3fmt(volLinha(cat,l))}</div>
                 <button onClick={()=>delLinha(cat,i)} style={{color:'var(--rd)',fontSize:'13px'}}>✕</button>
               </div>
@@ -494,9 +494,9 @@ function Secao({ cat, label, cor, arr, saving, setLin, addLinha, delLinha, salva
             {arr.map((l,i)=>(
               <div key={i} style={{display:'contents'}}>
                 <div style={cel}>{i+1}</div>
-                <input style={inG} type="text" inputMode="decimal" value={l.altura} onChange={e=>setLin(cat,i,'altura',e.target.value)} />
-                <input style={inG} type="text" inputMode="decimal" value={l.comprimento} onChange={e=>setLin(cat,i,'comprimento',e.target.value)} />
-                <input style={inG} type="text" inputMode="decimal" value={l.largura} onChange={e=>setLin(cat,i,'largura',e.target.value)} />
+                <input style={inG} type="text" inputMode="decimal" pattern="[0-9.,]*" value={l.altura} onChange={e=>setLin(cat,i,'altura',e.target.value)} />
+                <input style={inG} type="text" inputMode="decimal" pattern="[0-9.,]*" value={l.comprimento} onChange={e=>setLin(cat,i,'comprimento',e.target.value)} />
+                <input style={inG} type="text" inputMode="decimal" pattern="[0-9.,]*" value={l.largura} onChange={e=>setLin(cat,i,'largura',e.target.value)} />
                 <div style={{...cel,textAlign:'right',color:'var(--gn)',fontWeight:700}}>{m3fmt(volLinha(cat,l))}</div>
                 <button onClick={()=>delLinha(cat,i)} style={{color:'var(--rd)',fontSize:'13px'}}>✕</button>
               </div>
