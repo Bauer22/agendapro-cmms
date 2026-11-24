@@ -219,10 +219,6 @@ function Secao({ cat, label, cor, arr, saving, setLin, addLinha, delLinha, salva
 }) {
   const total = arr.reduce((s,l)=> s + volLinha(cat, l), 0)
   const folhas = usaFolhas(cat)
-  // campo numérico com teclado numérico no tablet (inputMode decimal)
-  const Num = ({v,on,ph}:{v:string,on:(x:string)=>void,ph?:string}) => (
-    <input style={inG} type="text" inputMode="decimal" value={v} onChange={e=>on(e.target.value)} placeholder={ph} />
-  )
   return (
     <div className="rounded-xl p-3 mb-3" style={{background:'var(--s1)',border:`2px solid ${cor}`}}>
       <div style={{fontSize:'13px',fontWeight:800,color:cor,marginBottom:'8px'}}>{label}</div>
@@ -234,10 +230,10 @@ function Secao({ cat, label, cor, arr, saving, setLin, addLinha, delLinha, salva
             {arr.map((l,i)=>(
               <div key={i} style={{display:'contents'}}>
                 <div style={cel}>{i+1}</div>
-                <Num v={l.espessura} on={(x)=>setLin(cat,i,'espessura',x)} ph="2,6" />
-                <Num v={l.comprimento} on={(x)=>setLin(cat,i,'comprimento',x)} />
-                <Num v={l.largura} on={(x)=>setLin(cat,i,'largura',x)} />
-                <Num v={l.folhas} on={(x)=>setLin(cat,i,'folhas',x)} />
+                <input style={inG} type="text" inputMode="decimal" value={l.espessura} onChange={e=>setLin(cat,i,'espessura',e.target.value)} placeholder="2,6" />
+                <input style={inG} type="text" inputMode="decimal" value={l.comprimento} onChange={e=>setLin(cat,i,'comprimento',e.target.value)} />
+                <input style={inG} type="text" inputMode="decimal" value={l.largura} onChange={e=>setLin(cat,i,'largura',e.target.value)} />
+                <input style={inG} type="text" inputMode="numeric" value={l.folhas} onChange={e=>setLin(cat,i,'folhas',e.target.value)} />
                 <div style={{...cel,textAlign:'right',color:'var(--gn)',fontWeight:700}}>{m3fmt(volLinha(cat,l))}</div>
                 <button onClick={()=>delLinha(cat,i)} style={{color:'var(--rd)',fontSize:'13px'}}>✕</button>
               </div>
@@ -249,9 +245,9 @@ function Secao({ cat, label, cor, arr, saving, setLin, addLinha, delLinha, salva
             {arr.map((l,i)=>(
               <div key={i} style={{display:'contents'}}>
                 <div style={cel}>{i+1}</div>
-                <Num v={l.altura} on={(x)=>setLin(cat,i,'altura',x)} />
-                <Num v={l.comprimento} on={(x)=>setLin(cat,i,'comprimento',x)} />
-                <Num v={l.largura} on={(x)=>setLin(cat,i,'largura',x)} />
+                <input style={inG} type="text" inputMode="decimal" value={l.altura} onChange={e=>setLin(cat,i,'altura',e.target.value)} />
+                <input style={inG} type="text" inputMode="decimal" value={l.comprimento} onChange={e=>setLin(cat,i,'comprimento',e.target.value)} />
+                <input style={inG} type="text" inputMode="decimal" value={l.largura} onChange={e=>setLin(cat,i,'largura',e.target.value)} />
                 <div style={{...cel,textAlign:'right',color:'var(--gn)',fontWeight:700}}>{m3fmt(volLinha(cat,l))}</div>
                 <button onClick={()=>delLinha(cat,i)} style={{color:'var(--rd)',fontSize:'13px'}}>✕</button>
               </div>
