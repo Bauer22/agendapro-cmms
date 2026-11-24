@@ -145,11 +145,44 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
   // helpers de grade por categoria
   const setLin = (cat:string, i:number, campo:string, v:string)=>
     setGrades(g=>({...g, [cat]: g[cat].map((l,idx)=> idx===i?{...l,[campo]:v}:l)}))
-  const addLinha = (cat:string)=> setGrades(g=>{
-    const arr = g[cat]||[]
-    const u = arr[arr.length-1] || {}
-    return {...g, [cat]: [...arr, { espessura: u.espessura||'', comprimento: u.comprimento||'', largura: u.largura||'', folhas:'', altura:'' }]}
-  })
+  // grava UM pacote no banco a partir de uma linha
+  async function gravarPacote(cat:string, l:any) {
+    const { data: numeroPacote, error: eNum } = await supabase.rpc('fn_proximo_numero_pacote', { p_company_id: profile?.company_id||null })
+    if (eNum) throw eNum
+    const obj:any = {
+      company_id: profile?.company_id||null, dia, numero: numeroPacote, categoria: cat,
+      tipo_lamina_id: null, tipo_nome: null,
+      espessura: usaFolhas(cat) ? (num(l.espessura)/1000) : null,
+      largura: num(l.largura), comprimento: num(l.comprimento),
+      altura: usaFolhas(cat) ? null : num(l.altura),
+      folhas: usaFolhas(cat) ? num(l.folhas) : null,
+      volume_m3: volLinha(cat, l),
+      created_by: profile?.display_name||'',
+    }
+    const { data, error } = await supabase.from('producao_pacotes').insert(obj).select().single()
+    if (error) throw error
+    return data
+  }
+
+  // + Lançamento: salva a última linha (se preenchida) e abre nova herdando medidas
+  async function addLinha(cat:string) {
+    const arr = grades[cat]||[]
+    const u = arr[arr.length-1]
+    // se a última linha está completa, salva ela antes de abrir a próxima
+    if (u && volLinha(cat, u) > 0) {
+      try {
+        const p = await gravarPacote(cat, u)
+        if (p) toast.success(`Pacote #${String(p.numero).padStart(6,'0')} salvo ✅`)
+        // nova linha herda medidas; remove a que foi salva da grade (já está no banco)
+        setGrades(g=>({...g, [cat]: [{ espessura: u.espessura||'', comprimento: u.comprimento||'', largura: u.largura||'', folhas:'', altura:'' }]}))
+        await loadDia()
+        return
+      } catch(e:any){ toast.error('Erro ao salvar: '+e.message); return }
+    }
+    // sem linha preenchida: só adiciona (herda da última se houver)
+    const base = u || {}
+    setGrades(g=>({...g, [cat]: [...(g[cat]||[]), { espessura: base.espessura||'', comprimento: base.comprimento||'', largura: base.largura||'', folhas:'', altura:'' }]}))
+  }
   const delLinha = (cat:string, i:number)=> setGrades(g=>({...g, [cat]: g[cat].filter((_,idx)=>idx!==i)}))
 
   async function salvarCategoria(cat:string, imprimir:boolean) {
@@ -160,21 +193,7 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
     const salvos:any[] = []
     try {
       for (const l of validas) {
-        const { data: numeroPacote, error: eNum } = await supabase.rpc('fn_proximo_numero_pacote', { p_company_id: profile?.company_id||null })
-        if (eNum) throw eNum
-        const obj:any = {
-          company_id: profile?.company_id||null, dia, numero: numeroPacote, categoria: cat,
-          tipo_lamina_id: null, tipo_nome: null,
-          espessura: usaFolhas(cat) ? (num(l.espessura)/1000) : null,  // grava em metros
-          largura: num(l.largura),
-          comprimento: num(l.comprimento),
-          altura: usaFolhas(cat) ? null : num(l.altura),
-          folhas: usaFolhas(cat) ? num(l.folhas) : null,
-          volume_m3: volLinha(cat, l),
-          created_by: profile?.display_name||'',
-        }
-        const { data, error } = await supabase.from('producao_pacotes').insert(obj).select().single()
-        if (error) throw error
+        const data = await gravarPacote(cat, l)
         if (data) salvos.push(data)
       }
       toast.success(`${salvos.length} ${cat} lançado(s) ✅`)
