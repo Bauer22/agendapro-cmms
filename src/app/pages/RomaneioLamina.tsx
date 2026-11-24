@@ -50,8 +50,16 @@ export default function RomaneioLamina({ profile }: Props) {
   // edição de grade
   const setLam = (i:number, campo:string, v:string)=> setLaminas(p=>p.map((l,idx)=> idx===i?{...l,[campo]:v}:l))
   const setRet = (i:number, campo:string, v:string)=> setRetalhos(p=>p.map((r,idx)=> idx===i?{...r,[campo]:v}:r))
-  const addLam = ()=> setLaminas(p=>[...p, linhaLaminaVazia()])
-  const addRet = ()=> setRetalhos(p=>[...p, linhaRetalhoVazia()])
+  // + Linha herda espessura/comprimento/largura da última (folhas fica vazio)
+  const addLam = ()=> setLaminas(p=>{
+    const u = p[p.length-1] || {}
+    return [...p, { espessura_mm: u.espessura_mm||'', comprimento: u.comprimento||'', largura: u.largura||'', n_folhas:'' }]
+  })
+  // retalho herda comprimento/largura da última (altura fica vazia)
+  const addRet = ()=> setRetalhos(p=>{
+    const u = p[p.length-1] || {}
+    return [...p, { altura:'', comprimento: u.comprimento||'', largura: u.largura||'' }]
+  })
   const delLam = (i:number)=> setLaminas(p=>p.length>1?p.filter((_,idx)=>idx!==i):p)
   const delRet = (i:number)=> setRetalhos(p=>p.length>1?p.filter((_,idx)=>idx!==i):p)
 
