@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Btn, Input, Empty, useConfirm } from '@/components/ui'
+import { Btn, Input, Modal, Empty, useConfirm } from '@/components/ui'
 import { td } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import type { UserProfile } from '@/types'
@@ -45,9 +45,75 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
   const [saving, setSaving] = useState('')
   // grades por categoria
   const [grades, setGrades] = useState<Record<string,any[]>>({ capa:[], capinha:[], retalho:[], aproveitamento:[] })
+  const [aba, setAba] = useState<'lancamento'|'historico'>('lancamento')
+  const [fechado, setFechado] = useState(false)
+  const [historico, setHistorico] = useState<any[]>([])
+  const [editPacote, setEditPacote] = useState<any>(null)   // pacote em edição rápida
   const { confirm, dialog } = useConfirm()
 
   useEffect(() => { loadDia() /* eslint-disable-next-line */ }, [dia])
+  useEffect(() => { if(aba==='historico') loadHistorico() /* eslint-disable-next-line */ }, [aba])
+
+  async function loadHistorico() {
+    const { data } = await supabase.from('producao_dia').select('*').order('dia',{ascending:false}).limit(120)
+    // conta pacotes e soma m³ por dia
+    const dias = (data||[]).map((d:any)=>d.dia)
+    let resumo:Record<string,{qtd:number,m3:number}> = {}
+    if (dias.length>0) {
+      const { data: pk } = await supabase.from('producao_pacotes').select('dia,volume_m3').in('dia', dias)
+      ;(pk||[]).forEach((p:any)=>{ const r = resumo[p.dia]||{qtd:0,m3:0}; r.qtd++; r.m3+=(+p.volume_m3||0); resumo[p.dia]=r })
+    }
+    setHistorico((data||[]).map((d:any)=>({ ...d, _qtd: resumo[d.dia]?.qtd||0, _m3: resumo[d.dia]?.m3||0 })))
+  }
+
+  async function fecharDia() {
+    if (pacotes.length===0) { toast.error('Nenhum pacote lançado neste dia'); return }
+    if (!await confirm('Fechar a produção deste dia? Ele vai para o histórico (você ainda pode editar por lá).')) return
+    const { error } = await supabase.from('producao_dia').upsert({
+      company_id: profile?.company_id||null, dia,
+      madeira: cab.madeira||null, tanque_m3: cab.tanque_m3?parseFloat(cab.tanque_m3):0, sobra_m3: cab.sobra_m3?parseFloat(cab.sobra_m3):0,
+      fechado: true, fechado_em: new Date().toISOString(), fechado_por: profile?.display_name||'',
+    }, { onConflict:'company_id,dia' })
+    if (error) { toast.error('Erro: '+error.message); return }
+    setFechado(true)
+    toast.success('Dia fechado ✅ (disponível no histórico)')
+  }
+
+  async function reabrirDiaNasGrades(diaAlvo:string) {
+    setDia(diaAlvo)
+    const { data: pk } = await supabase.from('producao_pacotes').select('*').eq('dia',diaAlvo)
+    const g:Record<string,any[]> = { capa:[], capinha:[], retalho:[], aproveitamento:[] }
+    ;(pk||[]).forEach((p:any)=>{
+      const cat = p.categoria
+      if (!g[cat]) g[cat]=[]
+      g[cat].push({
+        espessura: usaFolhas(cat) ? String(((p.espessura||0)*1000)) : '',
+        comprimento: String(p.comprimento??''), largura: String(p.largura??''),
+        folhas: usaFolhas(cat) ? String(p.folhas??'') : '', altura: usaFolhas(cat) ? '' : String(p.altura??''),
+      })
+    })
+    setGrades(g)
+    setAba('lancamento')
+    toast('Dia carregado nas grades. Ao salvar, exclua os pacotes antigos se for refazer.', { icon:'ℹ️' })
+  }
+
+  async function salvarEdicaoPacote() {
+    if (!editPacote) return
+    const cat = editPacote.categoria
+    const l = { espessura: editPacote._esp, comprimento: editPacote._comp, largura: editPacote._larg, folhas: editPacote._folhas, altura: editPacote._altura }
+    const vol = volLinha(cat, l)
+    if (vol<=0) { toast.error('Valores inválidos'); return }
+    const { error } = await supabase.from('producao_pacotes').update({
+      espessura: usaFolhas(cat) ? (num(editPacote._esp)/1000) : null,
+      comprimento: num(editPacote._comp), largura: num(editPacote._larg),
+      folhas: usaFolhas(cat) ? num(editPacote._folhas) : null,
+      altura: usaFolhas(cat) ? null : num(editPacote._altura),
+      volume_m3: vol,
+    }).eq('id', editPacote.id)
+    if (error) { toast.error('Erro: '+error.message); return }
+    toast.success('Pacote corrigido ✅')
+    setEditPacote(null); loadDia()
+  }
 
   async function loadDia() {
     setLoading(true)
@@ -55,8 +121,8 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
       supabase.from('producao_dia').select('*').eq('dia',dia).maybeSingle(),
       supabase.from('producao_pacotes').select('*').eq('dia',dia).order('numero',{ascending:false}),
     ])
-    if (c.data) setCab({ madeira:c.data.madeira||'', tanque_m3:c.data.tanque_m3??'', sobra_m3:c.data.sobra_m3??'' })
-    else setCab({ madeira:'', tanque_m3:'', sobra_m3:'' })
+    if (c.data) { setCab({ madeira:c.data.madeira||'', tanque_m3:c.data.tanque_m3??'', sobra_m3:c.data.sobra_m3??'' }); setFechado(!!c.data.fechado) }
+    else { setCab({ madeira:'', tanque_m3:'', sobra_m3:'' }); setFechado(false) }
     setPacotes(p.data||[])
     setLoading(false)
   }
@@ -156,7 +222,44 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
   return (
     <div>
       {dialog}
+
+      {/* Abas Lançamento / Histórico */}
+      <div className="flex gap-1.5 mb-3">
+        {[{k:'lancamento',l:'➕ Lançamento'},{k:'historico',l:'📚 Histórico'}].map(t=>(
+          <button key={t.k} onClick={()=>setAba(t.k as any)}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+            style={{background: aba===t.k?'var(--cy)':'var(--s1)', color: aba===t.k?'#061018':'var(--t2)', border:'1px solid var(--bd)'}}>{t.l}</button>
+        ))}
+      </div>
+
+      {aba==='historico' ? (
+        historico.length===0 ? <Empty icon="📚" text="Nenhum dia de produção registrado" />
+        : <div className="flex flex-col gap-2">
+            {historico.map(h=>(
+              <div key={h.dia} className="p-3 rounded-xl flex justify-between items-center gap-3 flex-wrap" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+                <div>
+                  <b style={{color:'#fff',fontSize:'13px'}}>{new Date(h.dia+'T00:00:00').toLocaleDateString('pt-BR')}</b>
+                  {h.fechado && <span style={{fontSize:'9px',color:'var(--gn)',marginLeft:'6px'}}>✓ fechado</span>}
+                  <div style={{color:'var(--t2)',fontSize:'11px'}}>{h.madeira?`Madeira ${h.madeira} · `:''}{h._qtd} pacote(s)</div>
+                </div>
+                <div style={{textAlign:'right',fontSize:'11px',color:'var(--t2)'}}>
+                  <b style={{color:'var(--gn)'}}>{m3fmt(h._m3)} m³</b>
+                </div>
+                <div className="flex gap-1.5">
+                  <Btn onClick={()=>{ setDia(h.dia); setAba('lancamento') }} size="sm" variant="secondary">👁️ Abrir</Btn>
+                  <Btn onClick={()=>reabrirDiaNasGrades(h.dia)} size="sm" variant="secondary">✏️ Reabrir grades</Btn>
+                </div>
+              </div>
+            ))}
+          </div>
+      ) : (
+      <>
       {/* Cabeçalho do dia */}
+      {fechado && (
+        <div className="rounded-xl p-2 mb-2" style={{background:'rgba(34,197,94,.1)',border:'1px solid rgba(34,197,94,.3)',fontSize:'11px',color:'var(--gn)'}}>
+          ✓ Este dia está fechado. Você ainda pode editar/excluir pacotes e lançar novos abaixo.
+        </div>
+      )}
       <div className="rounded-xl p-3 mb-3" style={{background:'var(--s1)',border:'1px solid rgba(249,115,22,.25)'}}>
         <div style={{fontSize:'10px',fontWeight:700,color:'#f97316',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'8px'}}>📅 Produção do dia</div>
         <div className="grid grid-cols-2 gap-x-3">
@@ -168,7 +271,10 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
           <Input label="Sobra do tanque (m³)" value={cab.sobra_m3} onChange={(v:string)=>setCab((e:any)=>({...e,sobra_m3:v}))} type="number" placeholder="0.000" />
         </div>
         <div style={{fontSize:'11px',color:'var(--cy)',fontWeight:700,marginBottom:'8px'}}>Tanque laminado: {m3fmt(tanqueLiq)} m³</div>
-        <Btn onClick={salvarCabecalho} variant="primary" size="sm">💾 Salvar dados do dia</Btn>
+        <div className="flex gap-2 flex-wrap">
+          <Btn onClick={salvarCabecalho} variant="primary" size="sm">💾 Salvar dados do dia</Btn>
+          <Btn onClick={fecharDia} variant="secondary" size="sm">🔒 Fechar dia</Btn>
+        </div>
       </div>
 
       {/* Seções por tipo de lâmina */}
@@ -199,6 +305,10 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
                 </div>
               </div>
               <div className="flex gap-1">
+                <button onClick={()=>setEditPacote({ id:p.id, categoria:p.categoria,
+                  _esp: usaFolhas(p.categoria)?String(((p.espessura||0)*1000)):'', _comp:String(p.comprimento??''), _larg:String(p.largura??''),
+                  _folhas: usaFolhas(p.categoria)?String(p.folhas??''):'', _altura: usaFolhas(p.categoria)?'':String(p.altura??''),
+                  numero:p.numero })} style={{fontSize:'15px'}}>✏️</button>
                 <button onClick={()=>imprimirEtiqueta(p)} style={{fontSize:'15px'}}>🏷️</button>
                 <button onClick={()=>del(p.id,p.numero)} style={{color:'var(--rd)',fontSize:'15px'}}>🗑️</button>
               </div>
@@ -206,6 +316,38 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
           ))}
         </div>
       )}
+      </>
+      )}
+
+      {/* Modal de edição rápida de um pacote */}
+      <Modal open={!!editPacote} onClose={()=>setEditPacote(null)} title={editPacote?`Corrigir pacote #${editPacote.numero} (${editPacote.categoria})`:''}
+        footer={<><Btn onClick={()=>setEditPacote(null)}>Cancelar</Btn><Btn onClick={salvarEdicaoPacote} variant="primary">Salvar correção</Btn></>}>
+        {editPacote && (usaFolhas(editPacote.categoria) ? (
+          <>
+            <div className="grid grid-cols-2 gap-x-3">
+              <Input label="Espessura (mm)" value={editPacote._esp} onChange={(v:string)=>setEditPacote((e:any)=>({...e,_esp:v}))} type="text" />
+              <Input label="Nº folhas" value={editPacote._folhas} onChange={(v:string)=>setEditPacote((e:any)=>({...e,_folhas:v}))} type="text" />
+            </div>
+            <div className="grid grid-cols-2 gap-x-3">
+              <Input label="Comprimento" value={editPacote._comp} onChange={(v:string)=>setEditPacote((e:any)=>({...e,_comp:v}))} type="text" />
+              <Input label="Largura" value={editPacote._larg} onChange={(v:string)=>setEditPacote((e:any)=>({...e,_larg:v}))} type="text" />
+            </div>
+          </>
+        ) : (
+          <>
+            <Input label="Altura" value={editPacote._altura} onChange={(v:string)=>setEditPacote((e:any)=>({...e,_altura:v}))} type="text" />
+            <div className="grid grid-cols-2 gap-x-3">
+              <Input label="Comprimento" value={editPacote._comp} onChange={(v:string)=>setEditPacote((e:any)=>({...e,_comp:v}))} type="text" />
+              <Input label="Largura" value={editPacote._larg} onChange={(v:string)=>setEditPacote((e:any)=>({...e,_larg:v}))} type="text" />
+            </div>
+          </>
+        ))}
+        {editPacote && (
+          <div style={{fontSize:'13px',fontWeight:800,color:'var(--gn)',marginTop:'6px'}}>
+            Novo m³: {m3fmt(volLinha(editPacote.categoria, { espessura:editPacote._esp, comprimento:editPacote._comp, largura:editPacote._larg, folhas:editPacote._folhas, altura:editPacote._altura }))}
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }
