@@ -30,6 +30,9 @@ export default function RomaneioLamina({ profile }: Props) {
   // grades
   const [laminas, setLaminas] = useState<any[]>([linhaLaminaVazia()])
   const [retalhos, setRetalhos] = useState<any[]>([linhaRetalhoVazia()])
+  const [editId, setEditId] = useState<string>('')      // id do romaneio em edição
+  const [editNumero, setEditNumero] = useState<number|null>(null)
+  const [editSaleId, setEditSaleId] = useState<string>('')
 
   async function loadClientes() {
     const { data } = await supabase.from('cadastros').select('id,nome_razao').eq('is_cliente',true).eq('status',true).order('nome_razao')
@@ -66,6 +69,20 @@ export default function RomaneioLamina({ profile }: Props) {
   function limpar() {
     setCab({ data: td(), motorista:'', cliente_id:'', placa:'', chapa_qtd:'', chapa_medida:'' })
     setLaminas([linhaLaminaVazia()]); setRetalhos([linhaRetalhoVazia()])
+    setEditId(''); setEditNumero(null); setEditSaleId('')
+  }
+
+  // carrega um romaneio salvo de volta para o formulário (edição)
+  async function editarRomaneio(rom:any) {
+    const { data: itens } = await supabase.from('romaneios_lamina_itens').select('*').eq('romaneio_id', rom.id).order('ordem')
+    const lams = (itens||[]).filter((i:any)=>i.tipo==='lamina').map((i:any)=>({ espessura_mm:String(i.espessura_mm??''), comprimento:String(i.comprimento??''), largura:String(i.largura??''), n_folhas:String(i.n_folhas??'') }))
+    const rets = (itens||[]).filter((i:any)=>i.tipo==='retalho').map((i:any)=>({ altura:String(i.altura??''), comprimento:String(i.comprimento??''), largura:String(i.largura??'') }))
+    setCab({ data: rom.data, motorista: rom.motorista||'', cliente_id: rom.cliente_id||'', placa: rom.placa||'', chapa_qtd: rom.chapa_qtd??'', chapa_medida: rom.chapa_medida||'' })
+    setLaminas(lams.length?lams:[linhaLaminaVazia()])
+    setRetalhos(rets.length?rets:[linhaRetalhoVazia()])
+    setEditId(rom.id); setEditNumero(rom.numero); setEditSaleId(rom.sale_order_id||'')
+    setAba('novo')
+    toast.success(`Editando romaneio #${rom.numero}`)
   }
 
   async function gerarRomaneio() {
@@ -77,48 +94,65 @@ export default function RomaneioLamina({ profile }: Props) {
     if (lamsValidas.length===0 && retsValidos.length===0) { toast.error('Informe ao menos uma lâmina ou retalho'); return }
     setSaving(true)
     try {
-      // 1. sequencial por empresa
-      const { data: cnt } = await supabase.from('romaneio_lamina_counter')
-        .upsert({ company_id: cid, ultimo: 1 }, { onConflict:'company_id', ignoreDuplicates:false })
-        .select().maybeSingle()
-      // incremento seguro: busca o maior numero atual +1
-      const { data: ult } = await supabase.from('romaneios_lamina').select('numero').order('numero',{ascending:false}).limit(1).maybeSingle()
-      const numero = ((ult?.numero)||0) + 1
+      let numero = editNumero
+      let romId = editId
 
-      // 2. cria o cabeçalho
-      const { data: rom, error: e1 } = await supabase.from('romaneios_lamina').insert({
-        company_id: cid, numero, data: cab.data, motorista: cab.motorista||null,
-        cliente_id: cab.cliente_id, cliente_nome: cli.nome_razao, placa: (cab.placa||'').toUpperCase()||null,
-        chapa_qtd: cab.chapa_qtd? Number(cab.chapa_qtd):null, chapa_medida: cab.chapa_medida||null,
-        total_lamina: totalLamina, total_retalho: totalRetalho, carga_total: cargaTotal,
-        created_by: profile?.display_name||'',
-      }).select().single()
-      if (e1) throw e1
+      if (editId) {
+        // ── EDIÇÃO: atualiza cabeçalho, apaga itens antigos e regrava ──
+        const { error: eU } = await supabase.from('romaneios_lamina').update({
+          data: cab.data, motorista: cab.motorista||null, cliente_id: cab.cliente_id, cliente_nome: cli.nome_razao,
+          placa: (cab.placa||'').toUpperCase()||null, chapa_qtd: cab.chapa_qtd? Number(cab.chapa_qtd):null, chapa_medida: cab.chapa_medida||null,
+          total_lamina: totalLamina, total_retalho: totalRetalho, carga_total: cargaTotal,
+        }).eq('id', editId)
+        if (eU) throw eU
+        await supabase.from('romaneios_lamina_itens').delete().eq('romaneio_id', editId)
+      } else {
+        // ── NOVO: sequencial + cabeçalho ──
+        const { data: ult } = await supabase.from('romaneios_lamina').select('numero').order('numero',{ascending:false}).limit(1).maybeSingle()
+        numero = ((ult?.numero)||0) + 1
+        const { data: rom, error: e1 } = await supabase.from('romaneios_lamina').insert({
+          company_id: cid, numero, data: cab.data, motorista: cab.motorista||null,
+          cliente_id: cab.cliente_id, cliente_nome: cli.nome_razao, placa: (cab.placa||'').toUpperCase()||null,
+          chapa_qtd: cab.chapa_qtd? Number(cab.chapa_qtd):null, chapa_medida: cab.chapa_medida||null,
+          total_lamina: totalLamina, total_retalho: totalRetalho, carga_total: cargaTotal,
+          created_by: profile?.display_name||'',
+        }).select().single()
+        if (e1) throw e1
+        romId = rom.id
+      }
 
-      // 3. grava os itens
+      // grava os itens
       const itens = [
-        ...lamsValidas.map((l,i)=>({ company_id:cid, romaneio_id:rom.id, tipo:'lamina', ordem:i,
+        ...lamsValidas.map((l,i)=>({ company_id:cid, romaneio_id:romId, tipo:'lamina', ordem:i,
           espessura_mm:Number(l.espessura_mm)||0, comprimento:Number(l.comprimento)||0, largura:Number(l.largura)||0,
           n_folhas:Number(l.n_folhas)||0, metragem:calcLamina(l) })),
-        ...retsValidos.map((r,i)=>({ company_id:cid, romaneio_id:rom.id, tipo:'retalho', ordem:i,
+        ...retsValidos.map((r,i)=>({ company_id:cid, romaneio_id:romId, tipo:'retalho', ordem:i,
           altura:Number(r.altura)||0, comprimento:Number(r.comprimento)||0, largura:Number(r.largura)||0,
           metragem:calcRetalho(r) })),
       ]
       if (itens.length>0) await supabase.from('romaneios_lamina_itens').insert(itens)
 
-      // 4. lança a venda (carga total, sem preço)
-      const { data: venda } = await supabase.from('sales_orders').insert({
-        sale_date: cab.data, client_id: cab.cliente_id, client_name: cli.nome_razao,
-        product_name: 'LÂMINA', volume_m3: cargaTotal, plate: (cab.placa||'').toUpperCase()||'—',
-        driver: cab.motorista||'—', status:'active',
-        romaneio_num: numero,
-        notes: `Romaneio lâmina #${numero} · lâmina ${n3(totalLamina)} + retalho ${n3(totalRetalho)} m³`,
-        created_by: profile?.display_name||'', created_by_id: profile?.id||null, company_id: cid,
-      }).select().single()
-      if (venda?.id) await supabase.from('romaneios_lamina').update({ sale_order_id: venda.id }).eq('id', rom.id)
+      // venda: atualiza a existente (edição) ou cria nova
+      if (editId && editSaleId) {
+        await supabase.from('sales_orders').update({
+          sale_date: cab.data, client_id: cab.cliente_id, client_name: cli.nome_razao,
+          volume_m3: cargaTotal, plate: (cab.placa||'').toUpperCase()||'—', driver: cab.motorista||'—',
+          notes: `Romaneio lâmina #${numero} · lâmina ${n3(totalLamina)} + retalho ${n3(totalRetalho)} m³`,
+          updated_by: profile?.display_name,
+        }).eq('id', editSaleId)
+      } else if (!editId) {
+        const { data: venda } = await supabase.from('sales_orders').insert({
+          sale_date: cab.data, client_id: cab.cliente_id, client_name: cli.nome_razao,
+          product_name: 'LÂMINA', volume_m3: cargaTotal, plate: (cab.placa||'').toUpperCase()||'—',
+          driver: cab.motorista||'—', status:'active', romaneio_num: numero,
+          notes: `Romaneio lâmina #${numero} · lâmina ${n3(totalLamina)} + retalho ${n3(totalRetalho)} m³`,
+          created_by: profile?.display_name||'', created_by_id: profile?.id||null, company_id: cid,
+        }).select().single()
+        if (venda?.id) await supabase.from('romaneios_lamina').update({ sale_order_id: venda.id }).eq('id', romId)
+      }
 
-      toast.success(`Romaneio #${numero} gerado e lançado em vendas ✅`)
-      await gerarPDF({ ...rom, numero }, lamsValidas, retsValidos, cli.nome_razao)
+      toast.success(editId ? `Romaneio #${numero} atualizado ✅` : `Romaneio #${numero} gerado e lançado em vendas ✅`)
+      await gerarPDF({ id:romId, numero, data:cab.data, motorista:cab.motorista, placa:(cab.placa||'').toUpperCase(), chapa_qtd:cab.chapa_qtd, chapa_medida:cab.chapa_medida, carga_total:cargaTotal, total_lamina:totalLamina, total_retalho:totalRetalho }, lamsValidas, retsValidos, cli.nome_razao)
       limpar(); setAba('historico')
     } catch(e:any){ toast.error('Erro: '+e.message) }
     finally { setSaving(false) }
@@ -129,54 +163,74 @@ export default function RomaneioLamina({ profile }: Props) {
       const { default: jsPDF } = await import('jspdf')
       const { default: autoTable } = await import('jspdf-autotable')
       const { addLogoOnBand } = await import('@/lib/pdf')
-      const doc = new jsPDF()
-      const pageW = doc.internal.pageSize.getWidth()
-      doc.setFillColor(6,13,26); doc.rect(0,0,pageW,24,'F')
-      await addLogoOnBand(doc, 24)
-      doc.setTextColor(249,115,22); doc.setFontSize(14); doc.setFont('helvetica','bold')
-      doc.text('Romaneio de Saída — Lâmina', 12, 11)
-      doc.setTextColor(226,232,240); doc.setFontSize(9); doc.setFont('helvetica','normal')
-      doc.text(`Romaneio Nº ${rom.numero}  ·  Data: ${String(rom.data).split('-').reverse().join('/')}`, 12, 18)
+      const doc = new jsPDF()  // retrato, 1 folha
+      const pageW = doc.internal.pageSize.getWidth()   // 210
+      const totLam = lams.reduce((s,l)=>s+calcLamina(l),0)
+      const totRet = rets.reduce((s,r)=>s+calcRetalho(r),0)
 
-      let y = 30
-      doc.setTextColor(0,0,0); doc.setFontSize(9)
-      doc.text(`Cliente: ${clienteNome}    Motorista: ${rom.motorista||'—'}    Placa: ${rom.placa||'—'}`, 12, y); y+=5
-      doc.text(`Chapa: ${rom.chapa_qtd||'—'}    Chapa medida: ${rom.chapa_medida||'—'}`, 12, y); y+=6
+      // ── Cabeçalho estilo planilha ──
+      doc.setFillColor(6,13,26); doc.rect(0,0,pageW,22,'F')
+      await addLogoOnBand(doc, 22)
+      doc.setTextColor(249,115,22); doc.setFontSize(13); doc.setFont('helvetica','bold')
+      doc.text('SAÍDA — ROMANEIO DE LÂMINA', 12, 10)
+      doc.setTextColor(226,232,240); doc.setFontSize(8); doc.setFont('helvetica','normal')
+      doc.text(`Nº ${rom.numero}   Data: ${String(rom.data).split('-').reverse().join('/')}   Cliente: ${clienteNome}   Motorista: ${rom.motorista||'—'}   Placa: ${rom.placa||'—'}`, 12, 17)
 
-      // tabela lâminas
-      if (lams.length>0) {
-        doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.text('Lâminas', 12, y); y+=2
-        autoTable(doc, { startY:y+2,
-          head:[['#','Espessura (mm)','Comprimento','Largura','Nº Folhas','Metragem (m³)']],
-          body: lams.map((l,i)=>[String(i+1), String(l.espessura_mm), String(l.comprimento), String(l.largura), String(l.n_folhas), n3(calcLamina(l))]),
-          theme:'grid', headStyles:{fillColor:[249,115,22],fontSize:8}, styles:{fontSize:8},
-          columnStyles:{5:{halign:'right'}},
-          foot:[['','','','','TOTAL LÂMINA', n3(lams.reduce((s,l)=>s+calcLamina(l),0))]],
-          footStyles:{fillColor:[30,58,95],textColor:[255,255,255],fontSize:8,halign:'right'} })
-        y = (doc as any).lastAutoTable.finalY + 6
-      }
-      // tabela retalhos
-      if (rets.length>0) {
-        if (y>230){doc.addPage();y=20}
-        doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.text('Retalho', 12, y); y+=2
-        autoTable(doc, { startY:y+2,
-          head:[['#','Altura','Comprimento','Largura','Metros (m³)']],
-          body: rets.map((r,i)=>[String(i+1), String(r.altura), String(r.comprimento), String(r.largura), n3(calcRetalho(r))]),
-          theme:'grid', headStyles:{fillColor:[249,115,22],fontSize:8}, styles:{fontSize:8},
-          columnStyles:{4:{halign:'right'}},
-          foot:[['','','','TOTAL RETALHO', n3(rets.reduce((s,r)=>s+calcRetalho(r),0))]],
-          footStyles:{fillColor:[30,58,95],textColor:[255,255,255],fontSize:8,halign:'right'} })
-        y = (doc as any).lastAutoTable.finalY + 8
-      }
-      // carga total
-      if (y>250){doc.addPage();y=20}
-      doc.setFillColor(249,115,22); doc.rect(12, y, pageW-24, 10, 'F')
+      // ── Duas colunas lado a lado ──
+      const marginL = 8
+      const gap = 4
+      const colW = (pageW - marginL*2 - gap) / 2     // largura de cada coluna
+      const startY = 26
+      const fs = 6.5   // fonte pequena p/ caber tudo numa folha
+
+      // LÂMINAS (esquerda)
+      autoTable(doc, {
+        startY,
+        margin: { left: marginL },
+        tableWidth: colW,
+        head: [['#','Esp','Comp','Larg','Folhas','m³']],
+        body: lams.map((l,i)=>[String(i+1), String(l.espessura_mm), String(l.comprimento), String(l.largura), String(l.n_folhas), n3(calcLamina(l))]),
+        foot: [['','','','','LÂMINA', n3(totLam)]],
+        theme:'grid',
+        headStyles:{fillColor:[249,115,22],fontSize:fs,halign:'center',cellPadding:1},
+        bodyStyles:{fontSize:fs,cellPadding:0.8,textColor:[20,20,20]},
+        footStyles:{fillColor:[30,58,95],textColor:[255,255,255],fontSize:fs,halign:'right',cellPadding:1},
+        columnStyles:{0:{cellWidth:7,halign:'center'},5:{halign:'right'}},
+        styles:{lineColor:[160,160,160],lineWidth:0.1},
+      })
+      const endLam = (doc as any).lastAutoTable.finalY
+
+      // RETALHO (direita)
+      autoTable(doc, {
+        startY,
+        margin: { left: marginL + colW + gap },
+        tableWidth: colW,
+        head: [['#','Altura','Comp','Larg','m³']],
+        body: rets.map((r,i)=>[String(i+1), String(r.altura), String(r.comprimento), String(r.largura), n3(calcRetalho(r))]),
+        foot: [['','','','RETALHO', n3(totRet)]],
+        theme:'grid',
+        headStyles:{fillColor:[249,115,22],fontSize:fs,halign:'center',cellPadding:1},
+        bodyStyles:{fontSize:fs,cellPadding:0.8,textColor:[20,20,20]},
+        footStyles:{fillColor:[30,58,95],textColor:[255,255,255],fontSize:fs,halign:'right',cellPadding:1},
+        columnStyles:{0:{cellWidth:7,halign:'center'},4:{halign:'right'}},
+        styles:{lineColor:[160,160,160],lineWidth:0.1},
+      })
+      const endRet = (doc as any).lastAutoTable.finalY
+
+      // ── Rodapé: carga total + chapa + assinatura ──
+      let y = Math.max(endLam, endRet) + 8
+      const pageH = doc.internal.pageSize.getHeight()
+      if (y > pageH - 30) y = pageH - 30   // garante que cabe na folha
+      doc.setFillColor(249,115,22); doc.rect(marginL, y, pageW-marginL*2, 11, 'F')
       doc.setTextColor(255,255,255); doc.setFontSize(12); doc.setFont('helvetica','bold')
-      doc.text('CARGA TOTAL', 16, y+7)
-      doc.text(n3(rom.carga_total)+' m³', pageW-16, y+7, {align:'right'})
-      y+=18
-      doc.setTextColor(60,60,60); doc.setFontSize(8); doc.setFont('helvetica','normal')
-      doc.text('Assinatura: ____________________________        Recebido por: ____________________________', 12, y)
+      doc.text('CARGA TOTAL', marginL+4, y+7.5)
+      doc.text(n3(rom.carga_total)+' m³', pageW-marginL-4, y+7.5, {align:'right'})
+      y += 17
+      doc.setTextColor(0,0,0); doc.setFontSize(9); doc.setFont('helvetica','bold')
+      doc.text(`CHAPA: ${rom.chapa_qtd||'—'}        CHAPA MEDIDA: ${rom.chapa_medida||'—'}`, marginL, y); y += 9
+      doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(60,60,60)
+      doc.text('Assinatura: ____________________________          Recebido por: ____________________________', marginL, y)
+
       doc.save(`romaneio_lamina_${rom.numero}.pdf`)
     } catch(e:any){ toast.error('Erro ao gerar PDF: '+e.message) }
   }
@@ -202,6 +256,12 @@ export default function RomaneioLamina({ profile }: Props) {
 
       {aba==='novo' && (
         <div>
+          {editId && (
+            <div className="rounded-xl p-2 mb-2 flex justify-between items-center" style={{background:'rgba(249,115,22,.12)',border:'1px solid rgba(249,115,22,.4)'}}>
+              <span style={{fontSize:'11px',color:'var(--cy)'}}>✏️ Editando romaneio <b>#{editNumero}</b></span>
+              <button onClick={limpar} style={{fontSize:'10px',color:'var(--t3)'}}>✕ cancelar edição (novo)</button>
+            </div>
+          )}
           {/* Cabeçalho */}
           <div className="grid grid-cols-2 gap-2 mb-2">
             <Input label="Data" type="date" value={cab.data} onChange={(v:string)=>setCab({...cab,data:v})} />
@@ -264,7 +324,7 @@ export default function RomaneioLamina({ profile }: Props) {
           </div>
 
           <div className="flex gap-2">
-            <Btn onClick={gerarRomaneio} variant="primary" disabled={saving}>{saving?'Gerando...':'🪵 Gerar romaneio + lançar venda'}</Btn>
+            <Btn onClick={gerarRomaneio} variant="primary" disabled={saving}>{saving?'Salvando...':(editId?`💾 Salvar alterações (#${editNumero})`:'🪵 Gerar romaneio + lançar venda')}</Btn>
             <Btn onClick={limpar} variant="secondary">Limpar</Btn>
           </div>
         </div>
@@ -283,7 +343,10 @@ export default function RomaneioLamina({ profile }: Props) {
                   <div>Lâmina {n3(r.total_lamina)} · Retalho {n3(r.total_retalho)}</div>
                   <div><b style={{color:'var(--gn)'}}>Total {n3(r.carga_total)} m³</b></div>
                 </div>
-                <Btn onClick={()=>reimprimir(r)} size="sm" variant="secondary">🖨️ Reimprimir</Btn>
+                <div className="flex gap-1.5">
+                  <Btn onClick={()=>editarRomaneio(r)} size="sm" variant="secondary">✏️ Editar</Btn>
+                  <Btn onClick={()=>reimprimir(r)} size="sm" variant="secondary">🖨️ Reimprimir</Btn>
+                </div>
               </div>
             ))}
           </div>
