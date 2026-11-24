@@ -20,12 +20,14 @@ import type { UserProfile } from '@/types'
 
 const usaFolhas = (cat:string) => cat === 'capa' || cat === 'capinha'
 const m3fmt = (v:number) => (v||0).toLocaleString('pt-BR',{minimumFractionDigits:3,maximumFractionDigits:3})
+// aceita vírgula OU ponto (o operador digita 2,6)
+const num = (v:any) => parseFloat(String(v==null?'':v).replace(',', '.')) || 0
 
 // volume de uma linha da grade (espessura vem em MM → divide por 1000)
 function volLinha(cat:string, l:any) {
-  const larg = parseFloat(l.largura)||0, comp = parseFloat(l.comprimento)||0
-  if (usaFolhas(cat)) return (parseFloat(l.folhas)||0) * comp * larg * ((parseFloat(l.espessura)||0)/1000)
-  return (parseFloat(l.altura)||0) * comp * larg
+  const larg = num(l.largura), comp = num(l.comprimento)
+  if (usaFolhas(cat)) return num(l.folhas) * comp * larg * (num(l.espessura)/1000)
+  return num(l.altura) * comp * larg
 }
 
 const TIPOS = [
@@ -97,11 +99,11 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
         const obj:any = {
           company_id: profile?.company_id||null, dia, numero: num, categoria: cat,
           tipo_lamina_id: null, tipo_nome: null,
-          espessura: usaFolhas(cat) ? ((parseFloat(l.espessura)||0)/1000) : null,  // grava em metros
-          largura: parseFloat(l.largura)||0,
-          comprimento: parseFloat(l.comprimento)||0,
-          altura: usaFolhas(cat) ? null : (parseFloat(l.altura)||0),
-          folhas: usaFolhas(cat) ? (parseFloat(l.folhas)||0) : null,
+          espessura: usaFolhas(cat) ? (num(l.espessura)/1000) : null,  // grava em metros
+          largura: num(l.largura),
+          comprimento: num(l.comprimento),
+          altura: usaFolhas(cat) ? null : num(l.altura),
+          folhas: usaFolhas(cat) ? num(l.folhas) : null,
           volume_m3: volLinha(cat, l),
           created_by: profile?.display_name||'',
         }
@@ -151,60 +153,6 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
   const totalM3 = pacotes.reduce((s,p)=>s+(+p.volume_m3||0),0)
   const tanqueLiq = (parseFloat(cab.tanque_m3)||0) - (parseFloat(cab.sobra_m3)||0)
 
-  // ── Seção de grade de uma categoria ──
-  const Secao = ({ cat, label, cor }:{cat:string,label:string,cor:string}) => {
-    const arr = grades[cat]||[]
-    const total = arr.reduce((s,l)=> s + volLinha(cat, l), 0)
-    const folhas = usaFolhas(cat)
-    return (
-      <div className="rounded-xl p-3 mb-3" style={{background:'var(--s1)',border:`2px solid ${cor}`}}>
-        <div style={{fontSize:'13px',fontWeight:800,color:cor,marginBottom:'8px'}}>{label}</div>
-
-        {arr.length>0 && (
-          folhas ? (
-            <div className="grid gap-1 mb-1" style={{gridTemplateColumns:'18px 1fr 1fr 1fr 1fr 64px 20px'}}>
-              <div style={hdr}>#</div><div style={hdr}>Esp(mm)</div><div style={hdr}>Comp</div><div style={hdr}>Larg</div><div style={hdr}>Folhas</div><div style={{...hdr,textAlign:'right'}}>m³</div><div></div>
-              {arr.map((l,i)=>(
-                <div key={i} style={{display:'contents'}}>
-                  <div style={cel}>{i+1}</div>
-                  <input style={inG} type="number" value={l.espessura} onChange={e=>setLin(cat,i,'espessura',e.target.value)} placeholder="2.6" />
-                  <input style={inG} type="number" value={l.comprimento} onChange={e=>setLin(cat,i,'comprimento',e.target.value)} />
-                  <input style={inG} type="number" value={l.largura} onChange={e=>setLin(cat,i,'largura',e.target.value)} />
-                  <input style={inG} type="number" value={l.folhas} onChange={e=>setLin(cat,i,'folhas',e.target.value)} />
-                  <div style={{...cel,textAlign:'right',color:'var(--gn)',fontWeight:700}}>{m3fmt(volLinha(cat,l))}</div>
-                  <button onClick={()=>delLinha(cat,i)} style={{color:'var(--rd)',fontSize:'13px'}}>✕</button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="grid gap-1 mb-1" style={{gridTemplateColumns:'18px 1fr 1fr 1fr 64px 20px'}}>
-              <div style={hdr}>#</div><div style={hdr}>Altura</div><div style={hdr}>Comp</div><div style={hdr}>Larg</div><div style={{...hdr,textAlign:'right'}}>m³</div><div></div>
-              {arr.map((l,i)=>(
-                <div key={i} style={{display:'contents'}}>
-                  <div style={cel}>{i+1}</div>
-                  <input style={inG} type="number" value={l.altura} onChange={e=>setLin(cat,i,'altura',e.target.value)} />
-                  <input style={inG} type="number" value={l.comprimento} onChange={e=>setLin(cat,i,'comprimento',e.target.value)} />
-                  <input style={inG} type="number" value={l.largura} onChange={e=>setLin(cat,i,'largura',e.target.value)} />
-                  <div style={{...cel,textAlign:'right',color:'var(--gn)',fontWeight:700}}>{m3fmt(volLinha(cat,l))}</div>
-                  <button onClick={()=>delLinha(cat,i)} style={{color:'var(--rd)',fontSize:'13px'}}>✕</button>
-                </div>
-              ))}
-            </div>
-          )
-        )}
-
-        <div className="flex items-center gap-2 flex-wrap mt-1">
-          <Btn onClick={()=>addLinha(cat)} size="sm" style={{background:cor,color:'#fff',border:'none'}}>+ Lançamento</Btn>
-          {arr.length>0 && <>
-            <span style={{fontSize:'12px',fontWeight:800,color:'var(--gn)'}}>Total: {m3fmt(total)} m³</span>
-            <Btn onClick={()=>salvarCategoria(cat,false)} size="sm" variant="secondary" disabled={saving===cat}>{saving===cat?'...':'💾 Salvar'}</Btn>
-            <Btn onClick={()=>salvarCategoria(cat,true)} size="sm" variant="primary" disabled={saving===cat}>🏷️ Salvar + Etiquetas</Btn>
-          </>}
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div>
       {dialog}
@@ -224,7 +172,11 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
       </div>
 
       {/* Seções por tipo de lâmina */}
-      {TIPOS.map(t=> <Secao key={t.cat} cat={t.cat} label={t.label} cor={t.cor} />)}
+      {TIPOS.map(t=> (
+        <Secao key={t.cat} cat={t.cat} label={t.label} cor={t.cor}
+          arr={grades[t.cat]||[]} saving={saving}
+          setLin={setLin} addLinha={addLinha} delLinha={delLinha} salvarCategoria={salvarCategoria} />
+      ))}
 
       {/* Resumo do dia */}
       <div className="rounded-xl p-3 mb-3" style={{background:'var(--s2)',border:'1px solid var(--bd)',display:'flex',justifyContent:'space-around',textAlign:'center'}}>
@@ -254,6 +206,68 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Seção de grade de uma categoria (componente de TOPO p/ não perder foco) ──
+function Secao({ cat, label, cor, arr, saving, setLin, addLinha, delLinha, salvarCategoria }:{
+  cat:string; label:string; cor:string; arr:any[]; saving:string;
+  setLin:(cat:string,i:number,campo:string,v:string)=>void;
+  addLinha:(cat:string)=>void; delLinha:(cat:string,i:number)=>void;
+  salvarCategoria:(cat:string,imprimir:boolean)=>void;
+}) {
+  const total = arr.reduce((s,l)=> s + volLinha(cat, l), 0)
+  const folhas = usaFolhas(cat)
+  // campo numérico com teclado numérico no tablet (inputMode decimal)
+  const Num = ({v,on,ph}:{v:string,on:(x:string)=>void,ph?:string}) => (
+    <input style={inG} type="text" inputMode="decimal" value={v} onChange={e=>on(e.target.value)} placeholder={ph} />
+  )
+  return (
+    <div className="rounded-xl p-3 mb-3" style={{background:'var(--s1)',border:`2px solid ${cor}`}}>
+      <div style={{fontSize:'13px',fontWeight:800,color:cor,marginBottom:'8px'}}>{label}</div>
+
+      {arr.length>0 && (
+        folhas ? (
+          <div className="grid gap-1 mb-1" style={{gridTemplateColumns:'18px 1fr 1fr 1fr 1fr 64px 20px'}}>
+            <div style={hdr}>#</div><div style={hdr}>Esp(mm)</div><div style={hdr}>Comp</div><div style={hdr}>Larg</div><div style={hdr}>Folhas</div><div style={{...hdr,textAlign:'right'}}>m³</div><div></div>
+            {arr.map((l,i)=>(
+              <div key={i} style={{display:'contents'}}>
+                <div style={cel}>{i+1}</div>
+                <Num v={l.espessura} on={(x)=>setLin(cat,i,'espessura',x)} ph="2,6" />
+                <Num v={l.comprimento} on={(x)=>setLin(cat,i,'comprimento',x)} />
+                <Num v={l.largura} on={(x)=>setLin(cat,i,'largura',x)} />
+                <Num v={l.folhas} on={(x)=>setLin(cat,i,'folhas',x)} />
+                <div style={{...cel,textAlign:'right',color:'var(--gn)',fontWeight:700}}>{m3fmt(volLinha(cat,l))}</div>
+                <button onClick={()=>delLinha(cat,i)} style={{color:'var(--rd)',fontSize:'13px'}}>✕</button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid gap-1 mb-1" style={{gridTemplateColumns:'18px 1fr 1fr 1fr 64px 20px'}}>
+            <div style={hdr}>#</div><div style={hdr}>Altura</div><div style={hdr}>Comp</div><div style={hdr}>Larg</div><div style={{...hdr,textAlign:'right'}}>m³</div><div></div>
+            {arr.map((l,i)=>(
+              <div key={i} style={{display:'contents'}}>
+                <div style={cel}>{i+1}</div>
+                <Num v={l.altura} on={(x)=>setLin(cat,i,'altura',x)} />
+                <Num v={l.comprimento} on={(x)=>setLin(cat,i,'comprimento',x)} />
+                <Num v={l.largura} on={(x)=>setLin(cat,i,'largura',x)} />
+                <div style={{...cel,textAlign:'right',color:'var(--gn)',fontWeight:700}}>{m3fmt(volLinha(cat,l))}</div>
+                <button onClick={()=>delLinha(cat,i)} style={{color:'var(--rd)',fontSize:'13px'}}>✕</button>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+
+      <div className="flex items-center gap-2 flex-wrap mt-1">
+        <Btn onClick={()=>addLinha(cat)} size="sm" style={{background:cor,color:'#fff',border:'none'}}>+ Lançamento</Btn>
+        {arr.length>0 && <>
+          <span style={{fontSize:'12px',fontWeight:800,color:'var(--gn)'}}>Total: {m3fmt(total)} m³</span>
+          <Btn onClick={()=>salvarCategoria(cat,false)} size="sm" variant="secondary" disabled={saving===cat}>{saving===cat?'...':'💾 Salvar'}</Btn>
+          <Btn onClick={()=>salvarCategoria(cat,true)} size="sm" variant="primary" disabled={saving===cat}>🏷️ Salvar + Etiquetas</Btn>
+        </>}
+      </div>
     </div>
   )
 }
