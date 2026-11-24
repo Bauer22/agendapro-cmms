@@ -227,7 +227,7 @@ export default function RomaneioLamina({ profile }: Props) {
       doc.text(n3(rom.carga_total)+' m³', pageW-marginL-4, y+7.5, {align:'right'})
       y += 17
       doc.setTextColor(0,0,0); doc.setFontSize(9); doc.setFont('helvetica','bold')
-      doc.text(`CHAPA: ${rom.chapa_qtd||'—'}        CHAPA MEDIDA: ${rom.chapa_medida||'—'}`, marginL, y); y += 9
+      doc.text(`CHAPA: ${rom.chapa_qtd||'—'}        CHAPINHA: ${rom.chapa_medida||'—'}`, marginL, y); y += 9
       doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(60,60,60)
       doc.text('Assinatura: ____________________________          Recebido por: ____________________________', marginL, y)
 
@@ -274,7 +274,7 @@ export default function RomaneioLamina({ profile }: Props) {
           <div className="grid grid-cols-3 gap-2 mb-3">
             <Input label="Placa" value={cab.placa} onChange={(v:string)=>setCab({...cab,placa:v})} />
             <Input label="Chapa (qtd)" type="number" value={cab.chapa_qtd} onChange={(v:string)=>setCab({...cab,chapa_qtd:v})} />
-            <Input label="Chapa medida" value={cab.chapa_medida} onChange={(v:string)=>setCab({...cab,chapa_medida:v})} placeholder="Ex: 1,30" />
+            <Input label="Chapinha" value={cab.chapa_medida} onChange={(v:string)=>setCab({...cab,chapa_medida:v})} placeholder="Ex: 1,30" />
           </div>
 
           {/* Grade LÂMINAS */}
