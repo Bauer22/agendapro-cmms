@@ -150,6 +150,56 @@ export default function ProductionPage({ profile, can }: Props) {
   const monthRecs = records.filter(r => r.prod_date >= monthStart)
   const monthProd = monthRecs.reduce((s,r)=>s+(parseFloat(r.produced_m3)||0),0)
 
+  // ── Folha em branco: MEDIÇÃO DOS TANQUES DE COZIMENTO — 7 dias ──
+  function imprimirFolhaTanques() {
+    const bd = 'border:1px solid #333'
+    const th = `${bd};padding:3px 4px;background:#f0f0f0;font-size:9px;text-align:center;font-weight:bold`
+    const cell = `${bd};height:20px`
+    const lbl = `${bd};padding:3px 4px;font-size:9px;background:#fafafa;font-weight:bold;text-align:center`
+    const DIAS = ['DIA 1','DIA 2','DIA 3','DIA 4','DIA 5','DIA 6','DIA 7']
+
+    // quadro: cada LINHA é uma medida (alturas/comprimento/resultado), cada COLUNA é um dia
+    const quadro = (titulo:string, nAlturas:number, ultimaLinha:string) => {
+      const header = `
+        <tr>
+          <th style="${th};width:16%;text-align:left">${titulo}</th>
+          ${DIAS.map(d=>`<th style="${th}">${d}</th>`).join('')}
+        </tr>`
+      const linhaMadeira = `
+        <tr><td style="${lbl};text-align:left">Madeira / Larg</td>${DIAS.map(()=>`<td style="${cell}"></td>`).join('')}</tr>`
+      const alturas = Array.from({length:nAlturas}).map((_,i)=>`
+        <tr><td style="${lbl}">Altura ${i+1}</td>${DIAS.map(()=>`<td style="${cell}"></td>`).join('')}</tr>`).join('')
+      const comp = `<tr><td style="${lbl}">Comprimento</td>${DIAS.map(()=>`<td style="${cell}"></td>`).join('')}</tr>`
+      const res = `<tr><td style="${lbl};background:#dce6f5">${ultimaLinha}</td>${DIAS.map(()=>`<td style="${cell};background:#eef3fb"></td>`).join('')}</tr>`
+      return `
+        <table style="width:100%;border-collapse:collapse;margin-bottom:10px">
+          ${header}${linhaMadeira}${alturas}${comp}${res}
+        </table>`
+    }
+
+    const html = `
+      <html><head><title>Medição dos Tanques — 7 dias</title>
+      <style>@page{size:A4 portrait;margin:8mm} body{font-family:Arial,sans-serif;margin:0;color:#000}</style>
+      </head><body>
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #000;padding-bottom:5px;margin-bottom:8px">
+          <div style="font-size:15px;font-weight:bold">FAGANELLO — MEDIÇÃO DOS TANQUES DE COZIMENTO</div>
+          <div style="font-size:11px">Semana: ____/____  a  ____/____/______</div>
+        </div>
+        <div style="font-size:10px;margin-bottom:8px">Largura = largura da madeira que vai ser laminada. Anote a madeira de cada dia na 1ª linha de cada tanque.</div>
+
+        ${quadro('TANQUE 1', 5, 'MÉDIA ALTURA')}
+        ${quadro('TANQUE 2', 5, 'MÉDIA ALTURA')}
+        ${quadro('TANQUE 1 — SOBRA', 3, 'TOTAL TANQUE')}
+        ${quadro('TANQUE 2 — SOBRA', 3, 'TOTAL TANQUE')}
+
+        <div style="margin-top:10px;font-size:10px">
+          Responsável: ______________________________        Assinatura: ______________________________
+        </div>
+      </body></html>`
+    const w = window.open('', '_blank')
+    if (w) { w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>w.print(),300) }
+  }
+
   // ── Folha em branco para o conferente preencher à mão (modelo Faganello) ──
   // nPacotes: pacotes de capa/capinha (folhas). nRetalho: linhas por bloco de retalho.
   function imprimirFolhaProducao(nPacotes = 60, nRetalho = 30) {
@@ -543,6 +593,14 @@ export default function ProductionPage({ profile, can }: Props) {
               <Btn onClick={()=>imprimirFolhaProducao(60,12)} variant="primary" size="md">🖨️ Imprimir folha (60 pacotes)</Btn>
               <Btn onClick={()=>imprimirFolhaProducao(40,12)} size="md">🖨️ 40 pacotes</Btn>
             </div>
+
+            <div style={{height:'1px',background:'var(--bd)',margin:'16px 0'}} />
+            <div style={{fontSize:'12px',fontWeight:700,color:'#f97316',marginBottom:'6px'}}>🛢️ Folha de Medição dos Tanques de Cozimento (7 dias)</div>
+            <div style={{fontSize:'12px',color:'var(--t2)',lineHeight:1.5,marginBottom:'12px'}}>
+              Imprime uma folha semanal (7 dias) para medir os tanques: Tanque 1 e 2 (5 alturas + comprimento + média),
+              e as sobras (3 alturas + comprimento + total). Anote a madeira e a largura de cada dia. Preenchida à mão na fábrica.
+            </div>
+            <Btn onClick={imprimirFolhaTanques} variant="primary" size="md">🖨️ Imprimir folha dos tanques (7 dias)</Btn>
           </div>
         )}
       </>)}
