@@ -242,6 +242,18 @@ export default function RomaneioLamina({ profile }: Props) {
     await gerarPDF(rom, lams, rets, rom.cliente_nome)
   }
 
+  async function excluirRomaneio(rom:any) {
+    if (!await confirm(`Excluir o romaneio #${rom.numero}? A venda lançada também será removida. Esta ação não pode ser desfeita.`)) return
+    // remove a venda vinculada (se houver)
+    if (rom.sale_order_id) await supabase.from('sales_orders').delete().eq('id', rom.sale_order_id)
+    // itens caem por cascade; remove o cabeçalho
+    await supabase.from('romaneios_lamina_itens').delete().eq('romaneio_id', rom.id)
+    const { error } = await supabase.from('romaneios_lamina').delete().eq('id', rom.id)
+    if (error) { toast.error('Erro ao excluir: '+error.message); return }
+    toast.success(`Romaneio #${rom.numero} excluído`)
+    loadHistorico()
+  }
+
   const inStyle: React.CSSProperties = { width:'100%', background:'#16284a', border:'1px solid var(--bd)', borderRadius:'6px', padding:'5px 6px', color:'#fff', fontSize:'11px', outline:'none' }
 
   return (
@@ -346,6 +358,7 @@ export default function RomaneioLamina({ profile }: Props) {
                 <div className="flex gap-1.5">
                   <Btn onClick={()=>editarRomaneio(r)} size="sm" variant="secondary">✏️ Editar</Btn>
                   <Btn onClick={()=>reimprimir(r)} size="sm" variant="secondary">🖨️ Reimprimir</Btn>
+                  <Btn onClick={()=>excluirRomaneio(r)} size="sm" variant="danger">🗑️</Btn>
                 </div>
               </div>
             ))}
