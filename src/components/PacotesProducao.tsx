@@ -238,6 +238,81 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
   const totalM3 = pacotes.reduce((s,p)=>s+(+p.volume_m3||0),0)
   const tanqueLiq = (parseFloat(cab.tanque_m3)||0) - (parseFloat(cab.sobra_m3)||0)
 
+  // ── Imprimir produção do dia (1 folha, colunas por tipo, estilo romaneio) ──
+  async function imprimirProducaoDia() {
+    if (pacotes.length===0) { toast.error('Nenhum pacote neste dia'); return }
+    try {
+      const { default: jsPDF } = await import('jspdf')
+      const { default: autoTable } = await import('jspdf-autotable')
+      const { addLogoOnBand } = await import('@/lib/pdf')
+      const doc = new jsPDF()
+      const pageW = doc.internal.pageSize.getWidth()
+      doc.setFillColor(6,13,26); doc.rect(0,0,pageW,22,'F')
+      await addLogoOnBand(doc, 22)
+      doc.setTextColor(249,115,22); doc.setFontSize(13); doc.setFont('helvetica','bold')
+      doc.text('PRODUÇÃO DIÁRIA', 12, 10)
+      doc.setTextColor(226,232,240); doc.setFontSize(8); doc.setFont('helvetica','normal')
+      doc.text(`Data: ${new Date(dia+'T00:00:00').toLocaleDateString('pt-BR')}   Madeira: ${cab.madeira||'—'}   Tanque: ${m3fmt(parseFloat(cab.tanque_m3)||0)}   Sobra: ${m3fmt(parseFloat(cab.sobra_m3)||0)}   Laminado: ${m3fmt(tanqueLiq)} m³`, 12, 17)
+
+      const marginL = 8, gap = 4
+      const colW = (pageW - marginL*2 - gap) / 2
+      const startY = 26
+      const fs = 6.5
+
+      // agrupa pacotes por categoria
+      const porCat: Record<string,any[]> = { capa:[], capinha:[], retalho:[], aproveitamento:[] }
+      pacotes.forEach(p=>{ if(!porCat[p.categoria]) porCat[p.categoria]=[]; porCat[p.categoria].push(p) })
+
+      // desenha um grupo numa coluna, a partir de um Y
+      const drawGrupo = (cat:string, label:string, x:number, y:number):number => {
+        const arr = porCat[cat]||[]
+        if (arr.length===0) return y
+        const folhas = usaFolhas(cat)
+        const tot = arr.reduce((s,p)=>s+(+p.volume_m3||0),0)
+        const head = folhas ? [['Nº','Esp','Comp','Larg','Folhas','m³']] : [['Nº','Alt','Comp','Larg','m³']]
+        const body = arr.map(p=> folhas
+          ? [String(p.numero), String(((p.espessura||0)*1000).toLocaleString('pt-BR')), String(p.comprimento), String(p.largura), String(p.folhas), m3fmt(p.volume_m3)]
+          : [String(p.numero), String(p.altura), String(p.comprimento), String(p.largura), m3fmt(p.volume_m3)])
+        doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0)
+        doc.text(label, x, y)
+        autoTable(doc, {
+          startY: y+2, margin:{left:x}, tableWidth: colW,
+          head, body,
+          foot: [folhas ? ['','','','','TOTAL', m3fmt(tot)] : ['','','','TOTAL', m3fmt(tot)]],
+          theme:'grid',
+          headStyles:{fillColor:[249,115,22],fontSize:fs,halign:'center',cellPadding:1},
+          bodyStyles:{fontSize:fs,cellPadding:0.8,textColor:[20,20,20]},
+          footStyles:{fillColor:[30,58,95],textColor:[255,255,255],fontSize:fs,halign:'right',cellPadding:1},
+          styles:{lineColor:[160,160,160],lineWidth:0.1},
+        })
+        return (doc as any).lastAutoTable.finalY + 6
+      }
+
+      // coluna esquerda: CAPA + RETALHO | coluna direita: CAPINHA + APROVEITAMENTO
+      const xL = marginL, xR = marginL + colW + gap
+      let yL = startY, yR = startY
+      yL = drawGrupo('capa', 'CAPA', xL, yL)
+      yL = drawGrupo('retalho', 'RETALHO', xL, yL)
+      yR = drawGrupo('capinha', 'CAPINHA', xR, yR)
+      yR = drawGrupo('aproveitamento', 'APROVEITAMENTO', xR, yR)
+
+      // rodapé: total geral
+      let y = Math.max(yL, yR) + 4
+      const pageH = doc.internal.pageSize.getHeight()
+      if (y > pageH - 24) y = pageH - 24
+      doc.setFillColor(249,115,22); doc.rect(marginL, y, pageW-marginL*2, 11, 'F')
+      doc.setTextColor(255,255,255); doc.setFontSize(12); doc.setFont('helvetica','bold')
+      doc.text(`TOTAL DO DIA  ·  ${pacotes.length} pacote(s)`, marginL+4, y+7.5)
+      doc.text(m3fmt(totalM3)+' m³', pageW-marginL-4, y+7.5, {align:'right'})
+      y += 17
+      doc.setTextColor(60,60,60); doc.setFontSize(8); doc.setFont('helvetica','normal')
+      doc.text('Responsável: ____________________________        Assinatura: ____________________________', marginL, y)
+
+      doc.save(`producao_${dia}.pdf`)
+      toast.success('Produção do dia gerada ✅')
+    } catch(e:any){ toast.error('Erro ao gerar PDF: '+e.message) }
+  }
+
   return (
     <div>
       {dialog}
@@ -265,8 +340,8 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
                   <b style={{color:'var(--gn)'}}>{m3fmt(h._m3)} m³</b>
                 </div>
                 <div className="flex gap-1.5">
-                  <Btn onClick={()=>{ setDia(h.dia); setAba('lancamento') }} size="sm" variant="secondary">👁️ Abrir</Btn>
-                  <Btn onClick={()=>reabrirDiaNasGrades(h.dia)} size="sm" variant="secondary">✏️ Reabrir grades</Btn>
+                  <Btn onClick={()=>{ setDia(h.dia); setAba('lancamento') }} size="sm" variant="secondary">👁️ Abrir / Imprimir</Btn>
+                  <Btn onClick={()=>reabrirDiaNasGrades(h.dia)} size="sm" variant="secondary">✏️ Reabrir</Btn>
                 </div>
               </div>
             ))}
@@ -293,6 +368,7 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
         <div className="flex gap-2 flex-wrap">
           <Btn onClick={salvarCabecalho} variant="primary" size="sm">💾 Salvar dados do dia</Btn>
           <Btn onClick={fecharDia} variant="secondary" size="sm">🔒 Fechar dia</Btn>
+          <Btn onClick={imprimirProducaoDia} variant="secondary" size="sm">🖨️ Imprimir produção</Btn>
         </div>
       </div>
 
