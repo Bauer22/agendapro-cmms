@@ -94,10 +94,10 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
     const salvos:any[] = []
     try {
       for (const l of validas) {
-        const { data: num, error: eNum } = await supabase.rpc('fn_proximo_numero_pacote', { p_company_id: profile?.company_id||null })
+        const { data: numeroPacote, error: eNum } = await supabase.rpc('fn_proximo_numero_pacote', { p_company_id: profile?.company_id||null })
         if (eNum) throw eNum
         const obj:any = {
-          company_id: profile?.company_id||null, dia, numero: num, categoria: cat,
+          company_id: profile?.company_id||null, dia, numero: numeroPacote, categoria: cat,
           tipo_lamina_id: null, tipo_nome: null,
           espessura: usaFolhas(cat) ? (num(l.espessura)/1000) : null,  // grava em metros
           largura: num(l.largura),
