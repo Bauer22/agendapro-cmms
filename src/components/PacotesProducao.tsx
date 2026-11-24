@@ -1,60 +1,51 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Btn, Modal, Input, Select, Empty, useConfirm } from '@/components/ui'
+import { Btn, Input, Empty, useConfirm } from '@/components/ui'
 import { td } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import type { UserProfile } from '@/types'
 
 // ═══════════════════════════════════════════════════════════════
-// PacotesProducao — lançamento da produção POR PACOTE (uso em tablet)
+// PacotesProducao — lançamento da produção POR GRADE (4 tipos na tela)
 //
-// - Cabeçalho do dia: madeira, m³ do tanque, sobra do tanque (producao_dia)
-// - Cada pacote é lançado ao sair: capa/capinha (folhas) ou retalho/
-//   aproveitamento (altura). Volume m³ calculado automaticamente.
-// - Número de identificação sequencial por empresa (fn_proximo_numero_pacote).
-// - Impressão da etiqueta do pacote para colar no material que vai ao estoque.
+// Cada tipo (Capa, Capinha, Retalho, Aproveitamento) tem na própria tela:
+//   cabeçalho + grade de linhas + botão "+ Lançamento".
+// Cada linha vira um pacote ao salvar.
 //
-// Dimensões em METROS → volume direto em m³.
+// Fórmulas (dimensões em metros; espessura digitada em MM):
+//   capa/capinha        = folhas × comprimento × largura × (espessura_mm/1000)
+//   retalho/aproveitam.  = altura × comprimento × largura
 // ═══════════════════════════════════════════════════════════════
 
-interface TipoLamina { id:string; nome:string; categoria:string; largura:number; comprimento:number; espessura:number|null }
-interface Espessura { id:string; valor_m:number }
-
 const usaFolhas = (cat:string) => cat === 'capa' || cat === 'capinha'
-const money = (v:number) => `R$ ${(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}`
 const m3fmt = (v:number) => (v||0).toLocaleString('pt-BR',{minimumFractionDigits:3,maximumFractionDigits:3})
 
-function calcVol(cat:string, larg:number, comp:number, esp:number, folhas:number, altura:number) {
-  if (usaFolhas(cat)) return (folhas||0) * (larg||0) * (comp||0) * (esp||0)
-  return (altura||0) * (larg||0) * (comp||0)
+// volume de uma linha da grade (espessura vem em MM → divide por 1000)
+function volLinha(cat:string, l:any) {
+  const larg = parseFloat(l.largura)||0, comp = parseFloat(l.comprimento)||0
+  if (usaFolhas(cat)) return (parseFloat(l.folhas)||0) * comp * larg * ((parseFloat(l.espessura)||0)/1000)
+  return (parseFloat(l.altura)||0) * comp * larg
 }
+
+const TIPOS = [
+  { cat:'capa',           label:'CAPA',           cor:'#22c55e' },
+  { cat:'capinha',        label:'CAPINHA',        cor:'#3b82f6' },
+  { cat:'retalho',        label:'RETALHO',        cor:'#f59e0b' },
+  { cat:'aproveitamento', label:'APROVEITAMENTO', cor:'#a855f7' },
+]
 
 export default function PacotesProducao({ profile }: { profile: UserProfile|null }) {
   const [dia, setDia] = useState(td())
   const [cab, setCab] = useState<any>({ madeira:'', tanque_m3:'', sobra_m3:'' })
-  const [tipos, setTipos] = useState<TipoLamina[]>([])
-  const [espessuras, setEspessuras] = useState<Espessura[]>([])
   const [pacotes, setPacotes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [modal, setModal] = useState(false)
-  const [novo, setNovo] = useState<any>({ categoria:'capa' })
-  // grade de várias linhas (cada linha = 1 pacote)
-  const [linhas, setLinhas] = useState<any[]>([])
+  const [saving, setSaving] = useState('')
+  // grades por categoria
+  const [grades, setGrades] = useState<Record<string,any[]>>({ capa:[], capinha:[], retalho:[], aproveitamento:[] })
   const { confirm, dialog } = useConfirm()
 
-  useEffect(() => { loadMeta() }, [])
   useEffect(() => { loadDia() /* eslint-disable-next-line */ }, [dia])
-
-  async function loadMeta() {
-    const [t, e] = await Promise.all([
-      supabase.from('tipos_lamina').select('*').eq('ativo',true).order('categoria').order('nome'),
-      supabase.from('espessuras_lamina').select('*').eq('ativo',true).order('valor_m'),
-    ])
-    setTipos((t.data as TipoLamina[])||[])
-    setEspessuras((e.data as Espessura[])||[])
-  }
 
   async function loadDia() {
     setLoading(true)
@@ -70,8 +61,7 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
 
   async function salvarCabecalho() {
     const obj:any = {
-      company_id: profile?.company_id||null,
-      dia,
+      company_id: profile?.company_id||null, dia,
       madeira: cab.madeira||null,
       tanque_m3: cab.tanque_m3 ? parseFloat(cab.tanque_m3) : 0,
       sobra_m3: cab.sobra_m3 ? parseFloat(cab.sobra_m3) : 0,
@@ -82,36 +72,23 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
     toast.success('Cabeçalho do dia salvo ✅')
   }
 
-  // linha vazia da grade (dimensões em branco; categoria vem do botão)
   const linhaVazia = ()=>({ espessura:'', comprimento:'', largura:'', folhas:'', altura:'' })
 
-  function abrirNovo(cat:string) {
-    setNovo({ categoria:cat })
-    setLinhas([ linhaVazia() ])
-    setModal(true)
-  }
-
-  // volume de uma linha da grade conforme a categoria
-  function volLinha(cat:string, l:any) {
-    const larg = parseFloat(l.largura)||0, comp = parseFloat(l.comprimento)||0
-    if (usaFolhas(cat)) return (parseFloat(l.folhas)||0) * larg * comp * (parseFloat(l.espessura)||0)
-    return (parseFloat(l.altura)||0) * larg * comp
-  }
-  const totalGrade = linhas.reduce((s,l)=> s + volLinha(novo.categoria, l), 0)
-
-  const setLin = (i:number, campo:string, v:string)=> setLinhas(p=>p.map((l,idx)=> idx===i?{...l,[campo]:v}:l))
-  // + Linha herda comprimento/largura/espessura da última (folhas/altura NÃO)
-  const addLinha = ()=> setLinhas(p=>{
-    const u = p[p.length-1] || {}
-    return [...p, { espessura: u.espessura||'', comprimento: u.comprimento||'', largura: u.largura||'', folhas:'', altura:'' }]
+  // helpers de grade por categoria
+  const setLin = (cat:string, i:number, campo:string, v:string)=>
+    setGrades(g=>({...g, [cat]: g[cat].map((l,idx)=> idx===i?{...l,[campo]:v}:l)}))
+  const addLinha = (cat:string)=> setGrades(g=>{
+    const arr = g[cat]||[]
+    const u = arr[arr.length-1] || {}
+    return {...g, [cat]: [...arr, { espessura: u.espessura||'', comprimento: u.comprimento||'', largura: u.largura||'', folhas:'', altura:'' }]}
   })
-  const delLinha = (i:number)=> setLinhas(p=> p.length>1 ? p.filter((_,idx)=>idx!==i) : p)
+  const delLinha = (cat:string, i:number)=> setGrades(g=>({...g, [cat]: g[cat].filter((_,idx)=>idx!==i)}))
 
-  async function salvarPacote(imprimir:boolean) {
-    const cat = novo.categoria
-    const validas = linhas.filter(l=> volLinha(cat, l) > 0)
+  async function salvarCategoria(cat:string, imprimir:boolean) {
+    const arr = grades[cat]||[]
+    const validas = arr.filter(l=> volLinha(cat, l) > 0)
     if (validas.length===0) { toast.error('Preencha ao menos uma linha completa'); return }
-    setSaving(true)
+    setSaving(cat)
     const salvos:any[] = []
     try {
       for (const l of validas) {
@@ -120,7 +97,7 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
         const obj:any = {
           company_id: profile?.company_id||null, dia, numero: num, categoria: cat,
           tipo_lamina_id: null, tipo_nome: null,
-          espessura: usaFolhas(cat) ? (parseFloat(l.espessura)||0) : null,
+          espessura: usaFolhas(cat) ? ((parseFloat(l.espessura)||0)/1000) : null,  // grava em metros
           largura: parseFloat(l.largura)||0,
           comprimento: parseFloat(l.comprimento)||0,
           altura: usaFolhas(cat) ? null : (parseFloat(l.altura)||0),
@@ -132,12 +109,12 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
         if (error) throw error
         if (data) salvos.push(data)
       }
-      toast.success(`${salvos.length} pacote(s) lançado(s) ✅`)
-      setModal(false); setLinhas([])
+      toast.success(`${salvos.length} ${cat} lançado(s) ✅`)
+      setGrades(g=>({...g, [cat]: []}))   // limpa a grade da categoria
       await loadDia()
       if (imprimir) salvos.forEach(p=>imprimirEtiqueta(p))
     } catch(e:any){ toast.error('Erro: '+e.message) }
-    finally { setSaving(false) }
+    finally { setSaving('') }
   }
 
   async function del(id:string, numero:number) {
@@ -150,7 +127,7 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
   function imprimirEtiqueta(p:any) {
     const esc = (s:any)=>String(s==null?'':s).replace(/[&<>"']/g,(c:string)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]||c))
     const dim = usaFolhas(p.categoria)
-      ? `${p.folhas} folhas · ${p.largura}×${p.comprimento}×${(p.espessura*1000).toLocaleString('pt-BR')}mm`
+      ? `${p.folhas} folhas · ${p.largura}×${p.comprimento}×${((p.espessura||0)*1000).toLocaleString('pt-BR')}mm`
       : `alt ${p.altura} · ${p.largura}×${p.comprimento} m`
     const html = `
       <html><head><title>Etiqueta Pacote</title>
@@ -162,7 +139,7 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
             <div style="font-size:11px">${esc(new Date(p.dia+'T00:00:00').toLocaleDateString('pt-BR'))}</div>
           </div>
           <div style="font-size:34px;font-weight:900;text-align:center;letter-spacing:1px;margin:4px 0">Nº ${esc(String(p.numero).padStart(6,'0'))}</div>
-          <div style="font-size:13px;text-align:center;text-transform:uppercase">${esc(p.categoria)}${p.tipo_nome?` · ${esc(p.tipo_nome)}`:''}</div>
+          <div style="font-size:13px;text-align:center;text-transform:uppercase">${esc(p.categoria)}</div>
           <div style="font-size:11px;text-align:center;color:#333;margin-top:2px">${esc(dim)}</div>
           <div style="font-size:16px;font-weight:bold;text-align:center;margin-top:4px">${m3fmt(p.volume_m3)} m³</div>
         </div>
@@ -174,13 +151,59 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
   const totalM3 = pacotes.reduce((s,p)=>s+(+p.volume_m3||0),0)
   const tanqueLiq = (parseFloat(cab.tanque_m3)||0) - (parseFloat(cab.sobra_m3)||0)
 
-  const btn = (cat:string, label:string, cor:string) => (
-    <button onClick={()=>abrirNovo(cat)}
-      style={{flex:1,minWidth:'120px',padding:'18px 10px',borderRadius:'14px',border:`2px solid ${cor}`,
-        background:'var(--s1)',color:cor,fontWeight:800,fontSize:'15px',cursor:'pointer'}}>
-      ➕ {label}
-    </button>
-  )
+  // ── Seção de grade de uma categoria ──
+  const Secao = ({ cat, label, cor }:{cat:string,label:string,cor:string}) => {
+    const arr = grades[cat]||[]
+    const total = arr.reduce((s,l)=> s + volLinha(cat, l), 0)
+    const folhas = usaFolhas(cat)
+    return (
+      <div className="rounded-xl p-3 mb-3" style={{background:'var(--s1)',border:`2px solid ${cor}`}}>
+        <div style={{fontSize:'13px',fontWeight:800,color:cor,marginBottom:'8px'}}>{label}</div>
+
+        {arr.length>0 && (
+          folhas ? (
+            <div className="grid gap-1 mb-1" style={{gridTemplateColumns:'18px 1fr 1fr 1fr 1fr 64px 20px'}}>
+              <div style={hdr}>#</div><div style={hdr}>Esp(mm)</div><div style={hdr}>Comp</div><div style={hdr}>Larg</div><div style={hdr}>Folhas</div><div style={{...hdr,textAlign:'right'}}>m³</div><div></div>
+              {arr.map((l,i)=>(
+                <div key={i} style={{display:'contents'}}>
+                  <div style={cel}>{i+1}</div>
+                  <input style={inG} type="number" value={l.espessura} onChange={e=>setLin(cat,i,'espessura',e.target.value)} placeholder="2.6" />
+                  <input style={inG} type="number" value={l.comprimento} onChange={e=>setLin(cat,i,'comprimento',e.target.value)} />
+                  <input style={inG} type="number" value={l.largura} onChange={e=>setLin(cat,i,'largura',e.target.value)} />
+                  <input style={inG} type="number" value={l.folhas} onChange={e=>setLin(cat,i,'folhas',e.target.value)} />
+                  <div style={{...cel,textAlign:'right',color:'var(--gn)',fontWeight:700}}>{m3fmt(volLinha(cat,l))}</div>
+                  <button onClick={()=>delLinha(cat,i)} style={{color:'var(--rd)',fontSize:'13px'}}>✕</button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-1 mb-1" style={{gridTemplateColumns:'18px 1fr 1fr 1fr 64px 20px'}}>
+              <div style={hdr}>#</div><div style={hdr}>Altura</div><div style={hdr}>Comp</div><div style={hdr}>Larg</div><div style={{...hdr,textAlign:'right'}}>m³</div><div></div>
+              {arr.map((l,i)=>(
+                <div key={i} style={{display:'contents'}}>
+                  <div style={cel}>{i+1}</div>
+                  <input style={inG} type="number" value={l.altura} onChange={e=>setLin(cat,i,'altura',e.target.value)} />
+                  <input style={inG} type="number" value={l.comprimento} onChange={e=>setLin(cat,i,'comprimento',e.target.value)} />
+                  <input style={inG} type="number" value={l.largura} onChange={e=>setLin(cat,i,'largura',e.target.value)} />
+                  <div style={{...cel,textAlign:'right',color:'var(--gn)',fontWeight:700}}>{m3fmt(volLinha(cat,l))}</div>
+                  <button onClick={()=>delLinha(cat,i)} style={{color:'var(--rd)',fontSize:'13px'}}>✕</button>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+
+        <div className="flex items-center gap-2 flex-wrap mt-1">
+          <Btn onClick={()=>addLinha(cat)} size="sm" style={{background:cor,color:'#fff',border:'none'}}>+ Lançamento</Btn>
+          {arr.length>0 && <>
+            <span style={{fontSize:'12px',fontWeight:800,color:'var(--gn)'}}>Total: {m3fmt(total)} m³</span>
+            <Btn onClick={()=>salvarCategoria(cat,false)} size="sm" variant="secondary" disabled={saving===cat}>{saving===cat?'...':'💾 Salvar'}</Btn>
+            <Btn onClick={()=>salvarCategoria(cat,true)} size="sm" variant="primary" disabled={saving===cat}>🏷️ Salvar + Etiquetas</Btn>
+          </>}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -196,19 +219,12 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
           <Input label="m³ do tanque" value={cab.tanque_m3} onChange={(v:string)=>setCab((e:any)=>({...e,tanque_m3:v}))} type="number" placeholder="0.000" />
           <Input label="Sobra do tanque (m³)" value={cab.sobra_m3} onChange={(v:string)=>setCab((e:any)=>({...e,sobra_m3:v}))} type="number" placeholder="0.000" />
         </div>
-        <div style={{fontSize:'11px',color:'var(--cy)',fontWeight:700,marginBottom:'8px'}}>
-          Tanque laminado: {m3fmt(tanqueLiq)} m³
-        </div>
+        <div style={{fontSize:'11px',color:'var(--cy)',fontWeight:700,marginBottom:'8px'}}>Tanque laminado: {m3fmt(tanqueLiq)} m³</div>
         <Btn onClick={salvarCabecalho} variant="primary" size="sm">💾 Salvar dados do dia</Btn>
       </div>
 
-      {/* Botões de lançamento por pacote */}
-      <div style={{display:'flex',gap:'10px',flexWrap:'wrap',marginBottom:'12px'}}>
-        {btn('capa','Capa','#22c55e')}
-        {btn('capinha','Capinha','#3b82f6')}
-        {btn('retalho','Retalho','#f59e0b')}
-        {btn('aproveitamento','Aproveit.','#a855f7')}
-      </div>
+      {/* Seções por tipo de lâmina */}
+      {TIPOS.map(t=> <Secao key={t.cat} cat={t.cat} label={t.label} cor={t.cor} />)}
 
       {/* Resumo do dia */}
       <div className="rounded-xl p-3 mb-3" style={{background:'var(--s2)',border:'1px solid var(--bd)',display:'flex',justifyContent:'space-around',textAlign:'center'}}>
@@ -227,69 +243,17 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
                   Nº {String(p.numero).padStart(6,'0')} <span style={{fontSize:'11px',fontWeight:600,color:'var(--cy)',textTransform:'uppercase'}}>· {p.categoria}</span>
                 </div>
                 <div style={{fontSize:'10px',color:'var(--t3)'}}>
-                  {p.tipo_nome ? p.tipo_nome+' · ' : ''}
                   {usaFolhas(p.categoria) ? `${p.folhas} folhas` : `alt ${p.altura}`} · <b style={{color:'var(--gn)'}}>{m3fmt(p.volume_m3)} m³</b>
                 </div>
               </div>
               <div className="flex gap-1">
-                <Btn onClick={()=>imprimirEtiqueta(p)} size="sm">🏷️</Btn>
-                <Btn onClick={()=>del(p.id,p.numero)} variant="danger" size="sm">🗑</Btn>
+                <button onClick={()=>imprimirEtiqueta(p)} style={{fontSize:'15px'}}>🏷️</button>
+                <button onClick={()=>del(p.id,p.numero)} style={{color:'var(--rd)',fontSize:'15px'}}>🗑️</button>
               </div>
             </div>
           ))}
         </div>
       )}
-
-      {/* Modal de lançamento — GRADE de várias linhas (cada linha = 1 pacote) */}
-      <Modal open={modal} onClose={()=>setModal(false)}
-        title={`Lançar ${novo.categoria||''} — várias linhas`}
-        footer={<>
-          <Btn onClick={()=>setModal(false)}>Cancelar</Btn>
-          <Btn onClick={()=>salvarPacote(false)} size="md" disabled={saving}>Salvar</Btn>
-          <Btn onClick={()=>salvarPacote(true)} variant="primary" size="md" disabled={saving}>{saving?'...':'Salvar + Etiquetas'}</Btn>
-        </>}>
-
-        <div style={{fontSize:'10px',color:'var(--t3)',marginBottom:'8px'}}>
-          Cada linha vira um pacote. Em "+ Linha" as medidas da anterior são copiadas ({usaFolhas(novo.categoria)?'folhas':'altura'} fica em branco).
-        </div>
-
-        {/* cabeçalho da grade */}
-        {usaFolhas(novo.categoria) ? (
-          <div className="grid gap-1" style={{gridTemplateColumns:'18px 1fr 1fr 1fr 1fr 60px 20px'}}>
-            <div style={hdr}>#</div><div style={hdr}>Esp(mm)</div><div style={hdr}>Comp</div><div style={hdr}>Larg</div><div style={hdr}>Folhas</div><div style={{...hdr,textAlign:'right'}}>m³</div><div></div>
-            {linhas.map((l,i)=>(
-              <div key={i} style={{display:'contents'}}>
-                <div style={cel}>{i+1}</div>
-                <input style={inG} type="number" value={l.espessura} onChange={e=>setLin(i,'espessura',e.target.value)} placeholder="2.6" />
-                <input style={inG} type="number" value={l.comprimento} onChange={e=>setLin(i,'comprimento',e.target.value)} />
-                <input style={inG} type="number" value={l.largura} onChange={e=>setLin(i,'largura',e.target.value)} />
-                <input style={inG} type="number" value={l.folhas} onChange={e=>setLin(i,'folhas',e.target.value)} />
-                <div style={{...cel,textAlign:'right',color:'var(--gn)',fontWeight:700}}>{m3fmt(volLinha(novo.categoria,l))}</div>
-                <button onClick={()=>delLinha(i)} style={{color:'var(--rd)',fontSize:'13px'}}>✕</button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="grid gap-1" style={{gridTemplateColumns:'18px 1fr 1fr 1fr 60px 20px'}}>
-            <div style={hdr}>#</div><div style={hdr}>Altura</div><div style={hdr}>Comp</div><div style={hdr}>Larg</div><div style={{...hdr,textAlign:'right'}}>m³</div><div></div>
-            {linhas.map((l,i)=>(
-              <div key={i} style={{display:'contents'}}>
-                <div style={cel}>{i+1}</div>
-                <input style={inG} type="number" value={l.altura} onChange={e=>setLin(i,'altura',e.target.value)} />
-                <input style={inG} type="number" value={l.comprimento} onChange={e=>setLin(i,'comprimento',e.target.value)} />
-                <input style={inG} type="number" value={l.largura} onChange={e=>setLin(i,'largura',e.target.value)} />
-                <div style={{...cel,textAlign:'right',color:'var(--gn)',fontWeight:700}}>{m3fmt(volLinha(novo.categoria,l))}</div>
-                <button onClick={()=>delLinha(i)} style={{color:'var(--rd)',fontSize:'13px'}}>✕</button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="flex justify-between items-center mt-2">
-          <Btn onClick={addLinha} size="sm" variant="secondary">+ Linha</Btn>
-          <div style={{fontSize:'13px',fontWeight:800,color:'var(--gn)'}}>Total: {m3fmt(totalGrade)} m³</div>
-        </div>
-      </Modal>
     </div>
   )
 }
