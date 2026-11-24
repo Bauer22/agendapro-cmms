@@ -267,7 +267,7 @@ export default function App() {
     {id:'fuel' as Page,       label:'Combustível', icon:<span>⛽</span>},
     {id:'gerencial' as Page,  label:'Gerencial',   icon:<span>📈</span>},
     {id:'sales' as Page,      label:'Vendas',      icon:<span>🛒</span>},
-    {id:'romlamina' as Page,  label:'Rom. Lâmina', icon:<span>🪵</span>},
+    {id:'romlamina' as Page,  label:'Rom. Lâmina', icon:<span>🟫</span>},
     {id:'estoque' as Page,    label:'Estoque',     icon:<span>📦</span>},
     {id:'pdv' as Page,        label:'PDV',         icon:<span>🧾</span>},
     {id:'transportadora' as Page, label:'Transportadora', icon:<span>🚚</span>},
