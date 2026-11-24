@@ -40,6 +40,7 @@ const ABAS_SISTEMA: {id:string;label:string;icon:string}[] = [
   {id:'fuel',      label:'Combustível', icon:'⛽'},
   {id:'gerencial', label:'Gerencial',  icon:'📈'},
   {id:'sales',     label:'Vendas',     icon:'🛒'},
+  {id:'romlamina', label:'Rom. Lâmina',icon:'🪵'},
   {id:'estoque',   label:'Estoque',    icon:'📦'},
   {id:'pdv',       label:'PDV',        icon:'🧾'},
   {id:'transportadora', label:'Transportadora', icon:'🚚'},
