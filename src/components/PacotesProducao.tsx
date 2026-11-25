@@ -327,16 +327,16 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
 
   return (
     <div style={ maximizado
-      ? { position:'fixed', inset:0, zIndex:90, background:'var(--bg)', overflowY:'auto', padding:'0', paddingTop:'var(--sat)' }
+      ? { position:'fixed', inset:0, zIndex:9999, background:'var(--bg)', overflowY:'auto', padding:'0', paddingTop:'var(--sat)', WebkitOverflowScrolling:'touch' }
       : undefined }>
       {dialog}
 
       {/* Barra fixa do modo maximizado — sempre visível, com botão SAIR */}
       {maximizado && (
-        <div style={{position:'sticky',top:0,zIndex:5,background:'var(--s1)',borderBottom:'1px solid var(--bd)',
+        <div style={{position:'sticky',top:0,zIndex:2,background:'var(--s1)',borderBottom:'1px solid var(--bd)',
           boxShadow:'0 2px 10px -4px rgba(0,0,0,.2)',padding:'10px 12px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'10px',marginBottom:'10px'}}>
           <div style={{fontSize:'13px',fontWeight:800,color:'var(--t1)'}}>🏭 Lançamento de Produção</div>
-          <Btn onClick={()=>setMaximizado(false)} size="md" variant="primary">✕ Sair da tela cheia</Btn>
+          <Btn onClick={()=>setMaximizado(false)} size="md" variant="danger">✕ Sair da tela cheia</Btn>
         </div>
       )}
 
