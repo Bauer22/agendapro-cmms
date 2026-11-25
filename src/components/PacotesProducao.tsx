@@ -327,25 +327,39 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
 
   return (
     <div style={ maximizado
-      ? { position:'fixed', inset:0, zIndex:90, background:'var(--bg)', overflowY:'auto', padding:'10px', paddingTop:'calc(var(--sat) + 10px)' }
+      ? { position:'fixed', inset:0, zIndex:90, background:'var(--bg)', overflowY:'auto', padding:'0', paddingTop:'var(--sat)' }
       : undefined }>
       {dialog}
 
-      {/* Abas Lançamento / Histórico + Maximizar */}
+      {/* Barra fixa do modo maximizado — sempre visível, com botão SAIR */}
+      {maximizado && (
+        <div style={{position:'sticky',top:0,zIndex:5,background:'var(--s1)',borderBottom:'1px solid var(--bd)',
+          boxShadow:'0 2px 10px -4px rgba(0,0,0,.2)',padding:'10px 12px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'10px',marginBottom:'10px'}}>
+          <div style={{fontSize:'13px',fontWeight:800,color:'var(--t1)'}}>🏭 Lançamento de Produção</div>
+          <Btn onClick={()=>setMaximizado(false)} size="md" variant="primary">✕ Sair da tela cheia</Btn>
+        </div>
+      )}
+
+      {/* Abas Lançamento / Histórico + Maximizar (ocultas no modo cheia) */}
+      {!maximizado && (
       <div className="flex gap-1.5 mb-3 items-center">
         {[{k:'lancamento',l:'➕ Lançamento'},{k:'historico',l:'📚 Histórico'}].map(t=>(
-          <button key={t.k} onClick={()=>{setAba(t.k as any); if(t.k==='historico') setMaximizado(false)}}
+          <button key={t.k} onClick={()=>{setAba(t.k as any)}}
             className="px-3 py-1.5 rounded-lg text-xs font-semibold"
             style={{background: aba===t.k?'var(--cy)':'var(--s1)', color: aba===t.k?'#fff':'var(--t2)', border:'1px solid var(--bd)'}}>{t.l}</button>
         ))}
         {aba==='lancamento' && (
-          <button onClick={()=>setMaximizado(m=>!m)}
+          <button onClick={()=>setMaximizado(true)}
             className="px-3 py-1.5 rounded-lg text-xs font-semibold ml-auto"
-            style={{background: maximizado?'var(--cy)':'var(--s1)', color: maximizado?'#fff':'var(--t2)', border:'1px solid var(--bd)'}}>
-            {maximizado?'✕ Sair':'⛶ Maximizar'}
+            style={{background:'var(--s1)', color:'var(--t2)', border:'1px solid var(--bd)'}}>
+            ⛶ Maximizar
           </button>
         )}
       </div>
+      )}
+
+      {/* Conteúdo com padding quando maximizado */}
+      <div style={ maximizado ? { padding:'0 12px 12px' } : undefined }>
 
       {aba==='historico' ? (
         historico.length===0 ? <Empty icon="📚" text="Nenhum dia de produção registrado" />
@@ -452,6 +466,7 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
       )}
       </>
       )}
+      </div>
 
       {/* Modal de edição rápida de um pacote */}
       <Modal open={!!editPacote} onClose={()=>setEditPacote(null)} title={editPacote?`Corrigir pacote #${editPacote.numero} (${editPacote.categoria})`:''}
