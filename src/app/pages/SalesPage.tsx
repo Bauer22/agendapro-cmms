@@ -477,6 +477,14 @@ export default function SalesPage({ profile, can }: Props) {
       user_name: profile?.display_name,
     }).then(() => {})
 
+    // Venda de TORA DE PINUS baixa o estoque de madeira: refecha o mês da venda
+    try {
+      if (/tora.*pinus/i.test(obj.product_name || '')) {
+        const mesVenda = (obj.sale_date || '').slice(0, 7)
+        if (mesVenda) await supabase.rpc('fn_refechar_cascata', { p_mes_inicial: mesVenda, p_company_id: profile?.company_id || null })
+      }
+    } catch (e) { /* silencioso */ }
+
     toast.success(editing.id ? 'Romaneio atualizado ✅' : 'Romaneio gerado ✅')
     setSaving(false)
     setModal(false)
@@ -509,8 +517,16 @@ export default function SalesPage({ profile, can }: Props) {
 
   async function cancel(id: string) {
     if (!await confirm('Cancelar este romaneio?')) return
+    const reg = orders.find((o:any)=>o.id===id)   // guarda produto/data antes de cancelar
     const { error } = await supabase.from('sales_orders').update({ status: 'cancelled', updated_by: profile?.display_name, updated_at: new Date().toISOString() }).eq('id', id)
     if (error) { toast.error(error.message); return }
+    // Se era venda de TORA DE PINUS, devolve ao estoque de madeira (refecha o mês)
+    try {
+      if (reg && /tora.*pinus/i.test(reg.product_name || '')) {
+        const mesVenda = (reg.sale_date || '').slice(0, 7)
+        if (mesVenda) await supabase.rpc('fn_refechar_cascata', { p_mes_inicial: mesVenda, p_company_id: profile?.company_id || null })
+      }
+    } catch (e) { /* silencioso */ }
     toast.success('Romaneio cancelado'); load()
   }
 
