@@ -8,31 +8,37 @@
    Todas as telas herdam daqui, então o sistema inteiro muda junto.
    ═══════════════════════════════════════════════════════════════ */
 :root {
-  /* fundos: fundo geral cinza iOS, cartões/campos claros */
-  --bg:#e3e3e8;        /* fundo geral (cinza iOS um pouco mais escuro) */
-  --bg2:#ededf2;       /* fundo secundário */
+  /* fundos: fundo geral cinza iOS (um tom mais fechado), cartões/campos claros */
+  --bg:#d9d9e0;        /* fundo geral (cinza iOS um pouco mais escuro) */
+  --bg2:#e6e6ec;       /* fundo secundário */
   --s1:#ffffff;        /* cartões */
-  --s2:#f4f4f7;        /* campos / inputs */
-  --s3:#ececf1;        /* realces sutis */
+  --s2:#f1f1f5;        /* campos / inputs */
+  --s3:#e9e9ef;        /* realces sutis */
 
   /* bordas e separadores (escuro translúcido sobre claro) */
-  --bd:rgba(60,60,67,.14);
+  --bd:rgba(60,60,67,.12);
   --bd2:rgba(249,115,22,.5);
 
   /* cores de destaque — laranja da marca mantido, demais em tom iOS */
   --cy:#f97316;  --cy2:#fb923c;   /* laranja Industrial8 */
   --am:#ff9500;                   /* âmbar iOS */
-  --gn:#34c759;                   /* verde iOS */
+  --gn:#30b84f;                   /* verde iOS (um pouco mais fechado p/ contraste) */
   --rd:#ff3b30;                   /* vermelho iOS */
   --pu:#5856d6;                   /* roxo iOS */
 
-  /* textos: ESCUROS sobre fundo claro (invertidos do tema dark) */
-  --t1:#1c1c1e;   /* texto principal */
-  --t2:#55555a;   /* texto secundário */
-  --t3:#8e8e93;   /* texto terciário / labels */
+  /* textos: ESCUROS sobre fundo claro — contraste uniforme (padrão iOS) */
+  --t1:#1c1c1e;   /* texto principal — quase preto */
+  --t2:#4a4a4f;   /* texto secundário — cinza escuro legível */
+  --t3:#7c7c82;   /* texto terciário / labels — cinza médio */
 
-  /* sombra em volta de TODA a borda (efeito card elevado iOS) */
-  --shadow:0 0 0 .5px rgba(0,0,0,.04), 0 2px 6px rgba(0,0,0,.08), 0 10px 28px -6px rgba(0,0,0,.14);
+  /* SOMBRA SOFISTICADA — luz na borda de cima (highlight) + sombra embaixo.
+     Dá o efeito de uma fonte de luz ressaltando a borda do cartão (bisel iOS). */
+  --shadow:
+    inset 0 1px 0 rgba(255,255,255,.9),           /* brilho superior interno */
+    0 0 0 .5px rgba(0,0,0,.05),                    /* contorno fino */
+    0 1px 2px rgba(0,0,0,.05),                     /* sombra de contato */
+    0 6px 16px -4px rgba(0,0,0,.12),               /* sombra média */
+    0 16px 40px -12px rgba(0,0,0,.14);             /* sombra ampla / profundidade */
 
   --sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);
 }
