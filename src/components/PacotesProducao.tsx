@@ -331,13 +331,24 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
       : undefined }>
       {dialog}
 
-      {/* Barra fixa do modo maximizado — sempre visível, com botão SAIR */}
+      {/* Barra do modo maximizado — título (a saída fica no botão flutuante) */}
       {maximizado && (
-        <div style={{position:'sticky',top:0,zIndex:2,background:'var(--s1)',borderBottom:'1px solid var(--bd)',
+        <div style={{background:'var(--s1)',borderBottom:'1px solid var(--bd)',
           boxShadow:'0 2px 10px -4px rgba(0,0,0,.2)',padding:'10px 12px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'10px',marginBottom:'10px'}}>
           <div style={{fontSize:'13px',fontWeight:800,color:'var(--t1)'}}>🏭 Lançamento de Produção</div>
-          <Btn onClick={()=>setMaximizado(false)} size="md" variant="danger">✕ Sair da tela cheia</Btn>
+          <Btn onClick={()=>setMaximizado(false)} size="md" variant="danger">✕ Sair</Btn>
         </div>
+      )}
+
+      {/* Botão FLUTUANTE de fechar — sempre visível no canto (celular/tablet) */}
+      {maximizado && (
+        <button onClick={()=>setMaximizado(false)}
+          style={{position:'fixed',right:'16px',bottom:'calc(var(--sab) + 16px)',zIndex:100000,
+            background:'var(--rd)',color:'#fff',border:'none',borderRadius:'999px',
+            padding:'14px 22px',fontSize:'15px',fontWeight:800,fontFamily:"'Sora',system-ui",
+            boxShadow:'0 6px 20px rgba(214,75,67,.5)',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px'}}>
+          ✕ Fechar
+        </button>
       )}
 
       {/* Abas Lançamento / Histórico + Maximizar (ocultas no modo cheia) */}
