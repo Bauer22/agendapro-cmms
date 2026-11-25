@@ -356,9 +356,9 @@ export default function WoodPage({ profile, can }: Props) {
         {([['lista','📋 Lançamentos'],['relatorio','📊 Relatório']] as ['lista'|'relatorio',string][]).map(([t,l]) => (
           <div key={t} onClick={()=>setTab(t)}
             style={{ flex:1, textAlign:'center', padding:'8px', borderRadius:'10px', fontSize:'12px', fontWeight:700, cursor:'pointer',
-              background: tab===t?'rgba(249,115,22,.12)':'var(--s1)',
-              border:`1px solid ${tab===t?'rgba(249,115,22,.4)':'var(--bd)'}`,
-              color: tab===t?'#f97316':'var(--t2)' }}>{l}</div>
+              background: tab===t?'rgba(47,168,154,.12)':'var(--s1)',
+              border:`1px solid ${tab===t?'rgba(47,168,154,.4)':'var(--bd)'}`,
+              color: tab===t?'var(--cy)':'var(--t2)' }}>{l}</div>
         ))}
       </div>
 
@@ -371,7 +371,7 @@ export default function WoodPage({ profile, can }: Props) {
         <>
           {/* ═══ FILTROS ═══ */}
           <div className="rounded-xl p-3 mb-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
-            <div style={{fontSize:'9px',fontWeight:700,color:'rgba(249,115,22,.65)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'8px'}}>FILTROS</div>
+            <div style={{fontSize:'9px',fontWeight:700,color:'var(--cy)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'8px'}}>FILTROS</div>
             <div className="grid grid-cols-2 gap-x-3">
               <Input label="De" value={rFrom} onChange={setRFrom} type="date" />
               <Input label="Até" value={rTo} onChange={setRTo} type="date" />
@@ -417,9 +417,9 @@ export default function WoodPage({ profile, can }: Props) {
                 {([['forn','🏭 Fornecedor'],['mot','🚗 Motorista'],['veic','🚛 Placa'],['classe','🪵 Classe']] as ['forn'|'mot'|'veic'|'classe',string][]).map(([k,l])=>(
                   <div key={k} onClick={()=>setRView(k)}
                     style={{flexShrink:0,padding:'6px 11px',borderRadius:'16px',fontSize:'10px',fontWeight:700,cursor:'pointer',
-                      background:rView===k?'rgba(249,115,22,.14)':'var(--s2)',
-                      border:`1px solid ${rView===k?'rgba(249,115,22,.4)':'var(--bd)'}`,
-                      color:rView===k?'#f97316':'var(--t3)',whiteSpace:'nowrap'}}>{l}</div>
+                      background:rView===k?'rgba(47,168,154,.14)':'var(--s2)',
+                      border:`1px solid ${rView===k?'rgba(47,168,154,.4)':'var(--bd)'}`,
+                      color:rView===k?'var(--cy)':'var(--t3)',whiteSpace:'nowrap'}}>{l}</div>
                 ))}
               </div>
 
@@ -437,11 +437,11 @@ export default function WoodPage({ profile, can }: Props) {
                         <span style={{textAlign:'right',color:'var(--t2)'}}>{f.cargas}</span>
                         <span style={{textAlign:'right',color:'var(--cy)'}}>{f.tons.toFixed(1)}</span>
                         <span style={{textAlign:'right',color:'var(--am)'}}>{f.m3>0?f.m3.toFixed(1):'—'}</span>
-                        <span style={{textAlign:'right',color:'#f97316',fontWeight:700}}>{f.val>0?f.val.toLocaleString('pt-BR',{maximumFractionDigits:0}):'—'}</span>
+                        <span style={{textAlign:'right',color:'var(--cy)',fontWeight:700}}>{f.val>0?f.val.toLocaleString('pt-BR',{maximumFractionDigits:0}):'—'}</span>
                       </div>
                       <div className="px-3 pb-2 pt-1">
-                        <div style={{height:'3px',background:'rgba(255,255,255,.05)',borderRadius:'2px',overflow:'hidden'}}>
-                          <div style={{height:'100%',width:`${Math.min(pct,100)}%`,background:'linear-gradient(90deg,#f97316,#fb923c)',borderRadius:'2px'}} />
+                        <div style={{height:'3px',background:'rgba(52,64,68,.08)',borderRadius:'2px',overflow:'hidden'}}>
+                          <div style={{height:'100%',width:`${Math.min(pct,100)}%`,background:'linear-gradient(90deg,var(--cy),var(--cy2))',borderRadius:'2px'}} />
                         </div>
                         <div style={{fontSize:'8px',color:'var(--t3)',marginTop:'2px'}}>
                           {pct.toFixed(1)}% · média {(f.tons/f.cargas).toFixed(2)} t/viagem
@@ -450,12 +450,12 @@ export default function WoodPage({ profile, can }: Props) {
                     </div>
                   )
                 })}
-                <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 44px 56px 48px 76px',background:'rgba(249,115,22,.1)',borderTop:'2px solid rgba(249,115,22,.3)',fontSize:'11px',fontWeight:800}}>
+                <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 44px 56px 48px 76px',background:'rgba(47,168,154,.1)',borderTop:'2px solid rgba(47,168,154,.3)',fontSize:'11px',fontWeight:800}}>
                   <span>TOTAL</span>
                   <span style={{textAlign:'right'}}>{rep.length}</span>
                   <span style={{textAlign:'right',color:'var(--cy)'}}>{repTons.toFixed(1)}</span>
                   <span style={{textAlign:'right',color:'var(--am)'}}>{repM3.toFixed(1)}</span>
-                  <span style={{textAlign:'right',color:'#f97316'}}>{repVal.toLocaleString('pt-BR',{maximumFractionDigits:0})}</span>
+                  <span style={{textAlign:'right',color:'var(--cy)'}}>{repVal.toLocaleString('pt-BR',{maximumFractionDigits:0})}</span>
                 </div>
               </div>
 
@@ -507,7 +507,7 @@ export default function WoodPage({ profile, can }: Props) {
                       {parseFloat(e.weight_tons || 0).toFixed(3)} t
                     </span>
                     {e.volume_m3 > 0 && <span className="text-xs" style={{ color: 'var(--t3)' }}>{parseFloat(e.volume_m3).toFixed(2)} m³</span>}
-                    {e.total_value > 0 && <span className="text-xs font-bold" style={{ color: '#f97316' }}>R$ {parseFloat(e.total_value).toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>}
+                    {e.total_value > 0 && <span className="text-xs font-bold" style={{ color: 'var(--cy)' }}>R$ {parseFloat(e.total_value).toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>}
                   </div>
                   <div className="font-bold text-sm">{e.supplier_name || '—'}</div>
                   <div className="text-xs mt-0.5" style={{ color: 'var(--t2)' }}>
@@ -632,7 +632,7 @@ export default function WoodPage({ profile, can }: Props) {
           <Input label="Metros cúbicos" value={editing.volume_m3} onChange={(v:string) => setEditing((e:any) => ({...e, volume_m3: v}))} type="number" placeholder="0.00" />
         </div>
 
-        <div style={{fontSize:'9px',fontWeight:700,color:'rgba(249,115,22,.65)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'4px',marginTop:'4px'}}>
+        <div style={{fontSize:'9px',fontWeight:700,color:'var(--cy)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'4px',marginTop:'4px'}}>
           💰 VALOR DA CARGA
         </div>
         <div className="grid grid-cols-2 gap-x-3">
@@ -662,10 +662,34 @@ export default function WoodPage({ profile, can }: Props) {
           )}
           <Input label="Frete R$ / tonelada" value={editing.frete_ton||''} onChange={(v:string) => setEditing((e:any) => ({...e, frete_ton:v}))} type="number" placeholder="0.00" />
         </div>
-        {editing.frete_ton && editing.weight_tons && (
-          <div style={{fontSize:'10px',color:'var(--t3)',marginBottom:'8px'}}>
-            Frete total: R$ {(parseFloat(editing.frete_ton)*parseFloat(editing.weight_tons)).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}
-            <span style={{marginLeft:'6px',color:'var(--t3)'}}>· entra só no custo de produção (não na conta corrente)</span>
+        {/* Resumo de custo: mostra o custo da tonelada JÁ COM frete (p/ o estoque) */}
+        {(editing.unit_value || editing.frete_ton) && (
+          <div className="rounded-xl p-2.5 mb-2" style={{background:'rgba(47,168,154,.08)',border:'1px solid rgba(47,168,154,.25)'}}>
+            {(() => {
+              const up = parseFloat(editing.unit_value) || 0
+              const fr = parseFloat(editing.frete_ton) || 0
+              const t  = parseFloat(editing.weight_tons) || 0
+              const custoTon = up + fr
+              const br = (v:number)=> v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})
+              return (
+                <>
+                  <div className="flex justify-between" style={{fontSize:'11px',color:'var(--t2)'}}>
+                    <span>Madeira</span><b>R$ {br(up)}/t</b>
+                  </div>
+                  <div className="flex justify-between" style={{fontSize:'11px',color:'var(--t2)'}}>
+                    <span>Frete</span><b>R$ {br(fr)}/t</b>
+                  </div>
+                  <div className="flex justify-between" style={{fontSize:'13px',color:'var(--cy)',fontWeight:800,borderTop:'1px solid var(--bd)',marginTop:'4px',paddingTop:'4px'}}>
+                    <span>Custo da tonelada (c/ frete)</span><span>R$ {br(custoTon)}/t</span>
+                  </div>
+                  {t>0 && fr>0 && (
+                    <div style={{fontSize:'9px',color:'var(--t3)',marginTop:'4px'}}>
+                      Frete total R$ {br(fr*t)} · entra só no custo de estoque, não na conta corrente da {suppliers.find(s=>s.id===editing.supplier_id)?.name || 'empresa'}.
+                    </div>
+                  )}
+                </>
+              )
+            })()}
           </div>
         )}
 
