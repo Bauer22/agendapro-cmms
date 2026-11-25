@@ -261,23 +261,33 @@ export default function RomaneioLamina({ profile }: Props) {
 
   return (
     <div style={ maximizado
-      ? { position:'fixed', inset:0, zIndex:90, background:'var(--bg)', overflowY:'auto', padding:'10px', paddingTop:'calc(var(--sat) + 10px)' }
+      ? { position:'fixed', inset:0, zIndex:90, background:'var(--bg)', overflowY:'auto', padding:'0', paddingTop:'var(--sat)' }
       : { padding:'14px' } }>
+
+      {/* Barra fixa do modo maximizado — sempre visível, com botão SAIR */}
+      {maximizado && (
+        <div style={{position:'sticky',top:0,zIndex:5,background:'var(--s1)',borderBottom:'1px solid var(--bd)',
+          boxShadow:'0 2px 10px -4px rgba(0,0,0,.2)',padding:'10px 12px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'10px'}}>
+          <div style={{fontSize:'13px',fontWeight:800,color:'var(--t1)'}}>🪵 Romaneio de Lâmina</div>
+          <Btn onClick={()=>setMaximizado(false)} size="md" variant="primary">✕ Sair da tela cheia</Btn>
+        </div>
+      )}
+
+      {!maximizado && (
       <SH label="🪵 ROMANEIO DE SAÍDA — LÂMINA" action={
         <div className="flex gap-1.5">
           {aba==='novo' && (
-            <Btn onClick={()=>setMaximizado(m=>!m)} size="sm" variant={maximizado?'primary':'secondary'}>
-              {maximizado?'✕ Sair':'⛶ Maximizar'}
-            </Btn>
+            <Btn onClick={()=>setMaximizado(true)} size="sm" variant="secondary">⛶ Maximizar</Btn>
           )}
           {[{k:'novo',l:'➕ Novo'},{k:'historico',l:'📚 Histórico'}].map(t=>(
             <Btn key={t.k} onClick={()=>{setAba(t.k as any); if(t.k==='historico') setMaximizado(false)}} size="sm" variant={aba===t.k?'primary':'secondary'}>{t.l}</Btn>
           ))}
         </div>
       } />
+      )}
 
       {aba==='novo' && (
-        <div>
+        <div style={ maximizado ? { padding:'12px' } : undefined }>
           {editId && (
             <div className="rounded-xl p-2 mb-2 flex justify-between items-center" style={{background:'rgba(47,168,154,.12)',border:'1px solid rgba(47,168,154,.4)'}}>
               <span style={{fontSize:'11px',color:'var(--cy)'}}>✏️ Editando romaneio <b>#{editNumero}</b></span>
@@ -301,13 +311,17 @@ export default function RomaneioLamina({ profile }: Props) {
           </div>
           </>}
 
-          {/* No modo maximizado: cliente compacto (obrigatório p/ gerar) */}
+          {/* No modo maximizado: cabeçalho compacto (Cliente + Placa + Motorista) */}
           {maximizado && (
             <div className="mb-2">
               <SelectComCadastro label="Cliente *" tipo="cliente" value={cab.cliente_id}
                 onChange={(v:string)=>setCab({...cab,cliente_id:v})}
                 options={clientes.map(c=>({value:c.id,label:c.nome_razao}))}
                 companyId={cid} createdBy={profile?.display_name} onCreatedRefresh={loadClientes} />
+              <div className="grid grid-cols-2 gap-2">
+                <Input label="Placa" value={cab.placa} onChange={(v:string)=>setCab({...cab,placa:v})} />
+                <Input label="Motorista" value={cab.motorista} onChange={(v:string)=>setCab({...cab,motorista:v})} />
+              </div>
             </div>
           )}
 
