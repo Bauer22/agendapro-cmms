@@ -173,11 +173,11 @@ export default function CadastrosPage({ profile, can }: Props) {
   function PapelBadge({item}: {item:any}) {
     return (
       <div className="flex flex-wrap gap-1">
-        {item.is_fornecedor && <Badge color="orange">🏭 Fornecedor</Badge>}
-        {item.is_cliente && <Badge color="blue">🤝 Cliente</Badge>}
-        {item.is_motorista && <Badge color="green">🚗 Motorista</Badge>}
-        {item.is_funcionario && <Badge color="amber">👷 Funcionário</Badge>}
-        {item.is_transportador && <Badge color="purple">🚛 Transportador</Badge>}
+        {item.is_cliente && <Badge color="teal">🤝 Cliente</Badge>}
+        {item.is_fornecedor && <Badge color="gray">🏭 Fornecedor</Badge>}
+        {item.is_motorista && <Badge color="gray">🚗 Motorista</Badge>}
+        {item.is_funcionario && <Badge color="gray">👷 Funcionário</Badge>}
+        {item.is_transportador && <Badge color="gray">🚛 Transportador</Badge>}
       </div>
     )
   }
@@ -186,13 +186,13 @@ export default function CadastrosPage({ profile, can }: Props) {
     return (
       <div onClick={() => onChange(!checked)}
         style={{ display:'flex', alignItems:'center', gap:'8px', padding:'9px 12px', borderRadius:'10px', cursor:'pointer',
-          background: checked ? 'rgba(249,115,22,.1)' : 'var(--s2)',
-          border: `1px solid ${checked ? 'rgba(249,115,22,.4)' : 'var(--bd)'}`, marginBottom:'6px' }}>
-        <div style={{ width:'18px', height:'18px', borderRadius:'4px', border:`2px solid ${checked?'#f97316':'var(--bd)'}`,
-          background: checked?'#f97316':'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+          background: checked ? 'rgba(47,168,154,.1)' : 'var(--s2)',
+          border: `1px solid ${checked ? 'var(--cy)' : 'var(--bd)'}`, marginBottom:'6px' }}>
+        <div style={{ width:'18px', height:'18px', borderRadius:'4px', border:`2px solid ${checked?'var(--cy)':'var(--bd)'}`,
+          background: checked?'var(--cy)':'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
           {checked && <span style={{color:'#fff',fontSize:'12px',fontWeight:900}}>✓</span>}
         </div>
-        <span style={{ fontSize:'13px', fontWeight:checked?700:400, color:checked?'#f97316':'var(--t1)' }}>{label}</span>
+        <span style={{ fontSize:'13px', fontWeight:checked?700:400, color:checked?'var(--cy)':'var(--t1)' }}>{label}</span>
       </div>
     )
   }
@@ -211,9 +211,10 @@ export default function CadastrosPage({ profile, can }: Props) {
         {([['pessoas','👥 Pessoas / Empresas'],['veiculos','🚛 Veículos']] as [Tab,string][]).map(([t,l]) => (
           <div key={t} onClick={() => { setTab(t); setSearch(''); setLoading(true) }}
             style={{ flex:1, textAlign:'center', padding:'9px', borderRadius:'12px', fontSize:'12px', fontWeight:700, cursor:'pointer',
-              background: tab===t ? 'rgba(249,115,22,.12)' : 'var(--s1)',
-              border: `1px solid ${tab===t ? 'rgba(249,115,22,.4)' : 'var(--bd)'}`,
-              color: tab===t ? '#f97316' : 'var(--t2)' }}>
+              background: tab===t ? 'rgba(47,168,154,.12)' : 'var(--s1)',
+              border: `1px solid ${tab===t ? 'var(--cy)' : 'var(--bd)'}`,
+              boxShadow: tab===t ? 'none' : 'var(--shadow)',
+              color: tab===t ? 'var(--cy)' : 'var(--t2)' }}>
             {l}
           </div>
         ))}
@@ -224,9 +225,9 @@ export default function CadastrosPage({ profile, can }: Props) {
           {FILTERS.map(f => (
             <div key={f.id} onClick={() => setFilter(f.id)}
               style={{ flexShrink:0, padding:'6px 12px', borderRadius:'20px', fontSize:'11px', fontWeight:700, cursor:'pointer',
-                background: filter===f.id ? 'rgba(249,115,22,.12)' : 'var(--s1)',
-                border: `1px solid ${filter===f.id ? 'rgba(249,115,22,.4)' : 'var(--bd)'}`,
-                color: filter===f.id ? '#f97316' : 'var(--t2)', whiteSpace:'nowrap' }}>
+                background: filter===f.id ? 'var(--cy)' : 'var(--s1)',
+                border: `1px solid ${filter===f.id ? 'var(--cy)' : 'var(--bd)'}`,
+                color: filter===f.id ? '#fff' : 'var(--t2)', whiteSpace:'nowrap' }}>
               {f.label}
             </div>
           ))}
@@ -247,7 +248,7 @@ export default function CadastrosPage({ profile, can }: Props) {
             {filtered.map(item => (
               <div key={item.id} onClick={() => setView(item)}
                 className="rounded-xl p-3 cursor-pointer"
-                style={{ background:'var(--s1)', border:'1px solid var(--bd)', opacity: item.status?1:0.6 }}>
+                style={{ background:'var(--s1)', border:'1px solid var(--bd)', boxShadow:'var(--shadow)', opacity: item.status?1:0.6 }}>
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <div className="font-bold text-sm mb-1">
@@ -280,7 +281,7 @@ export default function CadastrosPage({ profile, can }: Props) {
           <div className="flex flex-col gap-2">
             {filteredV.map(v => (
               <div key={v.id} className="rounded-xl p-3"
-                style={{ background:'var(--s1)', border:'1px solid var(--bd)', opacity: v.status?1:0.6 }}>
+                style={{ background:'var(--s1)', border:'1px solid var(--bd)', boxShadow:'var(--shadow)', opacity: v.status?1:0.6 }}>
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
@@ -347,7 +348,7 @@ export default function CadastrosPage({ profile, can }: Props) {
           <Btn onClick={save} variant="primary" size="md" disabled={saving}>{saving?'Salvando...':'Salvar'}</Btn>
         </>}>
 
-        <div style={{fontSize:'9px',fontWeight:700,color:'rgba(249,115,22,.65)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'8px'}}>
+        <div style={{fontSize:'9px',fontWeight:700,color:'var(--cy)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'8px'}}>
           PAPÉIS DESTE CADASTRO *
         </div>
         <Checkbox label="🏭 Fornecedor (aba Madeira, Compras, Consertos)" checked={!!editing.is_fornecedor} onChange={(v:boolean)=>setEditing((e:any)=>({...e,is_fornecedor:v}))} />
