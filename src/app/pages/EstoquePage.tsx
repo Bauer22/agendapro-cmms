@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { Btn, Modal, Input, Select, SelectComCadastro, Textarea, SH, Empty, Badge, KPI, useConfirm } from '@/components/ui'
 import PartsPage from '@/app/pages/PartsPage'
 import EstoqueLaminaPage from '@/app/pages/EstoqueLaminaPage'
+import EstoqueMadeiraPage from '@/app/pages/EstoqueMadeiraPage'
 
 type Props = { profile?: any; can?: any }
 
@@ -12,7 +13,7 @@ const qtd = (v: any) => (Number(v) || 0).toLocaleString('pt-BR', { maximumFracti
 
 export default function EstoquePage({ profile, can }: Props) {
   const { confirm, dialog } = useConfirm()
-  const [tab, setTab] = useState<'produtos' | 'compras' | 'movimentos' | 'pecas' | 'lamina'>('produtos')
+  const [tab, setTab] = useState<'produtos' | 'compras' | 'movimentos' | 'pecas' | 'lamina' | 'madeira'>('produtos')
   const [loading, setLoading] = useState(false)
   const [busca, setBusca] = useState('')
 
@@ -30,7 +31,7 @@ export default function EstoquePage({ profile, can }: Props) {
   const cid = profile?.company_id || null
 
   async function load() {
-    if (tab === 'pecas' || tab === 'lamina') return   // telas que carregam os próprios dados
+    if (tab === 'pecas' || tab === 'lamina' || tab === 'madeira') return   // telas que carregam os próprios dados
     setLoading(true)
     try {
       if (tab === 'produtos') {
@@ -149,6 +150,7 @@ export default function EstoquePage({ profile, can }: Props) {
     { k: 'movimentos', l: '📊 Movimentos' },
     { k: 'pecas', l: '🔧 Peças' },
     { k: 'lamina', l: '🪵 Lâmina' },
+    { k: 'madeira', l: '🌲 Madeira' },
   ] as const
 
   return (
@@ -274,6 +276,13 @@ export default function EstoquePage({ profile, can }: Props) {
       {tab === 'lamina' && (
         <div style={{ marginTop: '-14px', marginLeft: '-14px', marginRight: '-14px' }}>
           <EstoqueLaminaPage profile={profile} can={can} />
+        </div>
+      )}
+
+      {/* ─── MADEIRA PINUS (ton — compra entra, produção e venda saem) ─── */}
+      {tab === 'madeira' && (
+        <div style={{ marginTop: '-14px', marginLeft: '-14px', marginRight: '-14px' }}>
+          <EstoqueMadeiraPage profile={profile} can={can} />
         </div>
       )}
 
