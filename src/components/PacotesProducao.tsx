@@ -46,6 +46,7 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
   // grades por categoria
   const [grades, setGrades] = useState<Record<string,any[]>>({ capa:[], capinha:[], retalho:[], aproveitamento:[] })
   const [aba, setAba] = useState<'lancamento'|'historico'>('lancamento')
+  const [maximizado, setMaximizado] = useState(false)
   const [fechado, setFechado] = useState(false)
   const [historico, setHistorico] = useState<any[]>([])
   const [editPacote, setEditPacote] = useState<any>(null)   // pacote em edição rápida
@@ -325,16 +326,25 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
   }
 
   return (
-    <div>
+    <div style={ maximizado
+      ? { position:'fixed', inset:0, zIndex:90, background:'var(--bg)', overflowY:'auto', padding:'10px', paddingTop:'calc(var(--sat) + 10px)' }
+      : undefined }>
       {dialog}
 
-      {/* Abas Lançamento / Histórico */}
-      <div className="flex gap-1.5 mb-3">
+      {/* Abas Lançamento / Histórico + Maximizar */}
+      <div className="flex gap-1.5 mb-3 items-center">
         {[{k:'lancamento',l:'➕ Lançamento'},{k:'historico',l:'📚 Histórico'}].map(t=>(
-          <button key={t.k} onClick={()=>setAba(t.k as any)}
+          <button key={t.k} onClick={()=>{setAba(t.k as any); if(t.k==='historico') setMaximizado(false)}}
             className="px-3 py-1.5 rounded-lg text-xs font-semibold"
-            style={{background: aba===t.k?'var(--cy)':'var(--s1)', color: aba===t.k?'#061018':'var(--t2)', border:'1px solid var(--bd)'}}>{t.l}</button>
+            style={{background: aba===t.k?'var(--cy)':'var(--s1)', color: aba===t.k?'#fff':'var(--t2)', border:'1px solid var(--bd)'}}>{t.l}</button>
         ))}
+        {aba==='lancamento' && (
+          <button onClick={()=>setMaximizado(m=>!m)}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold ml-auto"
+            style={{background: maximizado?'var(--cy)':'var(--s1)', color: maximizado?'#fff':'var(--t2)', border:'1px solid var(--bd)'}}>
+            {maximizado?'✕ Sair':'⛶ Maximizar'}
+          </button>
+        )}
       </div>
 
       {aba==='historico' ? (
@@ -343,7 +353,7 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
             {historico.map(h=>(
               <div key={h.dia} className="p-3 rounded-xl flex justify-between items-center gap-3 flex-wrap" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
                 <div>
-                  <b style={{color:'#fff',fontSize:'13px'}}>{new Date(h.dia+'T00:00:00').toLocaleDateString('pt-BR')}</b>
+                  <b style={{color:'var(--t1)',fontSize:'13px'}}>{new Date(h.dia+'T00:00:00').toLocaleDateString('pt-BR')}</b>
                   {h.fechado && <span style={{fontSize:'9px',color:'var(--gn)',marginLeft:'6px'}}>✓ fechado</span>}
                   <div style={{color:'var(--t2)',fontSize:'11px'}}>{h.madeira?`Madeira ${h.madeira} · `:''}{h._qtd} pacote(s)</div>
                 </div>
@@ -360,14 +370,15 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
           </div>
       ) : (
       <>
-      {/* Cabeçalho do dia */}
+      {/* Cabeçalho do dia — oculto no modo maximizado */}
+      {!maximizado && <>
       {fechado && (
-        <div className="rounded-xl p-2 mb-2" style={{background:'rgba(34,197,94,.1)',border:'1px solid rgba(34,197,94,.3)',fontSize:'11px',color:'var(--gn)'}}>
+        <div className="rounded-xl p-2 mb-2" style={{background:'rgba(48,184,79,.1)',border:'1px solid rgba(48,184,79,.3)',fontSize:'11px',color:'var(--gn)'}}>
           ✓ Este dia está fechado. Você ainda pode editar/excluir pacotes e lançar novos abaixo.
         </div>
       )}
-      <div className="rounded-xl p-3 mb-3" style={{background:'var(--s1)',border:'1px solid rgba(249,115,22,.25)'}}>
-        <div style={{fontSize:'10px',fontWeight:700,color:'#f97316',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'8px'}}>📅 Produção do dia</div>
+      <div className="rounded-xl p-3 mb-3" style={{background:'var(--s1)',border:'1px solid var(--bd)',boxShadow:'var(--shadow)'}}>
+        <div style={{fontSize:'10px',fontWeight:700,color:'var(--cy)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'8px'}}>📅 Produção do dia</div>
         <div className="grid grid-cols-2 gap-x-3">
           <Input label="Dia *" value={dia} onChange={setDia} type="date" />
           <Input label="Madeira do dia" value={cab.madeira} onChange={(v:string)=>setCab((e:any)=>({...e,madeira:v}))} placeholder="Ex: 18 a 24" />
@@ -383,6 +394,18 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
           <Btn onClick={imprimirProducaoDia} variant="secondary" size="sm">🖨️ Imprimir produção</Btn>
         </div>
       </div>
+      </>}
+
+      {/* Dia atual (compacto) quando maximizado, p/ saber onde está lançando */}
+      {maximizado && (
+        <div className="rounded-xl p-2 mb-2 flex items-center justify-between" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
+          <Input label="Dia" value={dia} onChange={setDia} type="date" className="!mb-0" />
+          <div style={{textAlign:'right'}}>
+            <div style={{fontSize:'9px',color:'var(--t3)'}}>Pacotes · Total</div>
+            <div style={{fontSize:'14px',fontWeight:800,color:'var(--gn)'}}>{pacotes.length} · {m3fmt(totalM3)} m³</div>
+          </div>
+        </div>
+      )}
 
       {/* Seções por tipo de lâmina */}
       {TIPOS.map(t=> (
@@ -391,14 +414,17 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
           setLin={setLin} addLinha={addLinha} delLinha={delLinha} salvarCategoria={salvarCategoria} />
       ))}
 
-      {/* Resumo do dia */}
+      {/* Resumo do dia — oculto no maximizado (já aparece compacto no topo) */}
+      {!maximizado && (
       <div className="rounded-xl p-3 mb-3" style={{background:'var(--s2)',border:'1px solid var(--bd)',display:'flex',justifyContent:'space-around',textAlign:'center'}}>
         <div><div style={{fontSize:'9px',color:'var(--t3)'}}>Pacotes</div><div style={{fontSize:'18px',fontWeight:800,color:'var(--t1)'}}>{pacotes.length}</div></div>
         <div><div style={{fontSize:'9px',color:'var(--t3)'}}>Total m³</div><div style={{fontSize:'18px',fontWeight:800,color:'var(--gn)'}}>{m3fmt(totalM3)}</div></div>
       </div>
+      )}
 
-      {/* Lista de pacotes do dia */}
-      {loading ? <Empty icon="⏳" text="Carregando..." /> :
+      {/* Lista de pacotes do dia — oculta no maximizado */}
+      {!maximizado && (
+      loading ? <Empty icon="⏳" text="Carregando..." /> :
         pacotes.length===0 ? <Empty icon="📦" text="Nenhum pacote lançado neste dia." /> : (
         <div className="flex flex-col gap-2">
           {pacotes.map(p => (
@@ -422,6 +448,7 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
             </div>
           ))}
         </div>
+      )
       )}
       </>
       )}
@@ -519,4 +546,4 @@ function Secao({ cat, label, cor, arr, saving, setLin, addLinha, delLinha, salva
 
 const hdr: React.CSSProperties = { fontSize:'8px', color:'var(--t3)', textTransform:'uppercase', fontWeight:700, padding:'2px' }
 const cel: React.CSSProperties = { fontSize:'11px', color:'var(--t2)', display:'flex', alignItems:'center', justifyContent:'center' }
-const inG: React.CSSProperties = { width:'100%', background:'#16284a', border:'1px solid var(--bd)', borderRadius:'6px', padding:'5px 6px', color:'#fff', fontSize:'11px', outline:'none' }
+const inG: React.CSSProperties = { width:'100%', background:'var(--s2)', border:'1px solid var(--bd)', borderRadius:'6px', padding:'5px 6px', color:'var(--t1)', fontSize:'11px', outline:'none' }
