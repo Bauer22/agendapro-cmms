@@ -39,7 +39,7 @@ export default function GerencialPage({ profile, can }: Props) {
     // A funcao faz upsert e recalcula sempre; se falhar, apenas segue sem travar o dashboard
     try {
       const mesAtual = new Date().toISOString().slice(0,7)
-      await supabase.rpc('fn_fechar_estoque_madeira', { p_mes: mesAtual })
+      await supabase.rpc('fn_fechar_estoque_madeira', { p_mes: mesAtual, p_company_id: profile?.company_id || null })
     } catch (e) { /* silencioso: nao impede o carregamento */ }
     const [c, cc, t, k, s, v, est] = await Promise.all([
       supabase.from('v_custo_m3_mensal').select('*'),
