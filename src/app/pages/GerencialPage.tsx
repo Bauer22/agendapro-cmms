@@ -356,9 +356,9 @@ export default function GerencialPage({ profile, can }: Props) {
           {([['mes','📅 Mês atual'],['3m','🕐 3 meses'],['ano','📆 Ano'],['custom','⚙️ Período']] as [typeof period,string][]).map(([k,l])=>(
             <div key={k} onClick={()=>setPeriod(k)}
               style={{flexShrink:0,padding:'5px 11px',borderRadius:'16px',fontSize:'10px',fontWeight:700,cursor:'pointer',
-                background:period===k?'rgba(249,115,22,.14)':'var(--s2)',
-                border:`1px solid ${period===k?'rgba(249,115,22,.4)':'var(--bd)'}`,
-                color:period===k?'#f97316':'var(--t3)',whiteSpace:'nowrap'}}>{l}</div>
+                background:period===k?'rgba(47,168,154,.14)':'var(--s2)',
+                border:`1px solid ${period===k?'rgba(47,168,154,.4)':'var(--bd)'}`,
+                color:period===k?'var(--cy)':'var(--t3)',whiteSpace:'nowrap'}}>{l}</div>
           ))}
         </div>
         {period==='custom' && (
@@ -408,9 +408,9 @@ export default function GerencialPage({ profile, can }: Props) {
         {TABS.map(([t,l])=>(
           <div key={t} onClick={()=>setTab(t)}
             style={{flexShrink:0,padding:'7px 12px',borderRadius:'10px',fontSize:'11px',fontWeight:700,cursor:'pointer',
-              background:tab===t?'rgba(249,115,22,.12)':'var(--s1)',
-              border:`1px solid ${tab===t?'rgba(249,115,22,.4)':'var(--bd)'}`,
-              color:tab===t?'#f97316':'var(--t2)',whiteSpace:'nowrap'}}>{l}</div>
+              background:tab===t?'rgba(47,168,154,.12)':'var(--s1)',
+              border:`1px solid ${tab===t?'rgba(47,168,154,.4)':'var(--bd)'}`,
+              color:tab===t?'var(--cy)':'var(--t2)',whiteSpace:'nowrap'}}>{l}</div>
         ))}
       </div>
 
@@ -419,8 +419,8 @@ export default function GerencialPage({ profile, can }: Props) {
         {/* ═══ CUSTO/m³ ═══ */}
         {tab==='custo' && (
           <>
-            <div className="rounded-xl p-3 mb-3" style={{background:'var(--s1)',border:'1px solid rgba(249,115,22,.25)'}}>
-              <div style={{fontSize:'10px',fontWeight:700,color:'#f97316',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'8px'}}>
+            <div className="rounded-xl p-3 mb-3" style={{background:'var(--s1)',border:'1px solid rgba(47,168,154,.25)'}}>
+              <div style={{fontSize:'10px',fontWeight:700,color:'var(--cy)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'8px'}}>
                 💰 COMPOSIÇÃO DO CUSTO POR m³
               </div>
               <Row label="🪵 Matéria-Prima" value={`${money(T.m3>0?T.materiaPrima/T.m3:0)}/m³`} color="var(--gn)" />
@@ -435,7 +435,7 @@ export default function GerencialPage({ profile, can }: Props) {
               <Row label="🏢 Custos Fixos e Adm" value={`${money(T.m3>0?T.fixosAdm/T.m3:0)}/m³`} color="var(--rd)" />
               <Row label="🔨 Melhorias" value={`${money(T.m3>0?T.melhorias/T.m3:0)}/m³`} color="var(--gn)" />
               <div style={{height:'1px',background:'var(--bd)',margin:'6px 0'}} />
-              <Row label="CUSTO TOTAL / m³" value={money(custoM3)} color="#f97316" bold />
+              <Row label="CUSTO TOTAL / m³" value={money(custoM3)} color="var(--cy)" bold />
               <div style={{fontSize:'9px',color:'var(--t3)',marginTop:'6px'}}>
                 Base: {T.m3.toFixed(2)} m³ produzidos no período
               </div>
@@ -452,7 +452,7 @@ export default function GerencialPage({ profile, can }: Props) {
                     <span style={{textAlign:'right',color:'var(--gn)'}}>{(+x.m3_produzido).toFixed(0)}</span>
                     <span style={{textAlign:'right'}}>{n2(+x.materia_prima_por_m3)}</span>
                     <span style={{textAlign:'right',color:'var(--am)'}}>{n2(+x.mao_obra_por_m3)}</span>
-                    <span style={{textAlign:'right',color:'#f97316',fontWeight:700}}>{n2(+x.custo_total_por_m3)}</span>
+                    <span style={{textAlign:'right',color:'var(--cy)',fontWeight:700}}>{n2(+x.custo_total_por_m3)}</span>
                   </div>
                 ))}
               </div>
@@ -472,7 +472,7 @@ export default function GerencialPage({ profile, can }: Props) {
               <div className="rounded-xl p-2.5 mb-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
                 <div className="flex items-center justify-between mb-2">
                   <span style={{fontSize:'10px',fontWeight:700,color:'var(--t2)',textTransform:'uppercase',letterSpacing:'.5px'}}>Incluir no total — desmarque p/ excluir</span>
-                  {centrosOcultos.length>0 && <span onClick={()=>setCentrosOcultos([])} style={{fontSize:'10px',color:'#f97316',cursor:'pointer',fontWeight:700}}>Marcar todos</span>}
+                  {centrosOcultos.length>0 && <span onClick={()=>setCentrosOcultos([])} style={{fontSize:'10px',color:'var(--cy)',cursor:'pointer',fontWeight:700}}>Marcar todos</span>}
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {centrosAgg.map((c,i)=>{
@@ -480,9 +480,9 @@ export default function GerencialPage({ profile, can }: Props) {
                     return (
                       <div key={i} onClick={()=>toggleCentro(c.centro)}
                         style={{fontSize:'10px',fontWeight:700,padding:'4px 9px',borderRadius:'999px',cursor:'pointer',
-                          background: on?'rgba(249,115,22,.14)':'var(--s2)',
-                          border:`1px solid ${on?'rgba(249,115,22,.45)':'var(--bd)'}`,
-                          color: on?'#f97316':'var(--t3)',
+                          background: on?'rgba(47,168,154,.14)':'var(--s2)',
+                          border:`1px solid ${on?'rgba(47,168,154,.45)':'var(--bd)'}`,
+                          color: on?'var(--cy)':'var(--t3)',
                           textDecoration: on?'none':'line-through', opacity: on?1:.6}}>
                         {on?'✓ ':''}{c.centro}
                       </div>
@@ -490,7 +490,7 @@ export default function GerencialPage({ profile, can }: Props) {
                   })}
                 </div>
                 <div style={{fontSize:'10px',color:'var(--t3)',marginTop:'8px'}}>
-                  Total ({centrosVisiveis.length} centro{centrosVisiveis.length!==1?'s':''}): <b style={{color:'#f97316'}}>{money(totalCentrosVis)}</b>
+                  Total ({centrosVisiveis.length} centro{centrosVisiveis.length!==1?'s':''}): <b style={{color:'var(--cy)'}}>{money(totalCentrosVis)}</b>
                   {centrosOcultos.length>0 && <span> · {centrosOcultos.length} excluído(s)</span>}
                 </div>
               </div>
@@ -504,12 +504,12 @@ export default function GerencialPage({ profile, can }: Props) {
                       <div className="flex justify-between items-start mb-1.5">
                         <span style={{fontSize:'12px',fontWeight:700}}>{c.centro}</span>
                         <div style={{textAlign:'right'}}>
-                          <div style={{fontSize:'13px',fontWeight:800,color:'#f97316'}}>{money(c.porM3)}<span style={{fontSize:'9px',color:'var(--t3)'}}>/m³</span></div>
+                          <div style={{fontSize:'13px',fontWeight:800,color:'var(--cy)'}}>{money(c.porM3)}<span style={{fontSize:'9px',color:'var(--t3)'}}>/m³</span></div>
                           <div style={{fontSize:'9px',color:'var(--t3)'}}>{money(c.valor)} · {pct.toFixed(1)}%</div>
                         </div>
                       </div>
                       <div style={{height:'5px',background:'rgba(255,255,255,.05)',borderRadius:'3px',overflow:'hidden'}}>
-                        <div style={{height:'100%',width:`${Math.min(pct,100)}%`,background:'linear-gradient(90deg,#f97316,#fb923c)',borderRadius:'3px'}} />
+                        <div style={{height:'100%',width:`${Math.min(pct,100)}%`,background:'linear-gradient(90deg,var(--cy),var(--cy2))',borderRadius:'3px'}} />
                       </div>
                     </div>
                   )
@@ -536,7 +536,7 @@ export default function GerencialPage({ profile, can }: Props) {
                   <div key={i} className="rounded-xl p-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
                     <div className="flex justify-between items-start mb-1">
                       <span style={{fontSize:'13px',fontWeight:800,color:'var(--cy)',letterSpacing:'.5px'}}>{v.unidade}</span>
-                      <span style={{fontSize:'13px',fontWeight:800,color:'#f97316'}}>{money(v.total)}</span>
+                      <span style={{fontSize:'13px',fontWeight:800,color:'var(--cy)'}}>{money(v.total)}</span>
                     </div>
                     <div className="grid grid-cols-2 gap-x-3">
                       <Row label="⛽ Diesel" value={money(v.diesel)} color="var(--cy)" />
@@ -608,15 +608,15 @@ export default function GerencialPage({ profile, can }: Props) {
                     <span style={{textAlign:'right',color:'var(--t2)'}}>{p.qtd}</span>
                     <span style={{textAlign:'right',color:'var(--cy)'}}>{p.tons.toFixed(1)}</span>
                     <span style={{textAlign:'right',color:'var(--gn)'}}>{p.m3.toFixed(1)}</span>
-                    <span style={{textAlign:'right',color:'#f97316',fontWeight:700}}>{p.val>0?p.val.toLocaleString('pt-BR',{maximumFractionDigits:0}):'—'}</span>
+                    <span style={{textAlign:'right',color:'var(--cy)',fontWeight:700}}>{p.val>0?p.val.toLocaleString('pt-BR',{maximumFractionDigits:0}):'—'}</span>
                   </div>
                 ))}
-                <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 34px 56px 48px 76px',background:'rgba(249,115,22,.1)',borderTop:'2px solid rgba(249,115,22,.3)',fontSize:'11px',fontWeight:800}}>
+                <div className="grid px-3 py-2" style={{gridTemplateColumns:'1fr 34px 56px 48px 76px',background:'rgba(47,168,154,.1)',borderTop:'2px solid rgba(47,168,154,.3)',fontSize:'11px',fontWeight:800}}>
                   <span>TOTAL</span>
                   <span style={{textAlign:'right'}}>{vendasProd.reduce((s:any,p:any)=>s+p.qtd,0)}</span>
                   <span style={{textAlign:'right',color:'var(--cy)'}}>{vendasProd.reduce((s:any,p:any)=>s+p.tons,0).toFixed(1)}</span>
                   <span style={{textAlign:'right',color:'var(--gn)'}}>{vendasProd.reduce((s:any,p:any)=>s+p.m3,0).toFixed(1)}</span>
-                  <span style={{textAlign:'right',color:'#f97316'}}>{fatTotal.toLocaleString('pt-BR',{maximumFractionDigits:0})}</span>
+                  <span style={{textAlign:'right',color:'var(--cy)'}}>{fatTotal.toLocaleString('pt-BR',{maximumFractionDigits:0})}</span>
                 </div>
               </div>
 
@@ -629,7 +629,7 @@ export default function GerencialPage({ profile, can }: Props) {
                         <span style={{fontSize:'12px',fontWeight:700}}>{v.produto}</span>
                         <span style={{fontSize:'10px',color:'var(--t3)'}}> · {v.cliente}</span>
                       </div>
-                      <span style={{fontSize:'12px',fontWeight:700,color:'#f97316'}}>{v.faturado>0?money(+v.faturado):'—'}</span>
+                      <span style={{fontSize:'12px',fontWeight:700,color:'var(--cy)'}}>{v.faturado>0?money(+v.faturado):'—'}</span>
                     </div>
                     <div style={{fontSize:'9px',color:'var(--t3)',marginTop:'2px'}}>
                       {v.mes} · {v.vendas} venda(s){+v.toneladas>0?` · ${(+v.toneladas).toFixed(1)}t`:''}{+v.m3>0?` · ${(+v.m3).toFixed(1)}m³`:''}
