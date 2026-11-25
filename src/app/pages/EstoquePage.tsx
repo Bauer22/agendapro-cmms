@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Btn, Modal, Input, Select, SelectComCadastro, Textarea, SH, Empty, Badge, KPI, useConfirm } from '@/components/ui'
 import PartsPage from '@/app/pages/PartsPage'
+import EstoqueLaminaPage from '@/app/pages/EstoqueLaminaPage'
 
 type Props = { profile?: any; can?: any }
 
@@ -11,7 +12,7 @@ const qtd = (v: any) => (Number(v) || 0).toLocaleString('pt-BR', { maximumFracti
 
 export default function EstoquePage({ profile, can }: Props) {
   const { confirm, dialog } = useConfirm()
-  const [tab, setTab] = useState<'produtos' | 'compras' | 'movimentos' | 'pecas'>('produtos')
+  const [tab, setTab] = useState<'produtos' | 'compras' | 'movimentos' | 'pecas' | 'lamina'>('produtos')
   const [loading, setLoading] = useState(false)
   const [busca, setBusca] = useState('')
 
@@ -29,6 +30,7 @@ export default function EstoquePage({ profile, can }: Props) {
   const cid = profile?.company_id || null
 
   async function load() {
+    if (tab === 'pecas' || tab === 'lamina') return   // telas que carregam os próprios dados
     setLoading(true)
     try {
       if (tab === 'produtos') {
@@ -146,6 +148,7 @@ export default function EstoquePage({ profile, can }: Props) {
     { k: 'compras', l: '🛒 Compras' },
     { k: 'movimentos', l: '📊 Movimentos' },
     { k: 'pecas', l: '🔧 Peças' },
+    { k: 'lamina', l: '🪵 Lâmina' },
   ] as const
 
   return (
@@ -178,7 +181,7 @@ export default function EstoquePage({ profile, can }: Props) {
         <input
           placeholder="🔍 Buscar por nome, código de barras ou SKU..."
           value={busca} onChange={e => setBusca(e.target.value)}
-          style={{ width: '100%', background: '#16284a', border: '1px solid var(--bd)', borderRadius: '10px', padding: '10px 14px', color: '#fff', fontSize: '12px', marginBottom: '12px', outline: 'none' }}
+          style={{ width: '100%', background: 'var(--s2)', border: '1px solid var(--bd)', borderRadius: '10px', padding: '10px 14px', color: 'var(--t1)', fontSize: '12px', marginBottom: '12px', outline: 'none' }}
         />
       )}
 
@@ -195,7 +198,7 @@ export default function EstoquePage({ profile, can }: Props) {
                 <div key={p.id} style={{ background: 'var(--s1)', border: '1px solid var(--bd)', borderRadius: '12px', padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', opacity: p.active === false ? 0.5 : 1 }}>
                   <div style={{ flex: 1, minWidth: '180px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <b style={{ color: '#fff', fontSize: '13px' }}>{p.name}</b>
+                      <b style={{ color: 'var(--t1)', fontSize: '13px' }}>{p.name}</b>
                       {p.categoria && <Badge color="gray">{p.categoria}</Badge>}
                       {abaixo && p.active !== false && <Badge color="red">estoque baixo</Badge>}
                     </div>
@@ -204,7 +207,7 @@ export default function EstoquePage({ profile, can }: Props) {
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', fontSize: '11px', color: 'var(--t2)' }}>
-                    <div>Saldo: <b style={{ color: abaixo ? 'var(--rd)' : '#fff' }}>{qtd(p.saldo)} {p.unit || 'un'}</b></div>
+                    <div>Saldo: <b style={{ color: abaixo ? 'var(--rd)' : 'var(--t1)' }}>{qtd(p.saldo)} {p.unit || 'un'}</b></div>
                     <div>Custo médio: {money(p.custo_medio)}</div>
                     <div>Venda: <b style={{ color: 'var(--gn)' }}>{money(p.preco_venda)}</b></div>
                   </div>
@@ -226,7 +229,7 @@ export default function EstoquePage({ profile, can }: Props) {
             {compras.map(c => (
               <div key={c.id} style={{ background: 'var(--s1)', border: '1px solid var(--bd)', borderRadius: '12px', padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: '180px' }}>
-                  <b style={{ color: '#fff', fontSize: '13px' }}>{c.product_nome}</b>
+                  <b style={{ color: 'var(--t1)', fontSize: '13px' }}>{c.product_nome}</b>
                   <div style={{ color: 'var(--t3)', fontSize: '11px', marginTop: '2px' }}>
                     {c.fornecedor_nome || 'sem fornecedor'} {c.numero_nf ? ` · NF ${c.numero_nf}` : ''} · {c.data_compra?.split('-').reverse().join('/')}
                   </div>
@@ -248,7 +251,7 @@ export default function EstoquePage({ profile, can }: Props) {
             {movs.map(m => (
               <div key={m.id} style={{ background: 'var(--s1)', border: '1px solid var(--bd)', borderRadius: '10px', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: '160px' }}>
-                  <b style={{ color: '#fff', fontSize: '12px' }}>{m.product_nome}</b>
+                  <b style={{ color: 'var(--t1)', fontSize: '12px' }}>{m.product_nome}</b>
                   <div style={{ color: 'var(--t3)', fontSize: '10px' }}>{m.origem} · {m.created_at?.slice(0, 10).split('-').reverse().join('/')}</div>
                 </div>
                 <Badge color={m.tipo === 'entrada' ? 'green' : m.tipo === 'saida' ? 'red' : 'gray'}>
@@ -264,6 +267,13 @@ export default function EstoquePage({ profile, can }: Props) {
       {tab === 'pecas' && (
         <div style={{ marginTop: '-4px' }}>
           <PartsPage profile={profile} can={can} />
+        </div>
+      )}
+
+      {/* ─── LÂMINA (estoque por tipo — produção entra, romaneio sai) ─── */}
+      {tab === 'lamina' && (
+        <div style={{ marginTop: '-14px', marginLeft: '-14px', marginRight: '-14px' }}>
+          <EstoqueLaminaPage profile={profile} can={can} />
         </div>
       )}
 
@@ -285,7 +295,7 @@ export default function EstoquePage({ profile, can }: Props) {
           <Input label="Estoque mínimo" type="number" value={editProd?.estoque_minimo ?? ''} onChange={(v: string) => setEditProd({ ...editProd, estoque_minimo: v })} />
         </div>
         {editProd?.id && (
-          <div style={{ background: 'rgba(249,115,22,.08)', border: '1px solid var(--bd)', borderRadius: '10px', padding: '10px', fontSize: '11px', color: 'var(--t2)', marginTop: '6px' }}>
+          <div style={{ background: 'rgba(47,168,154,.08)', border: '1px solid var(--bd)', borderRadius: '10px', padding: '10px', fontSize: '11px', color: 'var(--t2)', marginTop: '6px' }}>
             Saldo atual: <b>{qtd(editProd.saldo)} {editProd.unit}</b> · Custo médio: <b>{money(editProd.custo_medio)}</b><br />
             <span style={{ color: 'var(--t3)' }}>Saldo e custo médio só mudam por compras e vendas (não são editados aqui).</span>
           </div>
