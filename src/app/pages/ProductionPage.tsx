@@ -149,6 +149,9 @@ export default function ProductionPage({ profile, can }: Props) {
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
   const monthRecs = records.filter(r => r.prod_date >= monthStart)
   const monthProd = monthRecs.reduce((s,r)=>s+(parseFloat(r.produced_m3)||0),0)
+  // Custo médio ponderado do MÊS ATUAL (da estoque_madeira_mensal) p/ o KPI do cabeçalho
+  const mesAtualYM = new Date().toISOString().slice(0,7)
+  const custoMesAtual = precoMesPonderado(mesAtualYM)
 
   // ── Folha em branco: MEDIÇÃO DOS TANQUES DE COZIMENTO — 7 dias ──
   function imprimirFolhaTanques() {
@@ -393,7 +396,7 @@ export default function ProductionPage({ profile, can }: Props) {
 
       <div className="grid grid-cols-3 gap-2 mb-3">
         <KPI num={`${monthProd.toFixed(1)}m³`} label="Produção/mês" color="green" />
-        <KPI num={money(avgTonPrice)} label="Custo médio/t" color="orange" />
+        <KPI num={money(custoMesAtual)} label="Custo madeira/t (mês)" color="teal" />
         <KPI num={repYield>0?repYield.toFixed(3):'—'} label="Renda média" color="purple" />
       </div>
 
@@ -401,9 +404,9 @@ export default function ProductionPage({ profile, can }: Props) {
         {([['pacotes','📦 Pacotes'],['lancamentos','📝 Lançamentos'],['relatorio','📊 Relatório'],['estoque','📦 Estoque'],['folha','📄 Folha']] as [Tab,string][]).map(([t,l]) => (
           <div key={t} onClick={()=>setTab(t)}
             style={{ flex:1, textAlign:'center', padding:'8px', borderRadius:'10px', fontSize:'12px', fontWeight:700, cursor:'pointer',
-              background: tab===t?'rgba(249,115,22,.12)':'var(--s1)',
-              border:`1px solid ${tab===t?'rgba(249,115,22,.4)':'var(--bd)'}`,
-              color: tab===t?'#f97316':'var(--t2)' }}>{l}</div>
+              background: tab===t?'rgba(47,168,154,.12)':'var(--s1)',
+              border:`1px solid ${tab===t?'rgba(47,168,154,.4)':'var(--bd)'}`,
+              color: tab===t?'var(--cy)':'var(--t2)' }}>{l}</div>
         ))}
       </div>
 
@@ -487,7 +490,7 @@ export default function ProductionPage({ profile, can }: Props) {
               ))}
             </div>
             <div className="rounded-xl p-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
-              <div style={{fontSize:'10px',fontWeight:700,color:'#f97316',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'10px'}}>📋 HISTÓRICO DE MOVIMENTAÇÕES</div>
+              <div style={{fontSize:'10px',fontWeight:700,color:'var(--cy)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'10px'}}>📋 HISTÓRICO DE MOVIMENTAÇÕES</div>
               {movs.length===0 ? <div style={{fontSize:'11px',color:'var(--t3)'}}>Sem movimentações.</div> : (
                 <div style={{overflowX:'auto'}}>
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:'11px'}}>
@@ -518,7 +521,7 @@ export default function ProductionPage({ profile, can }: Props) {
         {tab==='relatorio' && (
           <>
             <div className="rounded-xl p-3 mb-3" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
-              <div style={{fontSize:'9px',fontWeight:700,color:'rgba(249,115,22,.65)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'8px'}}>FILTROS</div>
+              <div style={{fontSize:'9px',fontWeight:700,color:'var(--cy)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'8px'}}>FILTROS</div>
               <div className="grid grid-cols-2 gap-x-3">
                 <Input label="De" value={rFrom} onChange={setRFrom} type="date" />
                 <Input label="Até" value={rTo} onChange={setRTo} type="date" />
@@ -529,14 +532,14 @@ export default function ProductionPage({ profile, can }: Props) {
             </div>
 
             {/* Custo de produção */}
-            <div className="rounded-xl p-3 mb-3" style={{background:'var(--s1)',border:'1px solid rgba(249,115,22,.25)'}}>
-              <div style={{fontSize:'10px',fontWeight:700,color:'#f97316',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'10px'}}>
+            <div className="rounded-xl p-3 mb-3" style={{background:'var(--s1)',border:'1px solid rgba(47,168,154,.25)'}}>
+              <div style={{fontSize:'10px',fontWeight:700,color:'var(--cy)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'10px'}}>
                 💰 CUSTO DE PRODUÇÃO
               </div>
               {[
                 ['Entrada total de madeira', `${totalWoodTons.toFixed(3)} t`, 'var(--t1)'],
                 ['Valor total da madeira', money(totalWoodVal), 'var(--t1)'],
-                ['Custo médio por tonelada', money(avgTonPrice), '#f97316'],
+                ['Custo médio por tonelada', money(avgTonPrice), 'var(--cy)'],
                 ['—', '', ''],
                 ['Total m³ tanque', `${repTank.toFixed(3)} m³`, 'var(--t1)'],
                 ['Equivalente em toneladas (÷1,4)', `${repTons.toFixed(3)} t`, 'var(--t1)'],
@@ -583,7 +586,7 @@ export default function ProductionPage({ profile, can }: Props) {
         {/* ═══ FOLHA P/ CONFERENTE ═══ */}
         {tab==='folha' && (
           <div className="rounded-xl p-4" style={{background:'var(--s1)',border:'1px solid var(--bd)'}}>
-            <div style={{fontSize:'12px',fontWeight:700,color:'#f97316',marginBottom:'6px'}}>📄 Folha de Produção de Lâminas (1 por dia)</div>
+            <div style={{fontSize:'12px',fontWeight:700,color:'var(--cy)',marginBottom:'6px'}}>📄 Folha de Produção de Lâminas (1 por dia)</div>
             <div style={{fontSize:'12px',color:'var(--t2)',lineHeight:1.5,marginBottom:'14px'}}>
               Imprime a folha no formato usado na fábrica: cabeçalho (data, espessura, comprimento, largura, tipo),
               pacotes de folhas e os blocos de retalho bom e aproveitamento. O conferente anota toda a produção do dia à mão
@@ -595,7 +598,7 @@ export default function ProductionPage({ profile, can }: Props) {
             </div>
 
             <div style={{height:'1px',background:'var(--bd)',margin:'16px 0'}} />
-            <div style={{fontSize:'12px',fontWeight:700,color:'#f97316',marginBottom:'6px'}}>🛢️ Folha de Medição dos Tanques de Cozimento (7 dias)</div>
+            <div style={{fontSize:'12px',fontWeight:700,color:'var(--cy)',marginBottom:'6px'}}>🛢️ Folha de Medição dos Tanques de Cozimento (7 dias)</div>
             <div style={{fontSize:'12px',color:'var(--t2)',lineHeight:1.5,marginBottom:'12px'}}>
               Imprime uma folha semanal (7 dias) para medir os tanques: Tanque 1 e 2 (5 alturas + comprimento + média),
               e as sobras (3 alturas + comprimento + total). Anote a madeira e a largura de cada dia. Preenchida à mão na fábrica.
