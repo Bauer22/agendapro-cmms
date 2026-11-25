@@ -85,33 +85,54 @@ export default function LoginPage({ onLogin }: { onLogin?: () => void }) {
     setLoad(false)
   }
 
+  // caminho da engrenagem (reusado nas decorações de fundo)
+  const COG = "M33 2h14l2 7a30 30 0 0 1 7 2.8l6.5-3.5 9.9 9.9-3.5 6.5A30 30 0 0 1 71.7 32l7 2v14l-7 2a30 30 0 0 1-2.8 7l3.5 6.5-9.9 9.9-6.5-3.5a30 30 0 0 1-7 2.8l-2 7h-14l-2-7a30 30 0 0 1-7-2.8l-6.5 3.5-9.9-9.9 3.5-6.5A30 30 0 0 1 8.3 46l-7-2V30l7-2a30 30 0 0 1 2.8-7L7.6 14.5l9.9-9.9 6.5 3.5a30 30 0 0 1 7-2.8L33 2z"
+  const COG52 = "M22 1h8l1.5 5.5a18 18 0 0 1 4.5 1.8l5-2.8 5.7 5.7-2.8 5a18 18 0 0 1 1.8 4.5L51 22v8l-5.5 1.5a18 18 0 0 1-1.8 4.5l2.8 5-5.7 5.7-5-2.8a18 18 0 0 1-4.5 1.8L30 51h-8l-1.5-5.5a18 18 0 0 1-4.5-1.8l-5 2.8-5.7-5.7 2.8-5a18 18 0 0 1-1.8-4.5L1 30v-8l5.5-1.5a18 18 0 0 1 1.8-4.5l-2.8-5 5.7-5.7 5 2.8a18 18 0 0 1 4.5-1.8L22 1z"
+
   return (
     <>
       <style>{`
-        @keyframes g-spin { to { transform: rotate(360deg) } }
+        @keyframes g-spin  { to { transform: rotate(360deg) } }
+        @keyframes g-spinr { to { transform: rotate(-360deg) } }
         .g-inp:focus { border-color:var(--cy)!important; box-shadow:0 0 0 3px rgba(47,168,154,.15)!important; outline:none; background:#fff!important; }
         .g-btn:hover:not(:disabled) { box-shadow:0 8px 28px rgba(47,168,154,.4)!important; transform:translateY(-1px)!important; }
       `}</style>
 
-      {/* Fundo claro, conteúdo centralizado vertical e horizontalmente */}
-      <div style={{position:'fixed',inset:0,overflow:'auto',background:'var(--bg)',fontFamily:"'Sora',system-ui,sans-serif",
+      {/* Fundo claro industrial: brilhos, trama e engrenagens girando */}
+      <div style={{position:'fixed',inset:0,overflow:'auto',fontFamily:"'Sora',system-ui,sans-serif",
+        background:'radial-gradient(ellipse 60% 50% at 50% 0%, rgba(47,168,154,.10), transparent 70%),radial-gradient(ellipse 50% 40% at 100% 100%, rgba(232,130,44,.07), transparent 70%),var(--bg)',
         display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px 16px'}}>
 
-        {/* Logo no topo do bloco central */}
-        <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'6px',marginBottom:'22px'}}>
-          <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
-            <svg width="48" height="48" viewBox="0 0 52 52" fill="none">
-              <g style={{transformOrigin:'26px 26px',animation:'g-spin 8s linear infinite'}}>
-                <path d="M22 1h8l1.5 5.5a18 18 0 0 1 4.5 1.8l5-2.8 5.7 5.7-2.8 5a18 18 0 0 1 1.8 4.5L51 22v8l-5.5 1.5a18 18 0 0 1-1.8 4.5l2.8 5-5.7 5.7-5-2.8a18 18 0 0 1-4.5 1.8L30 51h-8l-1.5-5.5a18 18 0 0 1-4.5-1.8l-5 2.8-5.7-5.7 2.8-5a18 18 0 0 1-1.8-4.5L1 30v-8l5.5-1.5a18 18 0 0 1 1.8-4.5l-2.8-5 5.7-5.7 5 2.8a18 18 0 0 1 4.5-1.8L22 1z" fill="#fde3cf" stroke="#e8822c" strokeWidth="1.3"/>
-              </g>
-              <circle cx="26" cy="26" r="9" fill="#ffffff" stroke="#e8822c" strokeWidth="1.5"/>
-              <g style={{transformOrigin:'26px 26px',animation:'g-spin 5s linear infinite reverse'}}>
-                <circle cx="26" cy="26" r="5.5" fill="none" stroke="rgba(232,130,44,.4)" strokeWidth="1" strokeDasharray="3 2"/>
-              </g>
-              <circle cx="26" cy="26" r="2.8" fill="#e8822c"/>
-              <circle cx="26" cy="26" r="1.1" fill="#ffffff"/>
-            </svg>
-            <div style={{fontSize:'30px',fontWeight:800,color:'var(--t1)',letterSpacing:'-.6px',lineHeight:1}}>
+        {/* trama técnica sutil */}
+        <div style={{position:'absolute',inset:0,pointerEvents:'none',
+          backgroundImage:'linear-gradient(rgba(52,64,68,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(52,64,68,.045) 1px,transparent 1px)',
+          backgroundSize:'46px 46px',
+          WebkitMaskImage:'radial-gradient(ellipse 80% 80% at 50% 45%,#000,transparent 85%)',
+          maskImage:'radial-gradient(ellipse 80% 80% at 50% 45%,#000,transparent 85%)'}}/>
+
+        {/* engrenagens decorativas de fundo */}
+        <svg width="260" height="260" viewBox="0 0 80 80" fill="var(--cy)" style={{position:'absolute',top:'-70px',left:'-60px',opacity:.09,pointerEvents:'none',transformOrigin:'center',animation:'g-spin 48s linear infinite'}}><path d={COG}/><circle cx="40" cy="40" r="13" fill="var(--bg)"/></svg>
+        <svg width="320" height="320" viewBox="0 0 80 80" fill="var(--br)" style={{position:'absolute',bottom:'-90px',right:'-70px',opacity:.08,pointerEvents:'none',transformOrigin:'center',animation:'g-spinr 60s linear infinite'}}><path d={COG}/><circle cx="40" cy="40" r="13" fill="var(--bg)"/></svg>
+        <svg width="150" height="150" viewBox="0 0 80 80" fill="var(--cy)" style={{position:'absolute',top:'14%',right:'8%',opacity:.09,pointerEvents:'none',transformOrigin:'center',animation:'g-spinr 40s linear infinite'}}><path d={COG}/><circle cx="40" cy="40" r="13" fill="var(--bg)"/></svg>
+        <svg width="120" height="120" viewBox="0 0 80 80" fill="var(--cy)" style={{position:'absolute',bottom:'16%',left:'7%',opacity:.09,pointerEvents:'none',transformOrigin:'center',animation:'g-spin 54s linear infinite'}}><path d={COG}/><circle cx="40" cy="40" r="13" fill="var(--bg)"/></svg>
+
+        {/* esteira industrial no rodapé */}
+        <div style={{position:'absolute',left:0,right:0,bottom:'46px',height:'8px',opacity:.1,pointerEvents:'none',
+          background:'repeating-linear-gradient(90deg,var(--t2) 0 14px,transparent 14px 28px)'}}/>
+
+        {/* LOGO — duas engrenagens concêntricas girando em sentidos opostos */}
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'7px',marginBottom:'20px',position:'relative',zIndex:2}}>
+          <div style={{display:'flex',alignItems:'center',gap:'13px'}}>
+            <div style={{width:'52px',height:'52px',position:'relative',flexShrink:0}}>
+              <svg width="52" height="52" viewBox="0 0 52 52" fill="none" style={{position:'absolute',inset:0,transformOrigin:'center',animation:'g-spin 9s linear infinite'}}>
+                <path d={COG52} fill="#fde3cf" stroke="#e8822c" strokeWidth="1.6"/>
+              </svg>
+              <svg width="24" height="24" viewBox="0 0 52 52" fill="none" style={{position:'absolute',top:'14px',left:'14px',transformOrigin:'center',animation:'g-spinr 6s linear infinite'}}>
+                <path d={COG52} fill="#2fa89a"/>
+              </svg>
+              <div style={{position:'absolute',top:'50%',left:'50%',width:'7px',height:'7px',background:'#fff',border:'2px solid #2fa89a',borderRadius:'50%',transform:'translate(-50%,-50%)'}}/>
+            </div>
+            <div style={{fontSize:'32px',fontWeight:800,color:'var(--t1)',letterSpacing:'-.6px',lineHeight:1}}>
               industrial<span style={{color:'var(--br)'}}>8</span>
             </div>
           </div>
@@ -122,13 +143,14 @@ export default function LoginPage({ onLogin }: { onLogin?: () => void }) {
 
         {/* Data */}
         <div style={{fontSize:'10px',fontWeight:600,letterSpacing:'2px',color:'var(--t3)',background:'var(--s1)',
-          padding:'4px 18px',borderRadius:'14px',border:'1px solid var(--bd)',whiteSpace:'nowrap',textTransform:'uppercase',marginBottom:'14px'}}>
+          padding:'4px 18px',borderRadius:'14px',border:'1px solid var(--bd)',whiteSpace:'nowrap',textTransform:'uppercase',marginBottom:'14px',
+          position:'relative',zIndex:2,boxShadow:'var(--shadow)'}}>
           {dateStr}
         </div>
 
         {/* CARD — fixo, centralizado, sem animação */}
-        <div style={{width:'min(340px,92vw)',background:'var(--s1)',border:'1px solid var(--bd)',borderRadius:'20px',
-          padding:'24px 24px 20px',position:'relative',overflow:'hidden',boxShadow:'var(--shadow)'}}>
+        <div style={{width:'min(360px,92vw)',background:'var(--s1)',border:'1px solid var(--bd)',borderRadius:'22px',
+          padding:'26px 26px 20px',position:'relative',zIndex:2,overflow:'hidden',boxShadow:'var(--shadow)'}}>
           {/* Linha de topo verde água */}
           <div style={{position:'absolute',top:0,left:0,right:0,height:'2px',background:'linear-gradient(90deg,transparent,var(--cy),var(--cy2),var(--cy),transparent)'}}/>
 
