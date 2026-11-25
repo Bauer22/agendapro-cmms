@@ -8,11 +8,13 @@ import toast from 'react-hot-toast'
 type Props = { profile?: any; can?: any }
 
 const n3 = (v:number)=> (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:3,maximumFractionDigits:3})
+// aceita vírgula OU ponto (operador digita 2,6 no tablet)
+const num = (v:any)=> parseFloat(String(v==null?'':v).replace(',', '.')) || 0
 
 // linha de lâmina: espessura(mm) · comprimento · largura · nº folhas → metragem(m³)
-const calcLamina = (l:any)=> (Number(l.n_folhas)||0) * (Number(l.comprimento)||0) * (Number(l.largura)||0) * ((Number(l.espessura_mm)||0)/1000)
+const calcLamina = (l:any)=> num(l.n_folhas) * num(l.comprimento) * num(l.largura) * (num(l.espessura_mm)/1000)
 // linha de retalho: altura · comprimento · largura → metros(m³)
-const calcRetalho = (r:any)=> (Number(r.altura)||0) * (Number(r.comprimento)||0) * (Number(r.largura)||0)
+const calcRetalho = (r:any)=> num(r.altura) * num(r.comprimento) * num(r.largura)
 
 const linhaLaminaVazia = ()=>({ espessura_mm:'', comprimento:'', largura:'', n_folhas:'' })
 const linhaRetalhoVazia = ()=>({ altura:'', comprimento:'', largura:'' })
@@ -125,10 +127,10 @@ export default function RomaneioLamina({ profile }: Props) {
       // grava os itens
       const itens = [
         ...lamsValidas.map((l,i)=>({ company_id:cid, romaneio_id:romId, tipo:'lamina', ordem:i,
-          espessura_mm:Number(l.espessura_mm)||0, comprimento:Number(l.comprimento)||0, largura:Number(l.largura)||0,
-          n_folhas:Number(l.n_folhas)||0, metragem:calcLamina(l) })),
+          espessura_mm:num(l.espessura_mm), comprimento:num(l.comprimento), largura:num(l.largura),
+          n_folhas:num(l.n_folhas), metragem:calcLamina(l) })),
         ...retsValidos.map((r,i)=>({ company_id:cid, romaneio_id:romId, tipo:'retalho', ordem:i,
-          altura:Number(r.altura)||0, comprimento:Number(r.comprimento)||0, largura:Number(r.largura)||0,
+          altura:num(r.altura), comprimento:num(r.comprimento), largura:num(r.largura),
           metragem:calcRetalho(r) })),
       ]
       if (itens.length>0) await supabase.from('romaneios_lamina_itens').insert(itens)
@@ -317,10 +319,10 @@ export default function RomaneioLamina({ profile }: Props) {
               {laminas.map((l,i)=>(
                 <div key={i} style={{display:'contents'}}>
                   <div style={cel}>{i+1}</div>
-                  <input style={inStyle} type="number" value={l.espessura_mm} onChange={e=>setLam(i,'espessura_mm',e.target.value)} />
-                  <input style={inStyle} type="number" value={l.comprimento} onChange={e=>setLam(i,'comprimento',e.target.value)} />
-                  <input style={inStyle} type="number" value={l.largura} onChange={e=>setLam(i,'largura',e.target.value)} />
-                  <input style={inStyle} type="number" value={l.n_folhas} onChange={e=>setLam(i,'n_folhas',e.target.value)} />
+                  <input style={inStyle} type="text" inputMode="decimal" pattern="[0-9.,]*" value={l.espessura_mm} onChange={e=>setLam(i,'espessura_mm',e.target.value)} />
+                  <input style={inStyle} type="text" inputMode="decimal" pattern="[0-9.,]*" value={l.comprimento} onChange={e=>setLam(i,'comprimento',e.target.value)} />
+                  <input style={inStyle} type="text" inputMode="decimal" pattern="[0-9.,]*" value={l.largura} onChange={e=>setLam(i,'largura',e.target.value)} />
+                  <input style={inStyle} type="text" inputMode="numeric" pattern="[0-9]*" value={l.n_folhas} onChange={e=>setLam(i,'n_folhas',e.target.value)} />
                   <div style={{...cel,textAlign:'right',color:'var(--gn)',fontWeight:600}}>{n3(calcLamina(l))}</div>
                   <button onClick={()=>delLam(i)} style={{color:'var(--rd)',fontSize:'13px'}}>✕</button>
                 </div>
@@ -337,9 +339,9 @@ export default function RomaneioLamina({ profile }: Props) {
               {retalhos.map((r,i)=>(
                 <div key={i} style={{display:'contents'}}>
                   <div style={cel}>{i+1}</div>
-                  <input style={inStyle} type="number" value={r.altura} onChange={e=>setRet(i,'altura',e.target.value)} />
-                  <input style={inStyle} type="number" value={r.comprimento} onChange={e=>setRet(i,'comprimento',e.target.value)} />
-                  <input style={inStyle} type="number" value={r.largura} onChange={e=>setRet(i,'largura',e.target.value)} />
+                  <input style={inStyle} type="text" inputMode="decimal" pattern="[0-9.,]*" value={r.altura} onChange={e=>setRet(i,'altura',e.target.value)} />
+                  <input style={inStyle} type="text" inputMode="decimal" pattern="[0-9.,]*" value={r.comprimento} onChange={e=>setRet(i,'comprimento',e.target.value)} />
+                  <input style={inStyle} type="text" inputMode="decimal" pattern="[0-9.,]*" value={r.largura} onChange={e=>setRet(i,'largura',e.target.value)} />
                   <div style={{...cel,textAlign:'right',color:'var(--gn)',fontWeight:600}}>{n3(calcRetalho(r))}</div>
                   <button onClick={()=>delRet(i)} style={{color:'var(--rd)',fontSize:'13px'}}>✕</button>
                 </div>
