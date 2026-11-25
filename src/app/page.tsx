@@ -198,36 +198,36 @@ export default function App() {
 
   // ─── Splash ────────────────────────────────────────────────────────────────
   if (!splashDone) return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{background:'#06101e',overflow:'hidden'}}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{background:'var(--bg)',overflow:'hidden'}}>
       <style>{`@keyframes splashSpin{to{transform:rotate(360deg)}} @keyframes splashPulse{0%,100%{opacity:.3}50%{opacity:.7}} @keyframes splashFill{from{width:0}to{width:100%}}`}</style>
       {/* Grid */}
-      <div style={{position:'absolute',inset:0,backgroundImage:'linear-gradient(rgba(249,115,22,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(249,115,22,.025) 1px,transparent 1px)',backgroundSize:'50px 50px',animation:'splashPulse 4s ease-in-out infinite'}}/>
+      <div style={{position:'absolute',inset:0,backgroundImage:'linear-gradient(rgba(47,168,154,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(47,168,154,.04) 1px,transparent 1px)',backgroundSize:'50px 50px',animation:'splashPulse 4s ease-in-out infinite'}}/>
       {/* Glow */}
-      <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:'400px',height:'400px',borderRadius:'50%',background:'radial-gradient(circle,rgba(249,115,22,.1),transparent 65%)',animation:'splashPulse 3s ease-in-out infinite'}}/>
+      <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:'400px',height:'400px',borderRadius:'50%',background:'radial-gradient(circle,rgba(47,168,154,.12),transparent 65%)',animation:'splashPulse 3s ease-in-out infinite'}}/>
       {/* Content */}
       <div className="relative z-10 text-center px-6">
         {/* Animated gear */}
-        <svg width="72" height="72" viewBox="0 0 52 52" fill="none" className="mx-auto mb-4" style={{filter:'drop-shadow(0 0 16px rgba(249,115,22,.8))'}}>
+        <svg width="72" height="72" viewBox="0 0 52 52" fill="none" className="mx-auto mb-4" style={{filter:'drop-shadow(0 0 16px rgba(47,168,154,.5))'}}>
           <g style={{transformOrigin:'26px 26px',animation:'splashSpin 7s linear infinite'}}>
-            <path d="M22 1h8l1.5 5.5a18 18 0 0 1 4.5 1.8l5-2.8 5.7 5.7-2.8 5a18 18 0 0 1 1.8 4.5L51 22v8l-5.5 1.5a18 18 0 0 1-1.8 4.5l2.8 5-5.7 5.7-5-2.8a18 18 0 0 1-4.5 1.8L30 51h-8l-1.5-5.5a18 18 0 0 1-4.5-1.8l-5 2.8-5.7-5.7 2.8-5a18 18 0 0 1-1.8-4.5L1 30v-8l5.5-1.5a18 18 0 0 1 1.8-4.5l-2.8-5 5.7-5.7 5 2.8a18 18 0 0 1 4.5-1.8L22 1z" fill="#1e3a6e" stroke="#f97316" strokeWidth="1.3"/>
+            <path d="M22 1h8l1.5 5.5a18 18 0 0 1 4.5 1.8l5-2.8 5.7 5.7-2.8 5a18 18 0 0 1 1.8 4.5L51 22v8l-5.5 1.5a18 18 0 0 1-1.8 4.5l2.8 5-5.7 5.7-5-2.8a18 18 0 0 1-4.5 1.8L30 51h-8l-1.5-5.5a18 18 0 0 1-4.5-1.8l-5 2.8-5.7-5.7 2.8-5a18 18 0 0 1-1.8-4.5L1 30v-8l5.5-1.5a18 18 0 0 1 1.8-4.5l-2.8-5 5.7-5.7 5 2.8a18 18 0 0 1 4.5-1.8L22 1z" fill="#d7f0ec" stroke="#2fa89a" strokeWidth="1.3"/>
           </g>
-          <circle cx="26" cy="26" r="9" fill="#06101e" stroke="#f97316" strokeWidth="1.5"/>
+          <circle cx="26" cy="26" r="9" fill="#ffffff" stroke="#2fa89a" strokeWidth="1.5"/>
           <g style={{transformOrigin:'26px 26px',animation:'splashSpin 4s linear infinite reverse'}}>
-            <circle cx="26" cy="26" r="5.5" fill="none" stroke="rgba(249,115,22,.45)" strokeWidth="1" strokeDasharray="3 2"/>
+            <circle cx="26" cy="26" r="5.5" fill="none" stroke="rgba(47,168,154,.45)" strokeWidth="1" strokeDasharray="3 2"/>
           </g>
-          <circle cx="26" cy="26" r="2.8" fill="#f97316"/>
-          <circle cx="26" cy="26" r="1.1" fill="#06101e"/>
+          <circle cx="26" cy="26" r="2.8" fill="#2fa89a"/>
+          <circle cx="26" cy="26" r="1.1" fill="#ffffff"/>
         </svg>
         {/* Logo text */}
-        <div style={{fontSize:'36px',fontWeight:800,color:'#e8edf5',letterSpacing:'-.5px',lineHeight:1,fontFamily:"'Sora',system-ui",filter:'drop-shadow(0 0 12px rgba(249,115,22,.4))'}}>
-          industrial<span style={{color:'#f97316'}}>8</span>
+        <div style={{fontSize:'36px',fontWeight:800,color:'var(--t1)',letterSpacing:'-.5px',lineHeight:1,fontFamily:"'Sora',system-ui"}}>
+          industrial<span style={{color:'var(--br)'}}>8</span>
         </div>
-        <div style={{fontSize:'9px',letterSpacing:'3.5px',color:'rgba(249,115,22,.55)',fontWeight:700,textTransform:'uppercase',marginTop:'6px'}}>
+        <div style={{fontSize:'9px',letterSpacing:'3.5px',color:'var(--t3)',fontWeight:700,textTransform:'uppercase',marginTop:'6px'}}>
           MANUTENÇÃO INDUSTRIAL INTELIGENTE
         </div>
         {/* Progress bar */}
-        <div style={{width:'180px',height:'2px',background:'rgba(249,115,22,.15)',borderRadius:'2px',margin:'20px auto 0',overflow:'hidden'}}>
-          <div style={{height:'100%',background:'linear-gradient(90deg,#f97316,#fb923c)',borderRadius:'2px',animation:'splashFill 1.2s ease-out forwards',boxShadow:'0 0 8px rgba(249,115,22,.7)'}}/>
+        <div style={{width:'180px',height:'2px',background:'rgba(47,168,154,.18)',borderRadius:'2px',margin:'20px auto 0',overflow:'hidden'}}>
+          <div style={{height:'100%',background:'linear-gradient(90deg,var(--cy),var(--cy2))',borderRadius:'2px',animation:'splashFill 1.2s ease-out forwards'}}/>
         </div>
       </div>
     </div>
@@ -347,34 +347,34 @@ export default function App() {
     <div className="fixed inset-0 flex flex-col" style={{background:'var(--bg)'}}>
       {/* HEADER */}
       <style>{`@keyframes hdrGearSpin { to { transform: rotate(360deg) } }`}</style>
-      <header className="flex-shrink-0" style={{paddingTop:'var(--sat)',background:'rgba(10,22,40,.98)',backdropFilter:'blur(20px)',borderBottom:'1px solid rgba(249,115,22,.25)',zIndex:50,boxShadow:'0 2px 20px rgba(249,115,22,.1)'}}>
-        {/* Orange top line */}
-        <div style={{height:'2px',background:'linear-gradient(90deg,transparent,#f97316,#fb923c,#f97316,transparent)',position:'absolute',top:0,left:0,right:0}}/>
+      <header className="flex-shrink-0" style={{paddingTop:'var(--sat)',background:'rgba(255,255,255,.82)',backdropFilter:'blur(20px)',borderBottom:'1px solid var(--bd)',zIndex:50,boxShadow:'0 2px 16px -6px rgba(0,0,0,.12)'}}>
+        {/* Teal top line */}
+        <div style={{height:'2px',background:'linear-gradient(90deg,transparent,var(--cy),var(--cy2),var(--cy),transparent)',position:'absolute',top:0,left:0,right:0}}/>
         <div className="h-14 flex items-center justify-between px-3" style={{marginTop:'2px'}}>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2">
               <svg width="30" height="30" viewBox="0 0 52 52" fill="none" style={{flexShrink:0}}>
                 <g style={{transformOrigin:'26px 26px',animation:'hdrGearSpin 8s linear infinite'}}>
-                  <path d="M22 1h8l1.5 5.5a18 18 0 0 1 4.5 1.8l5-2.8 5.7 5.7-2.8 5a18 18 0 0 1 1.8 4.5L51 22v8l-5.5 1.5a18 18 0 0 1-1.8 4.5l2.8 5-5.7 5.7-5-2.8a18 18 0 0 1-4.5 1.8L30 51h-8l-1.5-5.5a18 18 0 0 1-4.5-1.8l-5 2.8-5.7-5.7 2.8-5a18 18 0 0 1-1.8-4.5L1 30v-8l5.5-1.5a18 18 0 0 1 1.8-4.5l-2.8-5 5.7-5.7 5 2.8a18 18 0 0 1 4.5-1.8L22 1z" fill="#1e3a6e" stroke="#f97316" strokeWidth="1.2"/>
+                  <path d="M22 1h8l1.5 5.5a18 18 0 0 1 4.5 1.8l5-2.8 5.7 5.7-2.8 5a18 18 0 0 1 1.8 4.5L51 22v8l-5.5 1.5a18 18 0 0 1-1.8 4.5l2.8 5-5.7 5.7-5-2.8a18 18 0 0 1-4.5 1.8L30 51h-8l-1.5-5.5a18 18 0 0 1-4.5-1.8l-5 2.8-5.7-5.7 2.8-5a18 18 0 0 1-1.8-4.5L1 30v-8l5.5-1.5a18 18 0 0 1 1.8-4.5l-2.8-5 5.7-5.7 5 2.8a18 18 0 0 1 4.5-1.8L22 1z" fill="#fde3cf" stroke="#e8822c" strokeWidth="1.2"/>
                 </g>
-                <circle cx="26" cy="26" r="9" fill="#06101e" stroke="#f97316" strokeWidth="1.5"/>
+                <circle cx="26" cy="26" r="9" fill="#ffffff" stroke="#e8822c" strokeWidth="1.5"/>
                 <g style={{transformOrigin:'26px 26px',animation:'hdrGearSpin 5s linear infinite reverse'}}>
-                  <circle cx="26" cy="26" r="5.5" fill="none" stroke="rgba(249,115,22,.4)" strokeWidth="1" strokeDasharray="3 2"/>
+                  <circle cx="26" cy="26" r="5.5" fill="none" stroke="rgba(232,130,44,.4)" strokeWidth="1" strokeDasharray="3 2"/>
                 </g>
-                <circle cx="26" cy="26" r="2.8" fill="#f97316"/>
-                <circle cx="26" cy="26" r="1.1" fill="#06101e"/>
+                <circle cx="26" cy="26" r="2.8" fill="#e8822c"/>
+                <circle cx="26" cy="26" r="1.1" fill="#ffffff"/>
               </svg>
               <div style={{display:'flex',flexDirection:'column'}}>
-                <div style={{fontSize:'15px',fontWeight:800,color:'#e8edf5',letterSpacing:'-.3px',lineHeight:1,fontFamily:"'Sora',system-ui"}}>
-                  industrial<span style={{color:'#f97316'}}>8</span>
+                <div style={{fontSize:'15px',fontWeight:800,color:'var(--t1)',letterSpacing:'-.3px',lineHeight:1,fontFamily:"'Sora',system-ui"}}>
+                  industrial<span style={{color:'var(--br)'}}>8</span>
                 </div>
-                <div style={{fontSize:'7px',letterSpacing:'1.5px',color:'rgba(249,115,22,.5)',fontWeight:700,textTransform:'uppercase'}}>{DPT[now.getDay()]}, {now.getDate()} {MPT[now.getMonth()]}</div>
+                <div style={{fontSize:'7px',letterSpacing:'1.5px',color:'var(--t3)',fontWeight:700,textTransform:'uppercase'}}>{DPT[now.getDay()]}, {now.getDate()} {MPT[now.getMonth()]}</div>
               </div>
             </div>
           </div>
           <div className="flex items-center gap-1">
             <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs" style={{background:'var(--s2)',border:'1px solid var(--bd)',color:'var(--t2)'}}>
-              <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{background:'rgba(0,212,255,.15)',color:'var(--cy)'}}>
+              <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{background:'rgba(47,168,154,.15)',color:'var(--cy)'}}>
                 {(profile?.display_name||profile?.email||'?')[0].toUpperCase()}
               </div>
               <div>
@@ -390,12 +390,12 @@ export default function App() {
       </header>
 
       {/* NAV */}
-      <nav className="nav-scroll flex-shrink-0 flex overflow-x-auto" style={{background:'var(--bg2)',borderBottom:'1px solid var(--bd)',scrollbarWidth:'thin',scrollbarColor:'rgba(249,115,22,.5) transparent',gap:'3px',padding:'7px 8px',boxShadow:'0 4px 16px -8px rgba(0,0,0,.6)'}}>
+      <nav className="nav-scroll flex-shrink-0 flex overflow-x-auto" style={{background:'var(--s1)',borderBottom:'1px solid var(--bd)',scrollbarWidth:'thin',scrollbarColor:'rgba(47,168,154,.5) transparent',gap:'3px',padding:'7px 8px',boxShadow:'0 4px 16px -10px rgba(0,0,0,.25)'}}>
         <style>{`
           .nav-scroll::-webkit-scrollbar{height:7px}
           .nav-scroll::-webkit-scrollbar-track{background:transparent}
-          .nav-scroll::-webkit-scrollbar-thumb{background:rgba(249,115,22,.45);border-radius:4px}
-          .nav-scroll::-webkit-scrollbar-thumb:hover{background:rgba(249,115,22,.8)}
+          .nav-scroll::-webkit-scrollbar-thumb{background:rgba(47,168,154,.45);border-radius:4px}
+          .nav-scroll::-webkit-scrollbar-thumb:hover{background:rgba(47,168,154,.8)}
           .nav-ico{font-size:18px;line-height:1}
           .nav-ico svg{width:19px;height:19px}
         `}</style>
@@ -406,10 +406,10 @@ export default function App() {
               className="flex-shrink-0 flex flex-col items-center justify-center gap-1 cursor-pointer relative"
               style={{
                 padding:'9px 15px', borderRadius:'11px',
-                background: on ? 'linear-gradient(135deg,#f97316,#c2410c)' : 'transparent',
-                border: `1px solid ${on ? 'rgba(249,115,22,.5)' : 'transparent'}`,
-                boxShadow: on ? '0 4px 12px -3px rgba(249,115,22,.5)' : 'none',
-                color: on ? '#fff' : 'var(--t3)',
+                background: on ? 'linear-gradient(135deg,var(--cy),var(--cy2))' : 'transparent',
+                border: `1px solid ${on ? 'var(--cy)' : 'transparent'}`,
+                boxShadow: on ? '0 4px 12px -3px rgba(47,168,154,.45)' : 'none',
+                color: on ? '#fff' : 'var(--t2)',
                 fontFamily:'Sora,system-ui,sans-serif', fontSize:'10px', fontWeight:700,
                 textTransform:'uppercase', letterSpacing:'.3px', minWidth:'64px',
                 transition:'all .18s'
