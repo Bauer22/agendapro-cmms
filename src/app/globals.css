@@ -2,27 +2,62 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ═══════════════════════════════════════════════════════════════
+   TEMA iOS CLARO — mesmos nomes de variáveis, valores claros.
+   Todas as telas herdam daqui, então o sistema inteiro muda junto.
+   ═══════════════════════════════════════════════════════════════ */
 :root {
-  --bg:#0a1322;--bg2:#0e1b30;--s1:#13223c;--s2:#182a46;--s3:#20365a;
-  --bd:rgba(148,163,184,.14);--bd2:rgba(249,115,22,.45);
-  --cy:#f97316;--cy2:#fb923c;--am:#eab308;--gn:#22c55e;--rd:#ef4444;--pu:#a78bfa;
-  --t1:#eef2f8;--t2:#9fb0c8;--t3:#5f7694;
-  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.5);
+  /* fundos: fundo geral cinza iOS, cartões/campos claros */
+  --bg:#e3e3e8;        /* fundo geral (cinza iOS um pouco mais escuro) */
+  --bg2:#ededf2;       /* fundo secundário */
+  --s1:#ffffff;        /* cartões */
+  --s2:#f4f4f7;        /* campos / inputs */
+  --s3:#ececf1;        /* realces sutis */
+
+  /* bordas e separadores (escuro translúcido sobre claro) */
+  --bd:rgba(60,60,67,.14);
+  --bd2:rgba(249,115,22,.5);
+
+  /* cores de destaque — laranja da marca mantido, demais em tom iOS */
+  --cy:#f97316;  --cy2:#fb923c;   /* laranja Industrial8 */
+  --am:#ff9500;                   /* âmbar iOS */
+  --gn:#34c759;                   /* verde iOS */
+  --rd:#ff3b30;                   /* vermelho iOS */
+  --pu:#5856d6;                   /* roxo iOS */
+
+  /* textos: ESCUROS sobre fundo claro (invertidos do tema dark) */
+  --t1:#1c1c1e;   /* texto principal */
+  --t2:#55555a;   /* texto secundário */
+  --t3:#8e8e93;   /* texto terciário / labels */
+
+  /* sombra em volta de TODA a borda (efeito card elevado iOS) */
+  --shadow:0 0 0 .5px rgba(0,0,0,.04), 0 2px 6px rgba(0,0,0,.08), 0 10px 28px -6px rgba(0,0,0,.14);
+
   --sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);
 }
+
 *,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;background:var(--bg);color:var(--t1);font-family:'Sora',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
-body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
-  background:radial-gradient(ellipse 80% 35% at 50% 0%,rgba(249,115,22,.06),transparent),
-  linear-gradient(rgba(249,115,22,.018) 1px,transparent 1px),
-  linear-gradient(90deg,rgba(249,115,22,.018) 1px,transparent 1px);
-  background-size:100%,48px 48px,48px 48px}
-::-webkit-scrollbar{width:6px;height:6px}
-::-webkit-scrollbar-thumb{background:rgba(148,163,184,.25);border-radius:3px}
+html,body{
+  height:100%;
+  background:var(--bg);
+  color:var(--t1);
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Sora',system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  letter-spacing:-0.01em;
+}
+
+/* fundo claro liso (removido o grid/gradiente/glow do tema escuro) */
+body::before{content:none}
+
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:rgba(60,60,67,.22);border-radius:4px}
 ::-webkit-scrollbar-thumb:hover{background:rgba(249,115,22,.5)}
+
 .page-enter{animation:pageUp .16s ease}
 @keyframes pageUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 @keyframes spin{to{transform:rotate(360deg)}}
-@keyframes glow{0%,100%{filter:drop-shadow(0 0 5px rgba(249,115,22,.7))}50%{filter:drop-shadow(0 0 14px rgba(249,115,22,1))}}
+@keyframes glow{0%,100%{filter:drop-shadow(0 0 4px rgba(249,115,22,.5))}50%{filter:drop-shadow(0 0 10px rgba(249,115,22,.8))}}
 .spin{animation:spin .8s linear infinite}
 .glow{animation:glow 2s ease-in-out infinite}
