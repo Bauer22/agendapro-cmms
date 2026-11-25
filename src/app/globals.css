@@ -4,41 +4,44 @@
 @tailwind utilities;
 
 /* ═══════════════════════════════════════════════════════════════
-   TEMA iOS CLARO — mesmos nomes de variáveis, valores claros.
-   Todas as telas herdam daqui, então o sistema inteiro muda junto.
+   TEMA iOS CLARO — paleta natural, verde água nas guias.
+   Mesmos nomes de variáveis; o sistema inteiro herda daqui.
    ═══════════════════════════════════════════════════════════════ */
 :root {
-  /* fundos: fundo geral cinza iOS (um tom mais fechado), cartões/campos claros */
-  --bg:#d9d9e0;        /* fundo geral (cinza iOS um pouco mais escuro) */
+  /* fundos: cinza iOS suave, cartões/campos claros */
+  --bg:#d9d9e0;        /* fundo geral */
   --bg2:#e6e6ec;       /* fundo secundário */
   --s1:#ffffff;        /* cartões */
-  --s2:#f1f1f5;        /* campos / inputs */
-  --s3:#e9e9ef;        /* realces sutis */
+  --s2:#eef0f1;        /* campos / inputs / fundo de pills */
+  --s3:#e4e7e8;        /* realces sutis */
 
-  /* bordas e separadores (escuro translúcido sobre claro) */
-  --bd:rgba(60,60,67,.12);
-  --bd2:rgba(249,115,22,.5);
+  /* bordas e separadores */
+  --bd:rgba(52,64,68,.13);
+  --bd2:rgba(48,176,160,.5);
 
-  /* cores de destaque — laranja da marca mantido, demais em tom iOS */
-  --cy:#f97316;  --cy2:#fb923c;   /* laranja Industrial8 */
-  --am:#ff9500;                   /* âmbar iOS */
-  --gn:#30b84f;                   /* verde iOS (um pouco mais fechado p/ contraste) */
-  --rd:#ff3b30;                   /* vermelho iOS */
-  --pu:#5856d6;                   /* roxo iOS */
+  /* ── PALETA NATURAL ──────────────────────────────────────────
+     verde água (teal) é o novo acento de UI (guias/seleção).
+     O laranja da marca fica como destaque pontual.
+     Demais cores dessaturadas p/ um visual mais calmo. */
+  --cy:#2fa89a;  --cy2:#3cc0b0;   /* VERDE ÁGUA — acento principal da interface */
+  --am:#c8820a;                   /* âmbar fechado (menos berrante) */
+  --gn:#2f9e5a;                   /* verde fechado */
+  --rd:#d64b43;                   /* vermelho suave */
+  --pu:#6b6cc4;                   /* roxo/índigo suave */
+  --br:#e8822c;                   /* laranja da marca (Industrial8) p/ logo/destaque */
 
-  /* textos: ESCUROS sobre fundo claro — contraste uniforme (padrão iOS) */
-  --t1:#1c1c1e;   /* texto principal — quase preto */
-  --t2:#4a4a4f;   /* texto secundário — cinza escuro legível */
-  --t3:#7c7c82;   /* texto terciário / labels — cinza médio */
+  /* textos: escuros com contraste uniforme */
+  --t1:#1c2024;   /* principal — quase preto */
+  --t2:#474d52;   /* secundário */
+  --t3:#787f85;   /* terciário / labels */
 
-  /* SOMBRA SOFISTICADA — luz na borda de cima (highlight) + sombra embaixo.
-     Dá o efeito de uma fonte de luz ressaltando a borda do cartão (bisel iOS). */
+  /* SOMBRA SOFISTICADA — luz na borda de cima + profundidade embaixo */
   --shadow:
-    inset 0 1px 0 rgba(255,255,255,.9),           /* brilho superior interno */
-    0 0 0 .5px rgba(0,0,0,.05),                    /* contorno fino */
-    0 1px 2px rgba(0,0,0,.05),                     /* sombra de contato */
-    0 6px 16px -4px rgba(0,0,0,.12),               /* sombra média */
-    0 16px 40px -12px rgba(0,0,0,.14);             /* sombra ampla / profundidade */
+    inset 0 1px 0 rgba(255,255,255,.9),
+    0 0 0 .5px rgba(0,0,0,.05),
+    0 1px 2px rgba(0,0,0,.05),
+    0 6px 16px -4px rgba(0,0,0,.12),
+    0 16px 40px -12px rgba(0,0,0,.14);
 
   --sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);
 }
@@ -54,16 +57,24 @@ html,body{
   letter-spacing:-0.01em;
 }
 
-/* fundo claro liso (removido o grid/gradiente/glow do tema escuro) */
 body::before{content:none}
 
 ::-webkit-scrollbar{width:7px;height:7px}
-::-webkit-scrollbar-thumb{background:rgba(60,60,67,.22);border-radius:4px}
-::-webkit-scrollbar-thumb:hover{background:rgba(249,115,22,.5)}
+::-webkit-scrollbar-thumb{background:rgba(52,64,68,.22);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:rgba(47,168,154,.5)}
+
+/* ── PILLS / BADGES DE CATEGORIA ─────────────────────────────────
+   deixa as etiquetas (Motorista, Cliente, Fornecedor…) com fundo
+   sólido suave e texto escuro, saindo do visual "lavado".
+   Vale para qualquer badge marcado com .badge / [class*="badge"]. */
+.badge, .pill, [class*="badge"]{
+  font-weight:600;
+  letter-spacing:-.01em;
+}
 
 .page-enter{animation:pageUp .16s ease}
 @keyframes pageUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 @keyframes spin{to{transform:rotate(360deg)}}
-@keyframes glow{0%,100%{filter:drop-shadow(0 0 4px rgba(249,115,22,.5))}50%{filter:drop-shadow(0 0 10px rgba(249,115,22,.8))}}
+@keyframes glow{0%,100%{filter:drop-shadow(0 0 4px rgba(47,168,154,.5))}50%{filter:drop-shadow(0 0 10px rgba(47,168,154,.8))}}
 .spin{animation:spin .8s linear infinite}
 .glow{animation:glow 2s ease-in-out infinite}
