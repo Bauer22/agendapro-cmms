@@ -215,24 +215,12 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
     return data
   }
 
-  // + Lançamento: salva a última linha (se preenchida) e abre nova herdando medidas
+  // + Lançamento: apenas ADICIONA uma linha nova na grade (herda medidas da última,
+  // menos folhas/altura). NÃO salva — o salvamento é feito no botão "Salvar" (todas de uma vez).
   async function addLinha(cat:string) {
     const arr = grades[cat]||[]
-    const u = arr[arr.length-1]
-    // se a última linha está completa, salva ela antes de abrir a próxima
-    if (u && volLinha(cat, u) > 0) {
-      try {
-        const p = await gravarPacote(cat, u)
-        if (p) toast.success(`Pacote #${String(p.numero).padStart(6,'0')} salvo ✅`)
-        // nova linha herda medidas; remove a que foi salva da grade (já está no banco)
-        setGrades(g=>({...g, [cat]: [{ espessura: u.espessura||'', comprimento: u.comprimento||'', largura: u.largura||'', folhas:'', altura:'' }]}))
-        await loadDia()
-        return
-      } catch(e:any){ toast.error('Erro ao salvar: '+e.message); return }
-    }
-    // sem linha preenchida: só adiciona (herda da última se houver)
-    const base = u || {}
-    setGrades(g=>({...g, [cat]: [...(g[cat]||[]), { espessura: base.espessura||'', comprimento: base.comprimento||'', largura: base.largura||'', folhas:'', altura:'' }]}))
+    const u = arr[arr.length-1] || {}
+    setGrades(g=>({...g, [cat]: [...(g[cat]||[]), { espessura: u.espessura||'', comprimento: u.comprimento||'', largura: u.largura||'', folhas:'', altura:'' }]}))
   }
   const delLinha = (cat:string, i:number)=> setGrades(g=>({...g, [cat]: g[cat].filter((_,idx)=>idx!==i)}))
 
@@ -600,9 +588,9 @@ function Secao({ cat, label, cor, arr, saving, setLin, addLinha, delLinha, salva
       <div className="flex items-center gap-2 flex-wrap mt-1">
         <Btn onClick={()=>addLinha(cat)} size="sm" style={{background:cor,color:'#fff',border:'none'}}>+ Lançamento</Btn>
         {arr.length>0 && <>
-          <span style={{fontSize:'12px',fontWeight:800,color:'var(--gn)'}}>Total: {m3fmt(total)} m³</span>
-          <Btn onClick={()=>salvarCategoria(cat,false)} size="sm" variant="secondary" disabled={saving===cat}>{saving===cat?'...':'💾 Salvar'}</Btn>
-          <Btn onClick={()=>salvarCategoria(cat,true)} size="sm" variant="primary" disabled={saving===cat}>🏷️ Salvar + Etiquetas</Btn>
+          <span style={{fontSize:'12px',fontWeight:800,color:'var(--gn)'}}>{arr.length} linha(s) · Total: {m3fmt(total)} m³</span>
+          <Btn onClick={()=>salvarCategoria(cat,false)} size="sm" variant="primary" disabled={saving===cat}>{saving===cat?'Salvando...':`💾 Salvar ${arr.length} pacote(s)`}</Btn>
+          <Btn onClick={()=>salvarCategoria(cat,true)} size="sm" variant="secondary" disabled={saving===cat}>🏷️ + Etiquetas</Btn>
         </>}
       </div>
     </div>
