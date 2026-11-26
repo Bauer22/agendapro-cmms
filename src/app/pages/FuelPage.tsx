@@ -39,7 +39,7 @@ export default function FuelPage({ profile, can }: Props) {
 
   async function loadMeta() {
     const [v, m, mot, forn] = await Promise.all([
-      supabase.from('veiculos').select('id,placa,tipo,transportador_nome').eq('status',true).order('placa'),
+      supabase.from('veiculos').select('id,placa,tipo,transportador_id,transportador_nome').eq('status',true).order('placa'),
       supabase.from('machines').select('id,name,icon'),
       supabase.from('cadastros').select('id,nome_razao').eq('is_motorista',true).eq('status',true),
       supabase.from('cadastros').select('id,nome_razao').eq('is_fornecedor',true).eq('status',true),
@@ -123,6 +123,27 @@ export default function FuelPage({ profile, can }: Props) {
             .eq('id', editing.machine_id)
           if (eHm) console.error('Falha ao atualizar horímetro da máquina:', eHm.message)
         }
+      }
+
+      // ── DESCONTO NO FRETE ──────────────────────────────────────────
+      // Se o abastecimento é de um VEÍCULO DE TRANSPORTADORA, o diesel
+      // abastecido abate o frete que devemos a ela: cria um pagamento de
+      // frete (frete_pagamentos) com o valor do abastecimento.
+      // Só em NOVO registro (não na edição) e quando há transportadora + valor.
+      if (!error && !editing.id && ve?.transportador_id && obj.total_value && obj.total_value > 0) {
+        try {
+          await supabase.from('frete_pagamentos').insert({
+            company_id: profile?.company_id||null,
+            transportadora_id: ve.transportador_id,
+            transportadora_nome: ve.transportador_nome || null,
+            payment_date: obj.record_date,
+            value: obj.total_value,
+            method: 'Diesel/Abastecimento',
+            notes: `Abastecimento ${obj.veiculo_placa||''} · ${lt.toLocaleString('pt-BR')}L × ${money(up||0)} — desconto de frete`,
+            created_by: profile?.display_name||'',
+          })
+          toast.success(`Abatido ${money(obj.total_value)} do frete de ${ve.transportador_nome||'transportadora'} 🧾`)
+        } catch (e:any) { console.error('Falha ao lançar desconto de frete:', e?.message) }
       }
 
     } else if (tab === 'entradas') {
@@ -704,6 +725,21 @@ export default function FuelPage({ profile, can }: Props) {
           <SelectComCadastro label="Veículo" tipo="veiculo" value={editing.veiculo_id||''} onChange={(v:string)=>setEditing((e:any)=>({...e,veiculo_id:v,machine_id:''}))}
             options={veiculos.map(v=>({value:v.id,label:`${v.placa} (${v.tipo})`}))}
             companyId={profile?.company_id} createdBy={profile?.display_name} onCreatedRefresh={() => loadMeta()} />
+          {/* Aviso: veículo de transportadora → desconta do frete */}
+          {(() => {
+            const ve = veiculos.find(v=>v.id===editing.veiculo_id)
+            if (!editing.id && ve?.transportador_id) {
+              const lt = parseFloat(editing.liters)||0
+              const up = editing.unit_price ? parseFloat(editing.unit_price) : custoMedioL
+              const val = lt*up
+              return (
+                <div className="rounded-lg p-2 mb-2" style={{background:'rgba(47,168,154,.08)',border:'1px solid rgba(47,168,154,.3)',fontSize:'11px',color:'var(--t2)'}}>
+                  🧾 Veículo de <b>{ve.transportador_nome}</b>. {val>0 ? <>Vai abater <b style={{color:'var(--cy)'}}>{money(val)}</b> do frete dela.</> : 'O valor do abastecimento será abatido do frete dela.'}
+                </div>
+              )
+            }
+            return null
+          })()}
           <Select label="Máquina" value={editing.machine_id||''} onChange={(v:string)=>setEditing((e:any)=>({...e,machine_id:v,veiculo_id:''}))}
             options={[{value:'',label:'Nenhuma (é veículo)'}, ...machines.map(m=>({value:m.id,label:`${m.icon||'⚙️'} ${m.name}`}))]} />
           <div className="grid grid-cols-2 gap-x-3">
