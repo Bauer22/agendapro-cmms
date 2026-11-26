@@ -69,15 +69,47 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
 
   async function fecharDia() {
     if (pacotes.length===0) { toast.error('Nenhum pacote lançado neste dia'); return }
-    if (!await confirm('Fechar a produção deste dia? Ele vai para o histórico (você ainda pode editar por lá).')) return
+    if (!await confirm('Fechar a produção deste dia? Ele vai para o histórico e entra na Produção/mês.')) return
+    const cid = profile?.company_id||null
+    const tanque = cab.tanque_m3 ? num(cab.tanque_m3) : 0
+    const sobra  = cab.sobra_m3  ? num(cab.sobra_m3)  : 0
+    const tanqueLiquido = tanque - sobra               // tanque laminado efetivo
+    const produzido = pacotes.reduce((s,p)=>s+(+p.volume_m3||0),0)  // soma dos pacotes do dia
+    const CONV = 1.4
+
+    // 1) marca o dia como fechado
     const { error } = await supabase.from('producao_dia').upsert({
-      company_id: profile?.company_id||null, dia,
-      madeira: cab.madeira||null, tanque_m3: cab.tanque_m3?num(cab.tanque_m3):0, sobra_m3: cab.sobra_m3?num(cab.sobra_m3):0,
+      company_id: cid, dia,
+      madeira: cab.madeira||null, tanque_m3: tanque, sobra_m3: sobra,
       fechado: true, fechado_em: new Date().toISOString(), fechado_por: profile?.display_name||'',
     }, { onConflict:'company_id,dia' })
     if (error) { toast.error('Erro: '+error.message); return }
+
+    // 2) cria/atualiza o LANÇAMENTO do dia (production_records) com a produção dos pacotes
+    //    → é isso que alimenta o KPI Produção/mês, o custo e o estoque de madeira.
+    try {
+      // remove lançamento anterior desse mesmo dia (evita duplicar ao refechar)
+      await supabase.from('production_records').delete().eq('prod_date', dia).eq('company_id', cid)
+      if (produzido > 0 || tanqueLiquido > 0) {
+        await supabase.from('production_records').insert({
+          company_id: cid,
+          prod_date: dia,
+          wood_class: cab.madeira || null,
+          tank_m3: tanqueLiquido,
+          tank_tons: tanqueLiquido / CONV,
+          produced_m3: produzido,
+          yield_pct: produzido > 0 ? tanqueLiquido / produzido : null,
+          notes: `Gerado dos pacotes (${pacotes.length} pacote(s))`,
+          created_by: profile?.display_name||'',
+        })
+      }
+      // refecha o estoque de madeira do mês (o consumo mudou)
+      const mes = (dia||'').slice(0,7)
+      if (mes) await supabase.rpc('fn_refechar_cascata', { p_mes_inicial: mes, p_company_id: cid })
+    } catch (e) { /* silencioso */ }
+
     setFechado(true)
-    toast.success('Dia fechado ✅ (disponível no histórico)')
+    toast.success('Dia fechado ✅ e lançado na Produção do mês')
   }
 
   async function reabrirDiaNasGrades(diaAlvo:string) {
@@ -101,9 +133,16 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
   // exclui um dia inteiro do histórico (pacotes + cabeçalho)
   async function excluirDia(h:any) {
     if (!await confirm(`Excluir TODA a produção do dia ${new Date(h.dia+'T00:00:00').toLocaleDateString('pt-BR')}? (${h._qtd} pacote(s)) Esta ação não pode ser desfeita.`)) return
+    const cid = profile?.company_id||null
     const q1 = await supabase.from('producao_pacotes').delete().eq('dia', h.dia)
     if (q1.error) { toast.error('Erro ao excluir pacotes: '+q1.error.message); return }
     await supabase.from('producao_dia').delete().eq('dia', h.dia)
+    // remove também o lançamento de produção do dia (production_records) e refecha o estoque
+    try {
+      await supabase.from('production_records').delete().eq('prod_date', h.dia).eq('company_id', cid)
+      const mes = String(h.dia||'').slice(0,7)
+      if (mes) await supabase.rpc('fn_refechar_cascata', { p_mes_inicial: mes, p_company_id: cid })
+    } catch (e) { /* silencioso */ }
     toast.success('Dia excluído')
     loadHistorico()
     if (dia===h.dia) loadDia()
