@@ -196,12 +196,17 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
   // helpers de grade por categoria
   const setLin = (cat:string, i:number, campo:string, v:string)=>
     setGrades(g=>({...g, [cat]: g[cat].map((l,idx)=> idx===i?{...l,[campo]:v}:l)}))
-  // grava UM pacote no banco a partir de uma linha
-  async function gravarPacote(cat:string, l:any) {
-    const { data: numeroPacote, error: eNum } = await supabase.rpc('fn_proximo_numero_pacote', { p_company_id: profile?.company_id||null })
-    if (eNum) throw eNum
-    const obj:any = {
-      company_id: profile?.company_id||null, dia, numero: numeroPacote, categoria: cat,
+  // pega o próximo número de pacote SEM RPC (evita o erro de rede ERR_NAME_NOT_RESOLVED).
+  // lê o maior número já gravado e soma 1. Retorna a base; o lote numera a partir dela.
+  async function proximoNumeroBase(): Promise<number> {
+    const { data } = await supabase.from('producao_pacotes')
+      .select('numero').order('numero',{ascending:false}).limit(1).maybeSingle()
+    return ((data?.numero)||0) + 1
+  }
+  // monta o objeto de um pacote a partir de uma linha + número já definido
+  function objPacote(cat:string, l:any, numero:number) {
+    return {
+      company_id: profile?.company_id||null, dia, numero, categoria: cat,
       tipo_lamina_id: null, tipo_nome: null,
       espessura: usaFolhas(cat) ? (num(l.espessura)/1000) : null,
       largura: num(l.largura), comprimento: num(l.comprimento),
@@ -210,7 +215,11 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
       volume_m3: volLinha(cat, l),
       created_by: profile?.display_name||'',
     }
-    const { data, error } = await supabase.from('producao_pacotes').insert(obj).select().single()
+  }
+  // grava UM pacote (usado na edição rápida) — numeração sem RPC
+  async function gravarPacote(cat:string, l:any) {
+    const numero = await proximoNumeroBase()
+    const { data, error } = await supabase.from('producao_pacotes').insert(objPacote(cat,l,numero)).select().single()
     if (error) throw error
     return data
   }
@@ -229,16 +238,16 @@ export default function PacotesProducao({ profile }: { profile: UserProfile|null
     const validas = arr.filter(l=> volLinha(cat, l) > 0)
     if (validas.length===0) { toast.error('Preencha ao menos uma linha completa'); return }
     setSaving(cat)
-    const salvos:any[] = []
     try {
-      for (const l of validas) {
-        const data = await gravarPacote(cat, l)
-        if (data) salvos.push(data)
-      }
-      toast.success(`${salvos.length} ${cat} lançado(s) ✅`)
+      // numera todas a partir da base (1 consulta) e insere TODAS de uma vez (1 insert)
+      const base = await proximoNumeroBase()
+      const objs = validas.map((l,i)=> objPacote(cat, l, base + i))
+      const { data: salvos, error } = await supabase.from('producao_pacotes').insert(objs).select()
+      if (error) throw error
+      toast.success(`${salvos?.length||validas.length} ${cat} lançado(s) ✅`)
       setGrades(g=>({...g, [cat]: []}))   // limpa a grade da categoria
       await loadDia()
-      if (imprimir) salvos.forEach(p=>imprimirEtiqueta(p))
+      if (imprimir && salvos) salvos.forEach((p:any)=>imprimirEtiqueta(p))
     } catch(e:any){ toast.error('Erro: '+e.message) }
     finally { setSaving('') }
   }
